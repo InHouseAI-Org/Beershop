@@ -2,6 +2,28 @@
 
 A full-stack admin panel application built with React.js and Express.js, featuring JWT authentication and role-based access control.
 
+## ⚖️ LICENSE - IMPORTANT
+
+**© 2026 InHouseAI-Org. All Rights Reserved.**
+
+This is **proprietary software**. The code is made public for demonstration and portfolio purposes only.
+
+🚫 **YOU MAY NOT:**
+- Copy, reproduce, or duplicate any part of this code
+- Modify, adapt, or create derivative works
+- Distribute, sublicense, or transfer this software
+- Use this software for commercial purposes
+- Reverse engineer or decompile this software
+
+✅ **YOU MAY:**
+- View the code for learning and reference purposes only
+
+**Unauthorized use, copying, or distribution of this software is strictly prohibited and may result in legal action.**
+
+For licensing inquiries, contact: InHouseAI-Org
+
+See the [LICENSE](LICENSE) file for full terms and conditions.
+
 ## Features
 
 ### Super Admin
