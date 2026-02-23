@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { Search, X } from 'lucide-react';
 import api from '../utils/api';
 
 const AddSales = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [creditHolders, setCreditHolders] = useState([]);
-  const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -39,7 +36,6 @@ const AddSales = () => {
 
       setProducts(productsRes.data);
       setCreditHolders(creditHoldersRes.data);
-      setInventory(inventoryRes.data);
 
       // Initialize product data with opening stock from inventory
       const initialData = {};
