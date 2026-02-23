@@ -18,6 +18,8 @@ const OrdersTab = () => {
     orderData: [],
     tax: '',
     misc: '',
+    discount: '',
+    scheme: '',
     paymentOutstandingDate: ''
   });
 
@@ -66,6 +68,8 @@ const OrdersTab = () => {
         orderData: order.order_data || [],
         tax: order.tax || '',
         misc: order.misc || '',
+        discount: order.discount || '',
+        scheme: order.scheme || '',
         paymentOutstandingDate: order.payment_outstanding_date ? new Date(order.payment_outstanding_date).toISOString().split('T')[0] : ''
       });
     } else {
@@ -76,6 +80,8 @@ const OrdersTab = () => {
         orderData: [],
         tax: '',
         misc: '',
+        discount: '',
+        scheme: '',
         paymentOutstandingDate: ''
       });
     }
@@ -92,6 +98,8 @@ const OrdersTab = () => {
       orderData: [],
       tax: '',
       misc: '',
+      discount: '',
+      scheme: '',
       paymentOutstandingDate: ''
     });
   };
@@ -376,7 +384,7 @@ const OrdersTab = () => {
                 Payment & Additional Charges
               </h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="form-group">
                   <label htmlFor="tax" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
                     Tax (₹)
@@ -412,24 +420,58 @@ const OrdersTab = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="paymentOutstandingDate" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
-                    Payment Outstanding Date
+                  <label htmlFor="scheme" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                    Scheme (₹)
                   </label>
                   <input
-                    type="date"
-                    id="paymentOutstandingDate"
+                    type="number"
+                    id="scheme"
                     className="form-control"
-                    value={formData.paymentOutstandingDate}
-                    onChange={(e) => setFormData({ ...formData, paymentOutstandingDate: e.target.value })}
+                    value={formData.scheme}
+                    onChange={(e) => setFormData({ ...formData, scheme: e.target.value })}
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    style={{ fontSize: '1.125rem', padding: '1rem' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="discount" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                    Discount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    id="discount"
+                    className="form-control"
+                    value={formData.discount}
+                    onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
                 </div>
               </div>
 
+              <div className="form-group">
+                <label htmlFor="paymentOutstandingDate" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                  Payment Outstanding Date
+                </label>
+                <input
+                  type="date"
+                  id="paymentOutstandingDate"
+                  className="form-control"
+                  value={formData.paymentOutstandingDate}
+                  onChange={(e) => setFormData({ ...formData, paymentOutstandingDate: e.target.value })}
+                  style={{ fontSize: '1.125rem', padding: '1rem' }}
+                />
+              </div>
+
               {/* Order Summary */}
               <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '2px solid #dee2e6' }}>
                 <h4 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem' }}>Order Summary</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Items Total</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700' }}>
@@ -439,19 +481,31 @@ const OrdersTab = () => {
                   <div>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Tax</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700' }}>
-                      ₹{parseFloat(formData.tax || 0).toFixed(2)}
+                      +₹{parseFloat(formData.tax || 0).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Miscellaneous</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700' }}>
-                      ₹{parseFloat(formData.misc || 0).toFixed(2)}
+                      +₹{parseFloat(formData.misc || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Scheme</p>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700', color: '#f57c00' }}>
+                      -₹{parseFloat(formData.scheme || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Discount</p>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700', color: '#f57c00' }}>
+                      -₹{parseFloat(formData.discount || 0).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Grand Total</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.5rem', fontWeight: '700', color: '#2e7d32' }}>
-                      ₹{(getTotalOrderValue(formData.orderData) + parseFloat(formData.tax || 0) + parseFloat(formData.misc || 0)).toFixed(2)}
+                      ₹{(getTotalOrderValue(formData.orderData) + parseFloat(formData.tax || 0) + parseFloat(formData.misc || 0) - parseFloat(formData.scheme || 0) - parseFloat(formData.discount || 0)).toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -499,9 +553,12 @@ const OrdersTab = () => {
               <th>Order Date</th>
               <th>Distributor</th>
               <th>Items</th>
-              <th>Total</th>
+              <th>Items Total</th>
               <th>Tax</th>
               <th>Misc</th>
+              <th>Scheme</th>
+              <th>Discount</th>
+              <th>Grand Total</th>
               <th>Payment Date</th>
               <th>Actions</th>
             </tr>
@@ -509,7 +566,7 @@ const OrdersTab = () => {
           <tbody>
             {orders.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                <td colSpan="11" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
                   No orders found. Create your first order!
                 </td>
               </tr>
@@ -535,6 +592,11 @@ const OrdersTab = () => {
                   <td>₹{getTotalOrderValue(order.order_data).toFixed(2)}</td>
                   <td>₹{parseFloat(order.tax || 0).toFixed(2)}</td>
                   <td>₹{parseFloat(order.misc || 0).toFixed(2)}</td>
+                  <td style={{ color: '#f57c00' }}>₹{parseFloat(order.scheme || 0).toFixed(2)}</td>
+                  <td style={{ color: '#f57c00' }}>₹{parseFloat(order.discount || 0).toFixed(2)}</td>
+                  <td style={{ fontWeight: '700', color: '#2e7d32' }}>
+                    ₹{(getTotalOrderValue(order.order_data) + parseFloat(order.tax || 0) + parseFloat(order.misc || 0) - parseFloat(order.scheme || 0) - parseFloat(order.discount || 0)).toFixed(2)}
+                  </td>
                   <td>{order.payment_outstanding_date ? new Date(order.payment_outstanding_date).toLocaleDateString() : '-'}</td>
                   <td>
                     <button
@@ -654,13 +716,25 @@ const OrdersTab = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '1rem', color: '#666' }}>Tax:</span>
                   <span style={{ fontSize: '1.125rem', fontWeight: '600' }}>
-                    ₹{parseFloat(selectedOrder.tax || 0).toFixed(2)}
+                    +₹{parseFloat(selectedOrder.tax || 0).toFixed(2)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '1rem', color: '#666' }}>Miscellaneous:</span>
                   <span style={{ fontSize: '1.125rem', fontWeight: '600' }}>
-                    ₹{parseFloat(selectedOrder.misc || 0).toFixed(2)}
+                    +₹{parseFloat(selectedOrder.misc || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '1rem', color: '#666' }}>Scheme:</span>
+                  <span style={{ fontSize: '1.125rem', fontWeight: '600', color: '#f57c00' }}>
+                    -₹{parseFloat(selectedOrder.scheme || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '1rem', color: '#666' }}>Discount:</span>
+                  <span style={{ fontSize: '1.125rem', fontWeight: '600', color: '#f57c00' }}>
+                    -₹{parseFloat(selectedOrder.discount || 0).toFixed(2)}
                   </span>
                 </div>
                 <div style={{
@@ -675,7 +749,9 @@ const OrdersTab = () => {
                     ₹{(
                       getTotalOrderValue(selectedOrder.order_data) +
                       parseFloat(selectedOrder.tax || 0) +
-                      parseFloat(selectedOrder.misc || 0)
+                      parseFloat(selectedOrder.misc || 0) -
+                      parseFloat(selectedOrder.scheme || 0) -
+                      parseFloat(selectedOrder.discount || 0)
                     ).toFixed(2)}
                   </span>
                 </div>

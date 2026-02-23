@@ -278,7 +278,8 @@ const AddSales = () => {
               max={new Date().toISOString().split('T')[0]}
               style={{
                 fontSize: '1.25rem',
-                padding: '1.25rem',
+                widows: '100%',
+                overflow: 'hidden',
                 borderColor: dateError ? '#dc3545' : '#e0e0e0',
                 borderWidth: dateError ? '3px' : '2px'
               }}
@@ -326,30 +327,15 @@ const AddSales = () => {
               <thead>
                 <tr>
                   <th style={{ minWidth: '150px' }}>Product | उत्पाद</th>
-                  <th style={{ minWidth: '120px' }}>Opening Stock<br/>प्रारंभिक स्टॉक</th>
                   <th style={{ minWidth: '120px' }}>Closing Stock<br/>समापन स्टॉक</th>
                   <th style={{ minWidth: '120px' }}>Sale<br/>बिक्री</th>
+                  <th style={{ minWidth: '120px' }}>Opening Stock<br/>प्रारंभिक स्टॉक</th>
                 </tr>
               </thead>
               <tbody>
                 {products.map(product => (
                   <tr key={product.id}>
                     <td style={{ fontWeight: '600' }}>{product.product_name}</td>
-                    <td>
-                      <input
-                        type="number"
-                        className="form-control"
-                        value={productData[product.id].openingStock}
-                        readOnly
-                        style={{
-                          backgroundColor: '#e9ecef',
-                          cursor: 'not-allowed',
-                          fontWeight: '700',
-                          color: '#000',
-                          textAlign: 'center'
-                        }}
-                      />
-                    </td>
                     <td>
                       <input
                         type="number"
@@ -380,6 +366,21 @@ const AddSales = () => {
                         }}
                       />
                     </td>
+                    <td>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={productData[product.id].openingStock}
+                        readOnly
+                        style={{
+                          backgroundColor: '#e9ecef',
+                          cursor: 'not-allowed',
+                          fontWeight: '700',
+                          color: '#000',
+                          textAlign: 'center'
+                        }}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -393,9 +394,9 @@ const AddSales = () => {
             Cash & UPI Collection | नकद और UPI संग्रह
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="form-group">
-              <label htmlFor="cashCollected">Cash Collected | नकद एकत्रित</label>
+              <label htmlFor="cashCollected" style={{fontSize: '1rem'}}>Cash Collected | नकद एकत्रित</label>
               <input
                 type="number"
                 id="cashCollected"
@@ -410,7 +411,7 @@ const AddSales = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="upiCollected">UPI Collected | UPI एकत्रित</label>
+              <label htmlFor="upiCollected" style={{fontSize: '1rem'}}>UPI Collected | UPI एकत्रित</label>
               <input
                 type="number"
                 id="upiCollected"
@@ -443,7 +444,7 @@ const AddSales = () => {
 
           {creditEntries.map((entry, index) => (
             <div key={index} style={{ marginBottom: '1.5rem', padding: '1.5rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Credit Holder | उधार धारक</label>
                   <select

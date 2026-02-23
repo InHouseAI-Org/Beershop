@@ -39,7 +39,7 @@ const getOrder = async (req, res) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { distributorId, orderData, tax, misc, paymentOutstandingDate } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate } = req.body;
 
     if (!distributorId) {
       return res.status(400).json({ error: 'Please provide distributor ID' });
@@ -63,6 +63,8 @@ const createOrder = async (req, res) => {
       orderData,
       tax: tax || 0,
       misc: misc || 0,
+      discount: discount || 0,
+      scheme: scheme || 0,
       paymentOutstandingDate: paymentOutstandingDate || null
     });
 
@@ -87,6 +89,7 @@ const createOrder = async (req, res) => {
     }
 
     // Calculate total order amount and add to distributor outstanding
+    // Total = order value + tax + misc - scheme - discount
     let totalAmount = 0;
 
     // Sum up all product costs from orderData
@@ -98,9 +101,11 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // Add tax and misc
+    // Add tax and misc, subtract scheme and discount
     totalAmount += parseFloat(tax || 0);
     totalAmount += parseFloat(misc || 0);
+    totalAmount -= parseFloat(scheme || 0);
+    totalAmount -= parseFloat(discount || 0);
 
     console.log(`Adding ₹${totalAmount} to distributor ${distributorId} outstanding...`);
     await db.incrementDistributorOutstanding(distributorId, totalAmount);
@@ -115,7 +120,7 @@ const createOrder = async (req, res) => {
 const updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { distributorId, orderData, tax, misc, paymentOutstandingDate } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate } = req.body;
 
     const order = await db.getOrderById(id);
 
@@ -156,10 +161,13 @@ const updateOrder = async (req, res) => {
     }
 
     // Update distributor outstanding if order total has changed
-    if (orderData !== undefined || tax !== undefined || misc !== undefined) {
+    // Total = order value + tax + misc - scheme - discount
+    if (orderData !== undefined || tax !== undefined || misc !== undefined || discount !== undefined || scheme !== undefined) {
       const oldOrderData = order.order_data || [];
       const oldTax = parseFloat(order.tax || 0);
       const oldMisc = parseFloat(order.misc || 0);
+      const oldDiscount = parseFloat(order.discount || 0);
+      const oldScheme = parseFloat(order.scheme || 0);
 
       // Calculate old total
       let oldTotal = 0;
@@ -168,7 +176,7 @@ const updateOrder = async (req, res) => {
           oldTotal += parseFloat(item.total);
         }
       });
-      oldTotal += oldTax + oldMisc;
+      oldTotal += oldTax + oldMisc - oldScheme - oldDiscount;
 
       // Calculate new total
       let newTotal = 0;
@@ -180,6 +188,8 @@ const updateOrder = async (req, res) => {
       });
       newTotal += parseFloat(tax !== undefined ? (tax || 0) : oldTax);
       newTotal += parseFloat(misc !== undefined ? (misc || 0) : oldMisc);
+      newTotal -= parseFloat(discount !== undefined ? (discount || 0) : oldDiscount);
+      newTotal -= parseFloat(scheme !== undefined ? (scheme || 0) : oldScheme);
 
       // Calculate the difference
       const totalDifference = newTotal - oldTotal;
@@ -198,6 +208,8 @@ const updateOrder = async (req, res) => {
     if (orderData !== undefined) updates.orderData = orderData;
     if (tax !== undefined) updates.tax = tax;
     if (misc !== undefined) updates.misc = misc;
+    if (discount !== undefined) updates.discount = discount;
+    if (scheme !== undefined) updates.scheme = scheme;
     if (paymentOutstandingDate !== undefined) updates.paymentOutstandingDate = paymentOutstandingDate || null;
 
     const updatedOrder = await db.updateOrder(id, updates);

@@ -106,25 +106,24 @@ const UserDashboard = () => {
         </div>
 
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1.5rem' }}>
             <button onClick={() => changeMonth(-1)} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>
               ←
             </button>
-            <h2 style={{ color: '#000', margin: 0, textAlign: 'center' }}>
+            <h2 style={{fontSize: '1.2rem', color: '#000', margin: 0, textAlign: 'center' }}>
               {monthNames[month]} {year}<br/>
-              <span style={{ fontSize: '1rem', fontWeight: '400' }}>{monthNamesHindi[month]} {year}</span>
+              <span style={{ fontSize: '0.8rem', fontWeight: '400' }}>{monthNamesHindi[month]} {year}</span>
             </h2>
             <button onClick={() => changeMonth(1)} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>
               →
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', width: '100%', overflowX: 'auto', gap: '0.5rem' }}>
             {dayNames.map((day, idx) => (
               <div key={day} style={{
                 textAlign: 'center',
                 fontWeight: '700',
-                padding: '0.5rem',
                 borderBottom: '2px solid #000'
               }}>
                 {day}<br/>
@@ -133,7 +132,7 @@ const UserDashboard = () => {
             ))}
 
             {Array.from({ length: startingDayOfWeek }).map((_, idx) => (
-              <div key={`empty-${idx}`} style={{ padding: '1rem' }}></div>
+              <div key={`empty-${idx}`} style={{ padding: '0rem' }}></div>
             ))}
 
             {Array.from({ length: daysInMonth }).map((_, idx) => {
@@ -144,7 +143,7 @@ const UserDashboard = () => {
                   key={day}
                   style={{
                     textAlign: 'center',
-                    padding: '1rem',
+                    padding: '0.5rem',
                     border: '1px solid #e0e0e0',
                     borderRadius: '8px',
                     backgroundColor: hasSale ? '#000' : 'white',
