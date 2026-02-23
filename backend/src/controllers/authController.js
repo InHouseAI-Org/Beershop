@@ -6,7 +6,12 @@ const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Username:', username);
+    console.log('Password provided:', !!password);
+
     if (!username || !password) {
+      console.log('Missing username or password');
       return res.status(400).json({ error: 'Please provide username and password' });
     }
 
@@ -16,9 +21,12 @@ const login = async (req, res) => {
 
     // Check if super admin
     const superAdmin = await db.getSuperAdmin();
+    console.log('Super admin from DB:', superAdmin ? { username: superAdmin.username, hasPassword: !!superAdmin.password } : null);
+
     if (superAdmin && superAdmin.username === username) {
       user = superAdmin;
       role = 'superadmin';
+      console.log('User identified as superadmin');
     } else {
       // Check if regular admin
       const admin = await db.getAdminByUsername(username);
@@ -26,6 +34,7 @@ const login = async (req, res) => {
         user = admin;
         role = 'admin';
         organisationId = admin.organisation_id;
+        console.log('User identified as admin');
       } else {
         // Check if regular user
         const regularUser = await db.getUserByUsername(username);
@@ -33,17 +42,24 @@ const login = async (req, res) => {
           user = regularUser;
           role = 'user';
           organisationId = regularUser.organisation_id;
+          console.log('User identified as regular user');
         }
       }
     }
 
     if (!user) {
+      console.log('User not found');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Verify password
+    console.log('Comparing password...');
+    console.log('Stored hash:', user.password);
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log('Password match:', isMatch);
+
     if (!isMatch) {
+      console.log('Password mismatch - returning 401');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
