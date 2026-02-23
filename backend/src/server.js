@@ -37,7 +37,13 @@ app.get('/api/health', (req, res) => {
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0'; // Listen on all network interfaces
 
-app.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
-  console.log(`Local network access: http://192.168.1.36:${PORT}`);
-});
+// Only start server if not in serverless environment (Vercel)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
+    console.log(`Local network access: http://192.168.1.36:${PORT}`);
+  });
+}
+
+// Export for Vercel serverless
+module.exports = app;
