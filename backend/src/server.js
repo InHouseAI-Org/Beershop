@@ -34,6 +34,32 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
+// Debug endpoint (remove after troubleshooting)
+app.get('/api/debug', async (req, res) => {
+  const db = require('./models/data');
+  try {
+    const superAdmin = await db.getSuperAdmin();
+    res.json({
+      envVars: {
+        hasDatabaseUrl: !!process.env.DATABASE_URL,
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        nodeEnv: process.env.NODE_ENV
+      },
+      superAdminExists: !!superAdmin,
+      superAdminUsername: superAdmin ? superAdmin.username : null
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+      envVars: {
+        hasDatabaseUrl: !!process.env.DATABASE_URL,
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        nodeEnv: process.env.NODE_ENV
+      }
+    });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0'; // Listen on all network interfaces
 
