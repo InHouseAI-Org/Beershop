@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Search, X } from 'lucide-react';
 import api from '../utils/api';
 
 const AddSales = () => {
@@ -20,6 +21,9 @@ const AddSales = () => {
   const [creditEntries, setCreditEntries] = useState([]);
   const [remarks, setRemarks] = useState('');
   const [dateError, setDateError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [hideEmpty, setHideEmpty] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -95,6 +99,29 @@ const AddSales = () => {
     setCreditEntries(creditEntries.filter((_, i) => i !== index));
   };
 
+  const setProductToZero = (productId) => {
+    setProductData({
+      ...productData,
+      [productId]: {
+        ...productData[productId],
+        closingStock: productData[productId].openingStock.toString(),
+        sale: '0'
+      }
+    });
+  };
+
+  const filteredProducts = products.filter(product => {
+    // Search filter
+    const matchesSearch = product.product_name.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Hide empty filter
+    const hasData = hideEmpty
+      ? (productData[product.id]?.closingStock || productData[product.id]?.sale)
+      : true;
+
+    return matchesSearch && hasData;
+  });
+
   const checkDateAvailability = async (selectedDate) => {
     setDateError('');
 
@@ -132,10 +159,11 @@ const AddSales = () => {
   };
 
 
+  const handlePreview = () => {
+    setShowPreview(true);
+  };
+
   const handleSubmit = async () => {
-    if (!window.confirm('Are you sure you want to submit? | क्या आप सबमिट करना चाहते हैं?')) {
-      return;
-    }
 
     // Final check for duplicate sale before submission using local time
     try {
@@ -156,12 +184,12 @@ const AddSales = () => {
       });
 
       if (existingSale) {
-        setError('Sale already exists for this date. Cannot submit duplicate. | इस तारीख के लिए बिक्री पहले से मौजूद है। डुप्लिकेट सबमिट नहीं कर सकते।');
+        alert('❌ Sale already exists for this date. Cannot submit duplicate.\n\nइस तारीख के लिए बिक्री पहले से मौजूद है। डुप्लिकेट सबमिट नहीं कर सकते।');
         return;
       }
     } catch (err) {
       console.error('Error checking for duplicates:', err);
-      setError('Failed to verify duplicate. Please try again. | डुप्लिकेट सत्यापित करने में विफल। कृपया पुनः प्रयास करें।');
+      alert('❌ Failed to verify duplicate. Please try again.\n\nडुप्लिकेट सत्यापित करने में विफल। कृपया पुनः प्रयास करें।');
       return;
     }
 
@@ -232,10 +260,11 @@ const AddSales = () => {
       await api.post('/sales', payload);
 
       // Show success message and redirect
-      alert('Sales report submitted successfully! | बिक्री रिपोर्ट सफलतापूर्वक सबमिट की गई!');
+      alert('✅ Sales report submitted successfully!\n\nबिक्री रिपोर्ट सफलतापूर्वक सबमिट की गई!');
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit sale | बिक्री सबमिट करने में विफल');
+      const errorMessage = err.response?.data?.error || 'Failed to submit sale';
+      alert(`❌ ${errorMessage}\n\nबिक्री सबमिट करने में विफल`);
     }
   };
 
@@ -322,7 +351,80 @@ const AddSales = () => {
             </p>
           </div>
 
-          <div className="table-container" style={{ overflowX: 'auto' }}>
+          {/* Search and Filter Controls */}
+          <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="form-group" style={{ marginBottom: 0, position: 'relative' }}>
+              <div style={{ position: 'relative' }}>
+                <Search
+                  size={20}
+                  style={{
+                    position: 'absolute',
+                    left: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#666',
+                    pointerEvents: 'none'
+                  }}
+                />
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search products... | उत्पाद खोजें..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    fontSize: '1.125rem',
+                    padding: '1rem 1rem 1rem 3rem',
+                    borderWidth: '2px'
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '1rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#666',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+              <input
+                type="checkbox"
+                id="hideEmpty"
+                checked={hideEmpty}
+                onChange={(e) => setHideEmpty(e.target.checked)}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+              <label htmlFor="hideEmpty" style={{ margin: 0, fontSize: '1rem', cursor: 'pointer', userSelect: 'none' }}>
+                Hide products without data | खाली उत्पाद छुपाएं
+              </label>
+            </div>
+
+            <div style={{ padding: '0.75rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#2e7d32', fontWeight: '600' }}>
+                Showing {filteredProducts.length} of {products.length} products | {filteredProducts.length} में से {products.length} उत्पाद दिखाए जा रहे हैं
+              </p>
+            </div>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="table-container desktop-only" style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
@@ -330,10 +432,11 @@ const AddSales = () => {
                   <th style={{ minWidth: '120px' }}>Closing Stock<br/>समापन स्टॉक</th>
                   <th style={{ minWidth: '120px' }}>Sale<br/>बिक्री</th>
                   <th style={{ minWidth: '120px' }}>Opening Stock<br/>प्रारंभिक स्टॉक</th>
+                  <th style={{ minWidth: '100px' }}>Actions<br/>क्रियाएं</th>
                 </tr>
               </thead>
               <tbody>
-                {products.map(product => (
+                {filteredProducts.map(product => (
                   <tr key={product.id}>
                     <td style={{ fontWeight: '600' }}>{product.product_name}</td>
                     <td>
@@ -381,11 +484,115 @@ const AddSales = () => {
                         }}
                       />
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => setProductToZero(product.id)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', whiteSpace: 'nowrap' }}
+                      >
+                        Zero
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="mobile-only">
+            {filteredProducts.map(product => (
+              <div
+                key={product.id}
+                style={{
+                  marginBottom: '1rem',
+                  padding: '1.25rem',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '12px',
+                  backgroundColor: '#fff'
+                }}
+              >
+                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: '700', color: '#000' }}>
+                  {product.product_name}
+                </h3>
+
+                <div style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '0.875rem', color: '#666', marginBottom: '0.25rem' }}>
+                    Opening Stock | प्रारंभिक स्टॉक
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#000' }}>
+                    {productData[product.id].openingStock}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Closing Stock | समापन स्टॉक
+                  </label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={productData[product.id].closingStock}
+                    onChange={(e) => handleProductChange(product.id, 'closingStock', e.target.value)}
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter closing stock"
+                    style={{
+                      fontSize: '1.25rem',
+                      padding: '1rem',
+                      borderColor: productData[product.id].closingStock ? '#28a745' : '#e0e0e0',
+                      borderWidth: '2px'
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Sale | बिक्री
+                  </label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={productData[product.id].sale}
+                    onChange={(e) => handleProductChange(product.id, 'sale', e.target.value)}
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter sale"
+                    style={{
+                      fontSize: '1.25rem',
+                      padding: '1rem',
+                      borderColor: productData[product.id].sale ? '#28a745' : '#e0e0e0',
+                      borderWidth: '2px'
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setProductToZero(product.id)}
+                  className="btn btn-secondary"
+                  style={{
+                    width: '100%',
+                    fontSize: '1.125rem',
+                    padding: '1rem',
+                    marginTop: '0.5rem'
+                  }}
+                >
+                  Set to Zero | शून्य पर सेट करें
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {filteredProducts.length === 0 && (
+            <div style={{ padding: '3rem', textAlign: 'center', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+              <p style={{ margin: 0, fontSize: '1.125rem', color: '#666' }}>
+                No products found. Try adjusting your search or filters.<br/>
+                कोई उत्पाद नहीं मिला। अपनी खोज या फ़िल्टर समायोजित करने का प्रयास करें।
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Cash & UPI Collection */}
@@ -518,7 +725,7 @@ const AddSales = () => {
         {/* Submit Button */}
         <div className="card">
           <button
-            onClick={handleSubmit}
+            onClick={handlePreview}
             className="btn btn-success"
             disabled={dateError}
             style={{
@@ -530,10 +737,180 @@ const AddSales = () => {
               cursor: dateError ? 'not-allowed' : 'pointer'
             }}
           >
-            Submit Sales Report | बिक्री रिपोर्ट सबमिट करें
+            Preview & Submit | पूर्वावलोकन और सबमिट करें
           </button>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div className="modal-overlay" onClick={() => setShowPreview(false)}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0 }}>Confirm Sales Report | रिपोर्ट की पुष्टि करें</h2>
+              <button
+                onClick={() => setShowPreview(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Date */}
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.875rem', color: '#666', marginBottom: '0.25rem' }}>Date | तारीख</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#000' }}>
+                {new Date(saleDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </div>
+            </div>
+
+            {/* Products Summary */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem', color: '#000' }}>
+                Products Sold | बेचे गए उत्पाद
+              </h3>
+              <div style={{ maxHeight: '250px', overflowY: 'auto', border: '2px solid #e0e0e0', borderRadius: '8px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead style={{ position: 'sticky', top: 0, backgroundColor: '#000', color: 'white' }}>
+                    <tr>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem' }}>Product</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem' }}>Sale</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products
+                      .filter(product => productData[product.id]?.sale && parseFloat(productData[product.id].sale) > 0)
+                      .map((product, index) => (
+                        <tr key={product.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f8f9fa' }}>
+                          <td style={{ padding: '0.75rem', fontWeight: '600' }}>{product.product_name}</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '700', color: '#2e7d32' }}>
+                            {parseFloat(productData[product.id].sale).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    {products.filter(product => productData[product.id]?.sale && parseFloat(productData[product.id].sale) > 0).length === 0 && (
+                      <tr>
+                        <td colSpan="2" style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
+                          No sales recorded | कोई बिक्री दर्ज नहीं
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Cash & UPI */}
+            <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50' }}>
+                <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.25rem' }}>Cash | नकद</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1b5e20' }}>
+                  ₹{parseFloat(cashCollected || 0).toFixed(2)}
+                </div>
+              </div>
+              <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '1px solid #2196f3' }}>
+                <div style={{ fontSize: '0.875rem', color: '#1565c0', marginBottom: '0.25rem' }}>UPI</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0d47a1' }}>
+                  ₹{parseFloat(upiCollected || 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            {/* Total Collection */}
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#fff3e0', borderRadius: '8px', border: '2px solid #ff9800' }}>
+              <div style={{ fontSize: '0.875rem', color: '#e65100', marginBottom: '0.25rem' }}>
+                Total Collection | कुल संग्रह
+              </div>
+              <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#e65100' }}>
+                ₹{(parseFloat(cashCollected || 0) + parseFloat(upiCollected || 0)).toFixed(2)}
+              </div>
+            </div>
+
+            {/* Credit */}
+            {creditEntries.filter(e => e.creditHolderId && e.amount).length > 0 && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem', color: '#000' }}>
+                  Credit Given | उधार दिया गया
+                </h3>
+                <div style={{ border: '2px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                  {creditEntries
+                    .filter(entry => entry.creditHolderId && entry.amount)
+                    .map((entry, index) => {
+                      const holder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            padding: '0.75rem 1rem',
+                            backgroundColor: index % 2 === 0 ? '#fff' : '#f8f9fa',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <span style={{ fontWeight: '600' }}>{holder?.name || 'Unknown'}</span>
+                          <span style={{ fontWeight: '700', color: '#dc3545' }}>
+                            ₹{parseFloat(entry.amount).toFixed(2)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+                <div style={{ marginTop: '0.5rem', padding: '0.75rem', backgroundColor: '#ffebee', borderRadius: '8px', textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#c62828', marginRight: '0.5rem' }}>Total Credit:</span>
+                  <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#c62828' }}>
+                    ₹{creditEntries
+                      .filter(e => e.creditHolderId && e.amount)
+                      .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0)
+                      .toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Remarks */}
+            {remarks && (
+              <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
+                <div style={{ fontSize: '0.875rem', color: '#666', marginBottom: '0.5rem' }}>Remarks | टिप्पणियाँ</div>
+                <div style={{ fontSize: '1rem', color: '#000', whiteSpace: 'pre-wrap' }}>{remarks}</div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="btn btn-secondary"
+                style={{ flex: 1 }}
+              >
+                Edit | संपादित करें
+              </button>
+              <button
+                onClick={() => {
+                  setShowPreview(false);
+                  handleSubmit();
+                }}
+                className="btn btn-success"
+                style={{ flex: 1 }}
+              >
+                Confirm & Submit | पुष्टि करें और सबमिट करें
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

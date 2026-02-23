@@ -448,3 +448,22 @@ select.form-control {
 .table-container::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* Responsive visibility utilities */
+.desktop-only {
+  display: none;
+}
+
+.mobile-only {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .desktop-only {
+    display: block;
+  }
+
+  .mobile-only {
+    display: none;
+  }
+}
