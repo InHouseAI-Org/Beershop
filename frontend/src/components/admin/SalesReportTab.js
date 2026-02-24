@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../utils/api';
 import { Calendar, CreditCard, TrendingUp, User, X, FileText, Package, MessageSquare, Wallet, CheckCircle, AlertCircle } from 'lucide-react';
 
@@ -22,11 +22,27 @@ const SalesReportTab = () => {
   });
   const [allocationError, setAllocationError] = useState('');
 
-  useEffect(() => {
-    fetchSalesData();
+  const fetchAllocatedBalances = useCallback(async (salesData) => {
+    try {
+      const balancesResponse = await api.get('/balances');
+      const balances = balancesResponse.data;
+
+      // Create map of sales_id to balance allocation
+      const balanceMap = {};
+      balances.forEach(balance => {
+        if (balance.sales_id) {
+          balanceMap[balance.sales_id] = balance;
+        }
+      });
+
+      setAllocatedBalances(balanceMap);
+    } catch (err) {
+      console.error('Error fetching allocated balances:', err);
+      // Non-critical error, don't block main flow
+    }
   }, []);
 
-  const fetchSalesData = async () => {
+  const fetchSalesData = useCallback(async () => {
     try {
       const [salesResponse, productsResponse, creditHoldersResponse] = await Promise.all([
         api.get('/sales'),
@@ -76,27 +92,11 @@ const SalesReportTab = () => {
       setError('Failed to fetch sales data');
       setLoading(false);
     }
-  };
+  }, [fetchAllocatedBalances]);
 
-  const fetchAllocatedBalances = async (salesData) => {
-    try {
-      const balancesResponse = await api.get('/balances');
-      const balances = balancesResponse.data;
-
-      // Create map of sales_id to balance allocation
-      const balanceMap = {};
-      balances.forEach(balance => {
-        if (balance.sales_id) {
-          balanceMap[balance.sales_id] = balance;
-        }
-      });
-
-      setAllocatedBalances(balanceMap);
-    } catch (err) {
-      console.error('Error fetching allocated balances:', err);
-      // Non-critical error, don't block main flow
-    }
-  };
+  useEffect(() => {
+    fetchSalesData();
+  }, [fetchSalesData]);
 
   const calculateCreditSum = (sale) => {
     if (!Array.isArray(sale.credit)) return 0;
