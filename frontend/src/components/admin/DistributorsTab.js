@@ -265,6 +265,25 @@ const DistributorsTab = () => {
                 />
               </div>
 
+              {!editingDistributor && (
+                <div className="form-group">
+                  <label htmlFor="amountOutstanding">Initial Outstanding Amount (Optional)</label>
+                  <input
+                    type="number"
+                    id="amountOutstanding"
+                    className="form-control"
+                    value={formData.amountOutstanding}
+                    onChange={(e) => setFormData({ ...formData, amountOutstanding: e.target.value })}
+                    step="0.01"
+                    min="0"
+                    placeholder="₹ 0.00"
+                  />
+                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                    Set the initial outstanding amount if you already owe this distributor money
+                  </small>
+                </div>
+              )}
+
               {editingDistributor && (
                 <div className="form-group">
                   <label htmlFor="amountOutstanding">Amount Outstanding (Read-Only)</label>

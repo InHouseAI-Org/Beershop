@@ -7,9 +7,16 @@ const SalesReportTab = () => {
   const [error, setError] = useState('');
   const [activeMonth, setActiveMonth] = useState('');
   const [salesByMonth, setSalesByMonth] = useState({});
+  const [pendingSalesList, setPendingSalesList] = useState([]);
   const [selectedSale, setSelectedSale] = useState(null);
   const [products, setProducts] = useState([]);
   const [creditHolders, setCreditHolders] = useState([]);
+
+  // Approval state
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approvalSale, setApprovalSale] = useState(null);
+  const [approvalForm, setApprovalForm] = useState({});
+  const [approvalError, setApprovalError] = useState('');
 
   // Balance allocation state
   const [allocatedBalances, setAllocatedBalances] = useState({});
@@ -57,9 +64,16 @@ const SalesReportTab = () => {
       // Fetch allocated balances for all sales
       await fetchAllocatedBalances(salesData);
 
-      // Group sales by month
+      // Separate pending and approved sales
+      const pendingSales = salesData.filter(sale => sale.status === 'pending');
+      const approvedSales = salesData.filter(sale => sale.status === 'approved' || !sale.status);
+
+      // Store pending sales for display
+      setPendingSalesList(pendingSales);
+
+      // Group approved sales by month
       const grouped = {};
-      salesData.forEach(sale => {
+      approvedSales.forEach(sale => {
         const date = new Date(sale.date);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const monthLabel = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -249,6 +263,189 @@ const SalesReportTab = () => {
     return !!allocatedBalances[saleId];
   };
 
+  const handleOpenApprovalModal = (sale) => {
+    setApprovalSale(sale);
+
+    // Initialize product data from sale
+    const productDataMap = {};
+    if (sale.opening_stock && Array.isArray(sale.opening_stock)) {
+      sale.opening_stock.forEach(item => {
+        productDataMap[item.product_id] = {
+          openingStock: item.opening_stock || 0,
+          closingStock: 0,
+          sale: 0
+        };
+      });
+    }
+
+    if (sale.closing_stock && Array.isArray(sale.closing_stock)) {
+      sale.closing_stock.forEach(item => {
+        if (productDataMap[item.product_id]) {
+          productDataMap[item.product_id].closingStock = item.closing_stock || 0;
+        }
+      });
+    }
+
+    if (sale.sale && Array.isArray(sale.sale)) {
+      sale.sale.forEach(item => {
+        if (productDataMap[item.product_id]) {
+          productDataMap[item.product_id].sale = item.sale || 0;
+        }
+      });
+    }
+
+    // Initialize credit entries from sale
+    const creditEntriesData = [];
+    if (sale.credit && Array.isArray(sale.credit)) {
+      sale.credit.forEach(item => {
+        creditEntriesData.push({
+          creditHolderId: item.credit_holder_id,
+          amount: item.creditgiven || 0
+        });
+      });
+    }
+
+    setApprovalForm({
+      date: sale.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+      productData: productDataMap,
+      cashCollected: sale.cash_collected || 0,
+      upi: sale.upi || 0,
+      miscellaneous: sale.miscellaneous || 0,
+      creditEntries: creditEntriesData,
+      remarks: sale.remarks || ''
+    });
+    setApprovalError('');
+    setShowApprovalModal(true);
+  };
+
+  const handleCloseApprovalModal = () => {
+    setShowApprovalModal(false);
+    setApprovalSale(null);
+    setApprovalForm({});
+    setApprovalError('');
+  };
+
+  const handleProductChangeInApproval = (productId, field, value) => {
+    const data = { ...approvalForm.productData[productId] };
+    data[field] = value;
+
+    if (field === 'closingStock' && data.openingStock !== '') {
+      const opening = parseFloat(data.openingStock) || 0;
+      const closing = parseFloat(value) || 0;
+      data.sale = (opening - closing).toString();
+    } else if (field === 'sale' && data.openingStock !== '') {
+      const opening = parseFloat(data.openingStock) || 0;
+      const saleValue = parseFloat(value) || 0;
+      data.closingStock = (opening - saleValue).toString();
+    }
+
+    setApprovalForm({
+      ...approvalForm,
+      productData: {
+        ...approvalForm.productData,
+        [productId]: data
+      }
+    });
+  };
+
+  const addCreditEntryInApproval = () => {
+    setApprovalForm({
+      ...approvalForm,
+      creditEntries: [...(approvalForm.creditEntries || []), { creditHolderId: '', amount: '' }]
+    });
+  };
+
+  const updateCreditEntryInApproval = (index, field, value) => {
+    const updated = [...(approvalForm.creditEntries || [])];
+    updated[index][field] = value;
+    setApprovalForm({
+      ...approvalForm,
+      creditEntries: updated
+    });
+  };
+
+  const removeCreditEntryInApproval = (index) => {
+    setApprovalForm({
+      ...approvalForm,
+      creditEntries: (approvalForm.creditEntries || []).filter((_, i) => i !== index)
+    });
+  };
+
+  const handleApproveSale = async () => {
+    if (!approvalSale) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to approve this sale?\n\n` +
+      `This will update inventory and credit holders.\n` +
+      `This action cannot be undone!\n\n` +
+      `क्या आप सुनिश्चित हैं?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const openingStockData = [];
+      const closingStockData = [];
+      const saleData = [];
+
+      Object.keys(approvalForm.productData || {}).forEach(productId => {
+        const data = approvalForm.productData[productId];
+
+        if (data.openingStock !== '' && data.openingStock !== null && data.openingStock !== undefined) {
+          openingStockData.push({
+            product_id: productId,
+            opening_stock: parseFloat(data.openingStock) || 0
+          });
+        }
+
+        if (data.closingStock !== '' && data.closingStock !== null && data.closingStock !== undefined) {
+          closingStockData.push({
+            product_id: productId,
+            closing_stock: parseFloat(data.closingStock) || 0
+          });
+        }
+
+        if (data.sale !== '' && data.sale !== null && data.sale !== undefined) {
+          saleData.push({
+            product_id: productId,
+            sale: parseFloat(data.sale) || 0
+          });
+        }
+      });
+
+      const creditData = [];
+      (approvalForm.creditEntries || []).forEach(entry => {
+        if (entry.creditHolderId && entry.amount) {
+          creditData.push({
+            credit_holder_id: entry.creditHolderId,
+            creditgiven: parseFloat(entry.amount)
+          });
+        }
+      });
+
+      const payload = {
+        date: approvalForm.date,
+        openingStock: openingStockData.length > 0 ? openingStockData : null,
+        closingStock: closingStockData.length > 0 ? closingStockData : null,
+        sale: saleData.length > 0 ? saleData : null,
+        cashCollected: parseFloat(approvalForm.cashCollected) || 0,
+        upi: parseFloat(approvalForm.upi) || 0,
+        miscellaneous: parseFloat(approvalForm.miscellaneous) || 0,
+        credit: creditData.length > 0 ? creditData : null,
+        remarks: approvalForm.remarks || null
+      };
+
+      await api.post(`/sales/${approvalSale.id}/approve`, payload);
+
+      alert('✅ Sale approved successfully!\nबिक्री सफलतापूर्वक स्वीकृत हो गई!');
+      handleCloseApprovalModal();
+      await fetchSalesData();
+    } catch (err) {
+      console.error('Error approving sale:', err);
+      setApprovalError(err.response?.data?.error || 'Failed to approve sale');
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -263,7 +460,99 @@ const SalesReportTab = () => {
         Sales Reports
       </h2>
 
-      {monthKeys.length === 0 ? (
+      {/* Pending Sales Section */}
+      {pendingSalesList.length > 0 && (
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '1rem 1.5rem',
+            backgroundColor: '#fff3cd',
+            borderRadius: '12px',
+            border: '2px solid #ffc107',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <AlertCircle size={24} style={{ color: '#856404' }} />
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#856404' }}>
+                Pending Sales Approvals ({pendingSalesList.length})
+              </h3>
+            </div>
+          </div>
+
+          <div className="table-container" style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+            border: '2px solid #ffc107'
+          }}>
+            <table className="table" style={{ marginBottom: 0 }}>
+              <thead style={{ backgroundColor: '#ffc107' }}>
+                <tr>
+                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Date</th>
+                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>User</th>
+                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Cash</th>
+                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>UPI</th>
+                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Credit</th>
+                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Total</th>
+                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingSalesList.map((sale, index) => {
+                  const creditSum = calculateCreditSum(sale);
+                  const total = parseFloat(sale.cash_collected || 0) +
+                                parseFloat(sale.upi || 0) -
+                                creditSum;
+
+                  return (
+                    <tr
+                      key={sale.id}
+                      style={{
+                        backgroundColor: index % 2 === 0 ? '#fff9e6' : '#fff3cd',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleRowClick(sale)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffe8a1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#fff9e6' : '#fff3cd';
+                      }}
+                    >
+                      <td style={{ padding: '1rem', fontWeight: '600' }}>{new Date(sale.date).toLocaleDateString()}</td>
+                      <td style={{ padding: '1rem' }}>{sale.username || 'N/A'}</td>
+                      <td style={{ padding: '1rem', fontWeight: '600' }}>₹{parseFloat(sale.cash_collected || 0).toFixed(2)}</td>
+                      <td style={{ padding: '1rem', fontWeight: '600', color: '#4CAF50' }}>₹{parseFloat(sale.upi || 0).toFixed(2)}</td>
+                      <td style={{ padding: '1rem', fontWeight: '600', color: '#ff9800' }}>₹{creditSum.toFixed(2)}</td>
+                      <td style={{ padding: '1rem', fontWeight: '700', fontSize: '1.125rem', color: '#000' }}>₹{total.toFixed(2)}</td>
+                      <td style={{ padding: '1rem' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleOpenApprovalModal(sale)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            fontSize: '0.875rem',
+                            background: '#ffc107',
+                            color: '#000',
+                            border: 'none',
+                            fontWeight: '600'
+                          }}
+                        >
+                          Review & Approve
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {monthKeys.length === 0 && pendingSalesList.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
           <p style={{ color: '#666', fontSize: '1.25rem' }}>No sales data available</p>
         </div>
@@ -465,7 +754,23 @@ const SalesReportTab = () => {
                         </td>
                         <td style={{ padding: '1rem', fontWeight: '700', fontSize: '1.125rem', color: '#2196F3' }}>₹{total.toFixed(2)}</td>
                         <td style={{ padding: '1rem' }} onClick={(e) => e.stopPropagation()}>
-                          {allocated ? (
+                          {sale.status === 'pending' ? (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.5rem 1rem',
+                              backgroundColor: '#fff3cd',
+                              color: '#856404',
+                              borderRadius: '8px',
+                              border: '1px solid #ffc107',
+                              fontSize: '0.875rem',
+                              fontWeight: '600'
+                            }}>
+                              <AlertCircle size={16} />
+                              Pending
+                            </div>
+                          ) : allocated ? (
                             <div style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -637,7 +942,7 @@ const SalesReportTab = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="form-group">
                   <label style={{ fontSize: '1rem', fontWeight: '600' }}>
-                    Cash Balance | नकद शेष
+                    Amount to Add to Cash Balance for the day | नकद शेष
                   </label>
                   <input
                     type="number"
@@ -653,7 +958,7 @@ const SalesReportTab = () => {
 
                 <div className="form-group">
                   <label style={{ fontSize: '1rem', fontWeight: '600' }}>
-                    Gala Balance | गला शेष
+                    Amount to Add to Gala Balance for the day | गला शेष
                   </label>
                   <input
                     type="number"
@@ -669,7 +974,7 @@ const SalesReportTab = () => {
 
                 <div className="form-group">
                   <label style={{ fontSize: '1rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    Bank Balance | बैंक शेष
+                    Amount to Add to Bank Balance for the day | बैंक शेष
                     <span style={{ fontSize: '0.75rem', fontWeight: '400', color: '#666' }}>
                       (Auto-calculated | स्वतः गणना)
                     </span>
@@ -1127,6 +1432,397 @@ const SalesReportTab = () => {
                      parseFloat(selectedSale.upi || 0) -
                      calculateCreditSum(selectedSale)).toFixed(2)}
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approval Modal */}
+      {showApprovalModal && approvalSale && approvalForm.productData && (
+        <div
+          className="modal-overlay"
+          onClick={handleCloseApprovalModal}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            zIndex: 2000,
+            overflowY: 'auto',
+            padding: '2rem 1rem'
+          }}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              maxWidth: '1200px',
+              width: '100%',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+              marginBottom: '2rem'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)',
+              color: '#000',
+              padding: '2rem',
+              borderTopLeftRadius: '16px',
+              borderTopRightRadius: '16px',
+              position: 'relative'
+            }}>
+              <button
+                onClick={handleCloseApprovalModal}
+                style={{
+                  position: 'absolute',
+                  top: '1rem',
+                  right: '1rem',
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+              <h3 style={{ color: '#000', margin: 0, fontSize: '1.5rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <AlertCircle size={28} />
+                Review & Approve Sale
+              </h3>
+              <p style={{ color: 'rgba(0, 0, 0, 0.8)', margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
+                {new Date(approvalSale.date).toLocaleDateString()} - {approvalSale.username || 'N/A'}
+              </p>
+            </div>
+
+            <div style={{ padding: '2rem', maxHeight: 'calc(90vh - 120px)', overflowY: 'auto' }}>
+              {approvalError && (
+                <div style={{
+                  padding: '1rem',
+                  backgroundColor: '#f8d7da',
+                  color: '#721c24',
+                  borderRadius: '8px',
+                  marginBottom: '1.5rem',
+                  border: '1px solid #f5c6cb'
+                }}>
+                  {approvalError}
+                </div>
+              )}
+
+              {/* Date */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Sale Date</h4>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={approvalForm.date}
+                  onChange={(e) => setApprovalForm({ ...approvalForm, date: e.target.value })}
+                  style={{ fontSize: '1.125rem', padding: '0.75rem' }}
+                />
+              </div>
+
+              {/* Products Table */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Product Sales</h4>
+                <div style={{ overflowX: 'auto', border: '2px solid #e0e0e0', borderRadius: '12px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ backgroundColor: '#000', color: 'white' }}>
+                      <tr>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem' }}>Product</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem' }}>Opening Stock</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem' }}>Closing Stock</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem' }}>Sale</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem' }}>Sale Price</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem' }}>Sale Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((product, index) => {
+                        const productData = approvalForm.productData[product.id] || { openingStock: 0, closingStock: 0, sale: 0 };
+                        const saleQuantity = parseFloat(productData.sale) || 0;
+                        const salePrice = parseFloat(product.sale_price) || 0;
+                        const saleValue = saleQuantity * salePrice;
+
+                        return (
+                          <tr key={product.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f8f9fa' }}>
+                            <td style={{ padding: '0.75rem', fontWeight: '600' }}>{product.product_name}</td>
+                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                              <input
+                                type="number"
+                                value={productData.openingStock}
+                                readOnly
+                                style={{
+                                  width: '100px',
+                                  padding: '0.5rem',
+                                  border: '2px solid #e0e0e0',
+                                  borderRadius: '6px',
+                                  textAlign: 'center',
+                                  backgroundColor: '#f5f5f5',
+                                  fontWeight: '600'
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                              <input
+                                type="number"
+                                value={productData.closingStock}
+                                onChange={(e) => handleProductChangeInApproval(product.id, 'closingStock', e.target.value)}
+                                step="1"
+                                min="0"
+                                style={{
+                                  width: '100px',
+                                  padding: '0.5rem',
+                                  border: '2px solid #4CAF50',
+                                  borderRadius: '6px',
+                                  textAlign: 'center',
+                                  fontWeight: '600'
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                              <input
+                                type="number"
+                                value={productData.sale}
+                                onChange={(e) => handleProductChangeInApproval(product.id, 'sale', e.target.value)}
+                                step="1"
+                                min="0"
+                                style={{
+                                  width: '100px',
+                                  padding: '0.5rem',
+                                  border: '2px solid #2196F3',
+                                  borderRadius: '6px',
+                                  textAlign: 'center',
+                                  fontWeight: '600',
+                                  color: '#2196F3'
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', color: '#9c27b0', fontSize: '1rem' }}>
+                              ₹{salePrice.toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '700', color: '#2e7d32', fontSize: '1.125rem' }}>
+                              ₹{saleValue.toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ backgroundColor: '#fff3e0', fontWeight: '700' }}>
+                        <td colSpan="5" style={{ padding: '1rem', textAlign: 'right', fontSize: '1rem', color: '#e65100' }}>
+                          Total Sale Value
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center', fontSize: '1.25rem', color: '#e65100' }}>
+                          ₹{(() => {
+                            let total = 0;
+                            products.forEach(product => {
+                              const productData = approvalForm.productData[product.id] || { sale: 0 };
+                              const saleQuantity = parseFloat(productData.sale) || 0;
+                              const salePrice = parseFloat(product.sale_price) || 0;
+                              total += saleQuantity * salePrice;
+                            });
+                            return total.toFixed(2);
+                          })()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Cash, UPI & Extra */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Collection</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
+                      Cash Collected
+                    </label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={approvalForm.cashCollected || 0}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, cashCollected: e.target.value })}
+                      step="0.01"
+                      min="0"
+                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
+                      UPI
+                    </label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={approvalForm.upi || 0}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, upi: e.target.value })}
+                      step="0.01"
+                      min="0"
+                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
+                      Extra (Chakhna, Bag, etc)
+                    </label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={approvalForm.miscellaneous || 0}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, miscellaneous: e.target.value })}
+                      step="0.01"
+                      min="0"
+                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Credit */}
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>Credit Given</h4>
+                  <button
+                    type="button"
+                    onClick={addCreditEntryInApproval}
+                    className="btn btn-success"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                  >
+                    + Add Credit
+                  </button>
+                </div>
+
+                {(approvalForm.creditEntries || []).map((entry, index) => (
+                  <div key={index} style={{ marginBottom: '1rem', padding: '1rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Credit Holder</label>
+                        <select
+                          className="form-control"
+                          value={entry.creditHolderId}
+                          onChange={(e) => updateCreditEntryInApproval(index, 'creditHolderId', e.target.value)}
+                        >
+                          <option value="">Select</option>
+                          {creditHolders.map(ch => (
+                            <option key={ch.id} value={ch.id}>{ch.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Amount</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={entry.amount}
+                          onChange={(e) => updateCreditEntryInApproval(index, 'amount', e.target.value)}
+                          step="0.01"
+                          min="0"
+                          placeholder="₹ 0.00"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeCreditEntryInApproval(index)}
+                        className="btn btn-danger"
+                        style={{ padding: '0.5rem 1rem' }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {(!approvalForm.creditEntries || approvalForm.creditEntries.length === 0) && (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#666', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+                    No credit entries. Click "Add Credit" to add one.
+                  </div>
+                )}
+              </div>
+
+              {/* Remarks */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Remarks</h4>
+                <textarea
+                  className="form-control"
+                  value={approvalForm.remarks || ''}
+                  onChange={(e) => setApprovalForm({ ...approvalForm, remarks: e.target.value })}
+                  rows="3"
+                  style={{ fontSize: '1rem', padding: '0.75rem' }}
+                  placeholder="Enter any remarks (optional)"
+                />
+              </div>
+
+              {/* Total Summary */}
+              <div style={{
+                padding: '1.5rem',
+                backgroundColor: '#e3f2fd',
+                borderRadius: '12px',
+                border: '2px solid #2196f3',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#1565c0', fontWeight: '600' }}>
+                  Total Collection:
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0d47a1' }}>
+                  ₹{(() => {
+                    const creditSum = (approvalForm.creditEntries || []).reduce((sum, entry) => sum + parseFloat(entry.amount || 0), 0);
+                    const total = parseFloat(approvalForm.cashCollected || 0) +
+                                  parseFloat(approvalForm.upi || 0) +
+                                  parseFloat(approvalForm.miscellaneous || 0) -
+                                  creditSum;
+                    return total.toFixed(2);
+                  })()}
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#fff3cd',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                border: '1px solid #ffc107'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#856404' }}>
+                  <strong>Warning:</strong> Approving this sale will update inventory and credit holders. This action cannot be undone.
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleApproveSale}
+                  style={{ flex: 1, padding: '1rem', fontSize: '1rem', fontWeight: '600', background: '#4CAF50' }}
+                >
+                  Approve Sale
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleCloseApprovalModal}
+                  style={{ flex: 1, padding: '1rem', fontSize: '1rem' }}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>

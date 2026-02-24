@@ -542,8 +542,8 @@ const dataHelpers = {
     console.log('Credit JSON:', creditJson);
 
     const result = await pool.query(
-      `INSERT INTO sales (organisation_id, user_id, date, opening_stock, closing_stock, sale, cash_collected, upi, credit, remarks)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO sales (organisation_id, user_id, date, opening_stock, closing_stock, sale, cash_collected, upi, miscellaneous, credit, remarks, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         saleData.organisationId,
@@ -554,8 +554,10 @@ const dataHelpers = {
         saleJson,
         saleData.cashCollected || 0,
         saleData.upi || 0,
+        saleData.miscellaneous || 0,
         creditJson,
-        saleData.remarks || null
+        saleData.remarks || null,
+        saleData.status || 'approved'
       ]
     );
 
@@ -576,7 +578,8 @@ const dataHelpers = {
       date: 'date',
       cashCollected: 'cash_collected',
       upi: 'upi',
-      remarks: 'remarks'
+      remarks: 'remarks',
+      status: 'status'
     };
 
     Object.keys(updates).forEach(key => {
@@ -1012,6 +1015,53 @@ const dataHelpers = {
       [id]
     );
     return result.rowCount > 0;
+  },
+
+  // ==================== BALANCE TRANSFERS ====================
+  getAllBalanceTransfers: async (organisationId) => {
+    const result = await pool.query(
+      `SELECT bt.*,
+              COALESCE(u.username, bt.created_by_username) as created_by_name
+       FROM balance_transfers bt
+       LEFT JOIN users u ON bt.created_by = u.id
+       WHERE bt.organisation_id = $1
+       ORDER BY bt.transaction_date DESC, bt.created_at DESC`,
+      [organisationId]
+    );
+    return result.rows;
+  },
+
+  getBalanceTransferById: async (id) => {
+    const result = await pool.query('SELECT * FROM balance_transfers WHERE id = $1', [id]);
+    return result.rows[0];
+  },
+
+  createBalanceTransfer: async (transferData) => {
+    const result = await pool.query(
+      `INSERT INTO balance_transfers (organisation_id, name, description, amount, from_account, to_account, transaction_date, created_by, created_by_username)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [
+        transferData.organisationId,
+        transferData.name,
+        transferData.description || null,
+        transferData.amount,
+        transferData.fromAccount,
+        transferData.toAccount,
+        transferData.transactionDate || new Date(),
+        transferData.createdBy,
+        transferData.createdByUsername || null
+      ]
+    );
+    return result.rows[0];
+  },
+
+  deleteBalanceTransfer: async (id) => {
+    const result = await pool.query(
+      `DELETE FROM balance_transfers WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return result.rows[0];
   }
 };
 

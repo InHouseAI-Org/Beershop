@@ -127,8 +127,10 @@ CREATE TABLE sales (
   sale JSONB,
   cash_collected DECIMAL(10, 2) DEFAULT 0,
   upi DECIMAL(10, 2) DEFAULT 0,
+  miscellaneous DECIMAL(10, 2) DEFAULT 0,
   credit JSONB,
   remarks TEXT,
+  status VARCHAR(20) DEFAULT 'approved' CHECK (status IN ('pending', 'approved')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT unique_user_date UNIQUE (user_id, date)
@@ -239,6 +241,7 @@ CREATE INDEX idx_distributors_organisation_id ON distributors(organisation_id);
 CREATE INDEX idx_sales_organisation_id ON sales(organisation_id);
 CREATE INDEX idx_sales_user_id ON sales(user_id);
 CREATE INDEX idx_sales_date ON sales(date);
+CREATE INDEX idx_sales_status ON sales(status);
 
 -- Orders
 CREATE INDEX idx_orders_organisation_id ON orders(organisation_id);

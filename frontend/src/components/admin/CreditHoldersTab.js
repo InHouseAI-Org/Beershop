@@ -302,6 +302,25 @@ const CreditHoldersTab = () => {
                 />
               </div>
 
+              {!editingCreditHolder && (
+                <div className="form-group">
+                  <label htmlFor="amountPayable">Initial Outstanding Amount (Optional)</label>
+                  <input
+                    type="number"
+                    id="amountPayable"
+                    className="form-control"
+                    value={formData.amountPayable}
+                    onChange={(e) => setFormData({ ...formData, amountPayable: e.target.value })}
+                    step="0.01"
+                    min="0"
+                    placeholder="₹ 0.00"
+                  />
+                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                    Set the initial outstanding amount if this credit holder already owes money
+                  </small>
+                </div>
+              )}
+
               {editingCreditHolder && (
                 <div className="form-group">
                   <label htmlFor="amountPayable">Amount Payable (Read-Only)</label>

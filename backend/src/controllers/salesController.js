@@ -40,7 +40,7 @@ const getSale = async (req, res) => {
 const createSale = async (req, res) => {
   try {
     // Note: openingStock from frontend is ignored - we calculate it from inventory
-    const { date, closingStock, sale, cashCollected, upi, credit, remarks } = req.body;
+    const { date, closingStock, sale, cashCollected, upi, miscellaneous, credit, remarks } = req.body;
 
     console.log('=== CREATE SALE REQUEST ===');
     console.log('Closing Stock:', closingStock);
@@ -155,6 +155,9 @@ const createSale = async (req, res) => {
       }
     }
 
+    // Set status based on user role: 'pending' for users, 'approved' for admins
+    const status = req.user.role === 'user' ? 'pending' : 'approved';
+
     const newSale = await db.createSale({
       organisationId,
       userId,
@@ -164,12 +167,17 @@ const createSale = async (req, res) => {
       sale,
       cashCollected: cashCollected || 0,
       upi: upi || 0,
+      miscellaneous: miscellaneous || 0,
       credit,
-      remarks
+      remarks,
+      status
     });
 
-    // Update inventory: inventory_new = inventory_old - sale
-    console.log('Updating inventory after sale...');
+    // Only update inventory and credit for approved sales (admin-created)
+    // Pending sales will be processed after admin approval
+    if (status === 'approved') {
+      // Update inventory: inventory_new = inventory_old - sale
+      console.log('Updating inventory after sale...');
     if (Array.isArray(sale) && sale.length > 0) {
       for (const saleItem of sale) {
         if (saleItem.product_id && saleItem.sale) {
@@ -225,6 +233,9 @@ const createSale = async (req, res) => {
       }
     } else {
       console.log('No credit to process (not array or empty)');
+    }
+    } else {
+      console.log('Sale created with pending status - waiting for admin approval');
     }
 
     res.status(201).json(newSale);
@@ -321,6 +332,148 @@ const updateSale = async (req, res) => {
   }
 };
 
+const approveSale = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, openingStock, closingStock, sale, cashCollected, upi, credit, remarks } = req.body;
+
+    console.log('=== APPROVE SALE REQUEST ===');
+    console.log('Sale ID:', id);
+    console.log('Updated data:', { date, cashCollected, upi, credit, remarks });
+
+    const existingSale = await db.getSaleById(id);
+
+    if (!existingSale) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+
+    // Check if sale belongs to user's organisation
+    if (existingSale.organisation_id !== req.user.organisationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Only admins can approve sales
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can approve sales' });
+    }
+
+    // Check if sale is already approved
+    if (existingSale.status === 'approved') {
+      return res.status(400).json({ error: 'Sale is already approved' });
+    }
+
+    const organisationId = req.user.organisationId;
+
+    // If date is being changed, check for conflicts with other sales by the same user
+    if (date !== undefined) {
+      // Parse existing date
+      const existingDate = new Date(existingSale.date);
+      const existingYear = existingDate.getFullYear();
+      const existingMonth = String(existingDate.getMonth() + 1).padStart(2, '0');
+      const existingDay = String(existingDate.getDate()).padStart(2, '0');
+      const existingDateStr = `${existingYear}-${existingMonth}-${existingDay}`;
+
+      // Parse the new date
+      const newDate = new Date(date);
+      const newYear = newDate.getFullYear();
+      const newMonth = String(newDate.getMonth() + 1).padStart(2, '0');
+      const newDay = String(newDate.getDate()).padStart(2, '0');
+      const newDateStr = `${newYear}-${newMonth}-${newDay}`;
+
+      // Only check if date actually changed
+      if (existingDateStr !== newDateStr) {
+        const allSales = await db.getSalesByOrganisationId(organisationId);
+
+        // Check if another sale exists for this user on the new date (excluding the current sale)
+        const conflictingSale = allSales.find(s => {
+          if (s.id === id) return false; // Exclude current sale
+          if (s.user_id !== existingSale.user_id) return false; // Only check same user
+
+          const dbDate = new Date(s.date);
+          const dbYear = dbDate.getFullYear();
+          const dbMonth = String(dbDate.getMonth() + 1).padStart(2, '0');
+          const dbDay = String(dbDate.getDate()).padStart(2, '0');
+          const dbDateStr = `${dbYear}-${dbMonth}-${dbDay}`;
+
+          return dbDateStr === newDateStr;
+        });
+
+        if (conflictingSale) {
+          return res.status(400).json({
+            error: 'Cannot change date: Another sale already exists for this user on the selected date. | तारीख बदल नहीं सकते: इस उपयोगकर्ता के लिए चयनित तारीख पर पहले से बिक्री मौजूद है।'
+          });
+        }
+      }
+    }
+
+    // Update the sale with admin's changes (if any) and set status to approved
+    const updates = { status: 'approved' };
+    if (date !== undefined) updates.date = date;
+    if (openingStock !== undefined) updates.openingStock = openingStock;
+    if (closingStock !== undefined) updates.closingStock = closingStock;
+    if (sale !== undefined) updates.sale = sale;
+    if (cashCollected !== undefined) updates.cashCollected = cashCollected;
+    if (upi !== undefined) updates.upi = upi;
+    if (credit !== undefined) updates.credit = credit;
+    if (remarks !== undefined) updates.remarks = remarks;
+
+    const updatedSale = await db.updateSale(id, updates);
+
+    // Use the updated sale data for inventory and credit processing
+    const finalSale = updates.sale || existingSale.sale;
+    const finalCredit = updates.credit || existingSale.credit;
+
+    // Update inventory: inventory_new = inventory_old - sale
+    console.log('Updating inventory after approval...');
+    if (Array.isArray(finalSale) && finalSale.length > 0) {
+      for (const saleItem of finalSale) {
+        if (saleItem.product_id && saleItem.sale) {
+          const saleQty = parseFloat(saleItem.sale);
+          await db.decrementInventory(organisationId, saleItem.product_id, saleQty);
+          console.log(`Decreased inventory for product ${saleItem.product_id} by ${saleQty}`);
+        }
+      }
+    }
+
+    // Update credit holder outstanding: add credit given to outstanding amount
+    console.log('Updating credit holder outstanding amounts...');
+    if (Array.isArray(finalCredit) && finalCredit.length > 0) {
+      for (const creditItem of finalCredit) {
+        if (creditItem.credit_holder_id && creditItem.creditgiven) {
+          const creditAmount = parseFloat(creditItem.creditgiven);
+
+          // Get current outstanding before incrementing
+          const creditHolder = await db.getCreditHolderById(creditItem.credit_holder_id);
+          const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
+
+          // Increment outstanding
+          await db.incrementCreditHolderOutstanding(creditItem.credit_holder_id, creditAmount);
+          const newOutstanding = previousOutstanding + creditAmount;
+          console.log(`Added ${creditAmount} to credit holder ${creditItem.credit_holder_id} outstanding`);
+
+          // Record transaction history
+          await db.createCreditCollectionHistory({
+            organisationId,
+            creditHolderId: creditItem.credit_holder_id,
+            amountCollected: creditAmount,
+            previousOutstanding: previousOutstanding,
+            newOutstanding: newOutstanding,
+            collectedBy: req.user.id,
+            notes: 'Approved from pending sale',
+            transactionType: 'given',
+            saleId: updatedSale.id
+          });
+        }
+      }
+    }
+
+    res.json({ message: 'Sale approved successfully', sale: updatedSale });
+  } catch (error) {
+    console.error('Error approving sale:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 const deleteSale = async (req, res) => {
   // Sales deletion is disabled - sales cannot be deleted, only updated
   return res.status(403).json({
@@ -328,4 +481,4 @@ const deleteSale = async (req, res) => {
   });
 };
 
-module.exports = { getAllSales, getSale, createSale, updateSale, deleteSale };
+module.exports = { getAllSales, getSale, createSale, updateSale, deleteSale, approveSale };

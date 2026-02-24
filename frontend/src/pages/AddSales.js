@@ -15,6 +15,7 @@ const AddSales = () => {
   const [productData, setProductData] = useState({});
   const [cashCollected, setCashCollected] = useState('');
   const [upiCollected, setUpiCollected] = useState('');
+  const [miscellaneous, setMiscellaneous] = useState('');
   const [creditEntries, setCreditEntries] = useState([]);
   const [remarks, setRemarks] = useState('');
   const [dateError, setDateError] = useState('');
@@ -236,6 +237,7 @@ const AddSales = () => {
         sale: saleData.length > 0 ? saleData : null,
         cashCollected: parseFloat(cashCollected) || 0,
         upi: parseFloat(upiCollected) || 0,
+        miscellaneous: parseFloat(miscellaneous) || 0,
         credit: creditData.length > 0 ? creditData : null,
         remarks: remarks || null
       };
@@ -431,7 +433,7 @@ const AddSales = () => {
                         className="form-control"
                         value={productData[product.id].closingStock}
                         onChange={(e) => handleProductChange(product.id, 'closingStock', e.target.value)}
-                        step="0.01"
+                        step="1"
                         min="0"
                         placeholder="0"
                         style={{
@@ -446,7 +448,7 @@ const AddSales = () => {
                         className="form-control"
                         value={productData[product.id].sale}
                         onChange={(e) => handleProductChange(product.id, 'sale', e.target.value)}
-                        step="0.01"
+                        step="1"
                         min="0"
                         placeholder="0"
                         style={{
@@ -532,7 +534,7 @@ const AddSales = () => {
                     className="form-control"
                     value={productData[product.id].closingStock}
                     onChange={(e) => handleProductChange(product.id, 'closingStock', e.target.value)}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="Enter closing stock"
                     style={{
@@ -632,6 +634,21 @@ const AddSales = () => {
                 className="form-control"
                 value={upiCollected}
                 onChange={(e) => setUpiCollected(e.target.value)}
+                style={{ fontSize: '1.25rem', padding: '1.25rem' }}
+                step="0.01"
+                min="0"
+                placeholder="₹ 0.00"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="miscellaneous" style={{fontSize: '1rem'}}>Extra (Chakhna, Bag, etc) | अतिरिक्त</label>
+              <input
+                type="number"
+                id="miscellaneous"
+                className="form-control"
+                value={miscellaneous}
+                onChange={(e) => setMiscellaneous(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
                 step="0.01"
                 min="0"
@@ -819,8 +836,8 @@ const AddSales = () => {
               </div>
             </div>
 
-            {/* Cash & UPI */}
-            <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {/* Cash, UPI & Extra */}
+            <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
               <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50' }}>
                 <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.25rem' }}>Cash | नकद</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1b5e20' }}>
@@ -833,6 +850,12 @@ const AddSales = () => {
                   ₹{parseFloat(upiCollected || 0).toFixed(2)}
                 </div>
               </div>
+              <div style={{ padding: '1rem', backgroundColor: '#f3e5f5', borderRadius: '8px', border: '1px solid #9c27b0' }}>
+                <div style={{ fontSize: '0.875rem', color: '#6a1b9a', marginBottom: '0.25rem' }}>Extra | अतिरिक्त</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#4a148c' }}>
+                  ₹{parseFloat(miscellaneous || 0).toFixed(2)}
+                </div>
+              </div>
             </div>
 
             {/* Total Collection */}
@@ -841,7 +864,7 @@ const AddSales = () => {
                 Total Collection | कुल संग्रह
               </div>
               <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#e65100' }}>
-                ₹{(parseFloat(cashCollected || 0) + parseFloat(upiCollected || 0)).toFixed(2)}
+                ₹{(parseFloat(cashCollected || 0) + parseFloat(upiCollected || 0) + parseFloat(miscellaneous || 0)).toFixed(2)}
               </div>
             </div>
 

@@ -343,7 +343,7 @@ const OrdersTab = () => {
                             className="form-control"
                             value={item.qty}
                             onChange={(e) => updateOrderItem(index, 'qty', e.target.value)}
-                            step="0.01"
+                            step="1"
                             min="0"
                             placeholder="0"
                             style={{ fontSize: '1rem', padding: '0.875rem' }}
