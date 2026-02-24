@@ -42,11 +42,12 @@ const AddSales = () => {
       productsRes.data.forEach(product => {
         // Find inventory for this product
         const inventoryItem = inventoryRes.data.find(inv => inv.product_id === product.id);
+        const openingQty = inventoryItem ? (inventoryItem.qty || 0) : 0;
 
         initialData[product.id] = {
-          openingStock: inventoryItem ? (inventoryItem.qty || 0) : 0,
-          closingStock: '',
-          sale: ''
+          openingStock: openingQty,
+          closingStock: openingQty,
+          sale: 0
         };
       });
       setProductData(initialData);
@@ -95,16 +96,6 @@ const AddSales = () => {
     setCreditEntries(creditEntries.filter((_, i) => i !== index));
   };
 
-  const setProductToZero = (productId) => {
-    setProductData({
-      ...productData,
-      [productId]: {
-        ...productData[productId],
-        closingStock: productData[productId].openingStock.toString(),
-        sale: '0'
-      }
-    });
-  };
 
   const filteredProducts = products.filter(product => {
     // Search filter
@@ -427,7 +418,7 @@ const AddSales = () => {
                   <th style={{ minWidth: '120px' }}>Closing Stock<br/>समापन स्टॉक</th>
                   <th style={{ minWidth: '120px' }}>Sale<br/>बिक्री</th>
                   <th style={{ minWidth: '120px' }}>Opening Stock<br/>प्रारंभिक स्टॉक</th>
-                  <th style={{ minWidth: '100px' }}>Actions<br/>क्रियाएं</th>
+                  <th style={{ minWidth: '120px' }}>Sale Value<br/>बिक्री मूल्य</th>
                 </tr>
               </thead>
               <tbody>
@@ -479,19 +470,30 @@ const AddSales = () => {
                         }}
                       />
                     </td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => setProductToZero(product.id)}
-                        className="btn btn-secondary"
-                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', whiteSpace: 'nowrap' }}
-                      >
-                        Zero
-                      </button>
+                    <td style={{
+                      fontWeight: '700',
+                      color: '#2e7d32',
+                      fontSize: '1.125rem',
+                      textAlign: 'center'
+                    }}>
+                      ₹{((parseFloat(productData[product.id].sale) || 0) * (parseFloat(product.sale_price) || 0)).toFixed(2)}
                     </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr style={{ backgroundColor: '#fff3e0', fontWeight: '700' }}>
+                  <td colSpan="4" style={{ textAlign: 'right', padding: '1rem', fontSize: '1.125rem', color: '#e65100' }}>
+                    Total Sale Value | कुल बिक्री मूल्य
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '1rem', fontSize: '1.25rem', color: '#e65100' }}>
+                    ₹{filteredProducts.reduce((total, product) => {
+                      const saleValue = (parseFloat(productData[product.id].sale) || 0) * (parseFloat(product.sale_price) || 0);
+                      return total + saleValue;
+                    }, 0).toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 
@@ -563,22 +565,32 @@ const AddSales = () => {
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setProductToZero(product.id)}
-                  className="btn btn-secondary"
-                  style={{
-                    width: '100%',
-                    fontSize: '1.125rem',
-                    padding: '1rem',
-                    marginTop: '0.5rem'
-                  }}
-                >
-                  Set to Zero | शून्य पर सेट करें
-                </button>
+                <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50' }}>
+                  <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.25rem' }}>
+                    Sale Value | बिक्री मूल्य
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1b5e20' }}>
+                    ₹{((parseFloat(productData[product.id].sale) || 0) * (parseFloat(product.sale_price) || 0)).toFixed(2)}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
+
+          {/* Total Sale Value for Mobile */}
+          {filteredProducts.length > 0 && (
+            <div className="mobile-only" style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: '#fff3e0', borderRadius: '12px', border: '2px solid #ff9800' }}>
+              <div style={{ fontSize: '1rem', color: '#e65100', marginBottom: '0.5rem', fontWeight: '600' }}>
+                Total Sale Value | कुल बिक्री मूल्य
+              </div>
+              <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#e65100' }}>
+                ₹{filteredProducts.reduce((total, product) => {
+                  const saleValue = (parseFloat(productData[product.id].sale) || 0) * (parseFloat(product.sale_price) || 0);
+                  return total + saleValue;
+                }, 0).toFixed(2)}
+              </div>
+            </div>
+          )}
 
           {filteredProducts.length === 0 && (
             <div style={{ padding: '3rem', textAlign: 'center', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>

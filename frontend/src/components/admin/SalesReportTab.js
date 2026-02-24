@@ -122,6 +122,11 @@ const SalesReportTab = () => {
     return holder ? holder.name : 'Unknown';
   };
 
+  const getProductSalePrice = (productId) => {
+    const product = products.find(p => p.id === productId);
+    return product ? parseFloat(product.sale_price || 0) : 0;
+  };
+
   const handleRowClick = (sale) => {
     setSelectedSale(sale);
   };
@@ -927,12 +932,21 @@ const SalesReportTab = () => {
                             Sale
                           </div>
                         </th>
+                        <th style={{ color: 'white', padding: '1rem', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center' }}>
+                          Sale Price
+                        </th>
+                        <th style={{ color: 'white', padding: '1rem', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center' }}>
+                          Total
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedSale.opening_stock && Array.isArray(selectedSale.opening_stock) && selectedSale.opening_stock.map((openingItem, index) => {
                         const closingItem = selectedSale.closing_stock?.find(c => c.product_id === openingItem.product_id);
                         const saleItem = selectedSale.sale?.find(s => s.product_id === openingItem.product_id);
+                        const saleQuantity = saleItem ? parseFloat(saleItem.sale || 0) : 0;
+                        const salePrice = getProductSalePrice(openingItem.product_id);
+                        const totalAmount = saleQuantity * salePrice;
 
                         return (
                           <tr key={index} style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa' }}>
@@ -965,12 +979,50 @@ const SalesReportTab = () => {
                               color: '#4CAF50',
                               backgroundColor: index % 2 === 0 ? '#e8f5e9' : '#c8e6c9'
                             }}>
-                              {saleItem ? parseFloat(saleItem.sale || 0).toFixed(2) : '0.00'}
+                              {saleQuantity.toFixed(2)}
+                            </td>
+                            <td style={{
+                              padding: '1rem',
+                              textAlign: 'center',
+                              fontWeight: '700',
+                              fontSize: '1.125rem',
+                              color: '#9c27b0'
+                            }}>
+                              ₹{salePrice.toFixed(2)}
+                            </td>
+                            <td style={{
+                              padding: '1rem',
+                              textAlign: 'center',
+                              fontWeight: '700',
+                              fontSize: '1.25rem',
+                              color: '#000',
+                              backgroundColor: index % 2 === 0 ? '#fff9c4' : '#fff59d'
+                            }}>
+                              ₹{totalAmount.toFixed(2)}
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
+                    <tfoot>
+                      <tr style={{ fontWeight: '700', backgroundColor: '#000', color: 'white' }}>
+                        <td colSpan="5" style={{ padding: '1.25rem 1rem', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Grand Total</td>
+                        <td style={{ padding: '1.25rem 1rem', fontSize: '1.5rem', fontWeight: '700', textAlign: 'center' }}>
+                          ₹{(() => {
+                            let grandTotal = 0;
+                            if (selectedSale.opening_stock && Array.isArray(selectedSale.opening_stock)) {
+                              selectedSale.opening_stock.forEach(openingItem => {
+                                const saleItem = selectedSale.sale?.find(s => s.product_id === openingItem.product_id);
+                                const saleQuantity = saleItem ? parseFloat(saleItem.sale || 0) : 0;
+                                const salePrice = getProductSalePrice(openingItem.product_id);
+                                grandTotal += saleQuantity * salePrice;
+                              });
+                            }
+                            return grandTotal.toFixed(2);
+                          })()}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
