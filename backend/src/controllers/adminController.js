@@ -22,7 +22,7 @@ const getAllAdmins = async (req, res) => {
 
 const createAdmin = async (req, res) => {
   try {
-    const { username, password, organisationName, email } = req.body;
+    const { username, password, organisationName, email, initialCashBalance, initialBankBalance, initialGalaBalance } = req.body;
 
     if (!username || !password || !organisationName) {
       return res.status(400).json({ error: 'Please provide username, password, and organisation name' });
@@ -34,8 +34,13 @@ const createAdmin = async (req, res) => {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
-    // Create organisation first
-    const organisation = await db.createOrganisation({ organisationName });
+    // Create organisation first with initial balances
+    const organisation = await db.createOrganisation({
+      organisationName,
+      initialCashBalance: parseFloat(initialCashBalance) || 0,
+      initialBankBalance: parseFloat(initialBankBalance) || 0,
+      initialGalaBalance: parseFloat(initialGalaBalance) || 0
+    });
 
     // Create admin with organisation_id
     const newAdmin = await db.createAdmin({

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Calendar, CreditCard, TrendingUp, User, X, FileText, Package, MessageSquare } from 'lucide-react';
+import { Calendar, CreditCard, TrendingUp, User, X, FileText, Package, MessageSquare, Wallet, CheckCircle, AlertCircle } from 'lucide-react';
 
 const SalesReportTab = () => {
   const [loading, setLoading] = useState(true);
@@ -10,6 +10,17 @@ const SalesReportTab = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [products, setProducts] = useState([]);
   const [creditHolders, setCreditHolders] = useState([]);
+
+  // Balance allocation state
+  const [allocatedBalances, setAllocatedBalances] = useState({});
+  const [showAllocationModal, setShowAllocationModal] = useState(false);
+  const [allocationSale, setAllocationSale] = useState(null);
+  const [allocationForm, setAllocationForm] = useState({
+    cashBalance: '',
+    bankBalance: '',
+    galaBalance: ''
+  });
+  const [allocationError, setAllocationError] = useState('');
 
   useEffect(() => {
     fetchSalesData();
@@ -26,6 +37,9 @@ const SalesReportTab = () => {
       const salesData = salesResponse.data;
       setProducts(productsResponse.data);
       setCreditHolders(creditHoldersResponse.data);
+
+      // Fetch allocated balances for all sales
+      await fetchAllocatedBalances(salesData);
 
       // Group sales by month
       const grouped = {};
@@ -64,6 +78,26 @@ const SalesReportTab = () => {
     }
   };
 
+  const fetchAllocatedBalances = async (salesData) => {
+    try {
+      const balancesResponse = await api.get('/balances');
+      const balances = balancesResponse.data;
+
+      // Create map of sales_id to balance allocation
+      const balanceMap = {};
+      balances.forEach(balance => {
+        if (balance.sales_id) {
+          balanceMap[balance.sales_id] = balance;
+        }
+      });
+
+      setAllocatedBalances(balanceMap);
+    } catch (err) {
+      console.error('Error fetching allocated balances:', err);
+      // Non-critical error, don't block main flow
+    }
+  };
+
   const calculateCreditSum = (sale) => {
     if (!Array.isArray(sale.credit)) return 0;
     return sale.credit.reduce((sum, item) => sum + parseFloat(item.creditgiven || 0), 0);
@@ -94,6 +128,120 @@ const SalesReportTab = () => {
 
   const closeModal = () => {
     setSelectedSale(null);
+  };
+
+  const handleAllocateBalance = (sale, e) => {
+    e.stopPropagation(); // Prevent row click
+
+    // Calculate total available for allocation
+    const totalCollection = parseFloat(sale.cash_collected || 0) + parseFloat(sale.upi || 0);
+    const totalCredit = calculateCreditSum(sale);
+    const maxAllowed = totalCollection - totalCredit;
+
+    setAllocationSale(sale);
+    setAllocationForm({
+      cashBalance: '0',
+      bankBalance: maxAllowed.toString(),
+      galaBalance: '0'
+    });
+    setAllocationError('');
+    setShowAllocationModal(true);
+  };
+
+  const handleCloseAllocationModal = () => {
+    setShowAllocationModal(false);
+    setAllocationSale(null);
+    setAllocationForm({
+      cashBalance: '',
+      bankBalance: '',
+      galaBalance: ''
+    });
+    setAllocationError('');
+  };
+
+  const handleAllocationFieldChange = (field, value) => {
+    if (!allocationSale) return;
+
+    // Calculate total available for allocation
+    const totalCollection = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
+    const totalCredit = calculateCreditSum(allocationSale);
+    const maxAllowed = totalCollection - totalCredit;
+
+    let newForm = { ...allocationForm, [field]: value };
+
+    // Auto-calculate bank balance based on cash and gala
+    const cashBal = parseFloat(newForm.cashBalance || 0);
+    const galaBal = parseFloat(newForm.galaBalance || 0);
+    const calculatedBankBalance = maxAllowed - cashBal - galaBal;
+
+    newForm.bankBalance = Math.max(0, calculatedBankBalance).toString();
+
+    setAllocationForm(newForm);
+    setAllocationError('');
+  };
+
+  const handleSubmitAllocation = async () => {
+    if (!allocationSale) return;
+
+    const totalCollection = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
+    const totalCredit = calculateCreditSum(allocationSale);
+    const maxAllowed = totalCollection - totalCredit;
+
+    const cashBal = parseFloat(allocationForm.cashBalance || 0);
+    const bankBal = parseFloat(allocationForm.bankBalance || 0);
+    const galaBal = parseFloat(allocationForm.galaBalance || 0);
+    const totalAllocated = cashBal + bankBal + galaBal;
+
+    // Require full allocation - no partial allocations allowed
+    if (Math.abs(totalAllocated - maxAllowed) > 0.01) {
+      setAllocationError(
+        `All funds must be allocated!\n` +
+        `Total Available: ₹${maxAllowed.toFixed(2)}\n` +
+        `Currently Allocated: ₹${totalAllocated.toFixed(2)}\n\n` +
+        `सभी फंड आवंटित किए जाने चाहिए!`
+      );
+      return;
+    }
+
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to allocate the following balances?\n\n` +
+      `Cash Balance: ₹${cashBal.toFixed(2)}\n` +
+      `Bank Balance: ₹${bankBal.toFixed(2)}\n` +
+      `Gala Balance: ₹${galaBal.toFixed(2)}\n\n` +
+      `Total: ₹${totalAllocated.toFixed(2)}\n\n` +
+      `⚠️ This action cannot be undone!\n` +
+      `क्या आप सुनिश्चित हैं?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.post('/balances', {
+        salesId: allocationSale.id,
+        date: allocationSale.date,
+        cashBalance: cashBal,
+        bankBalance: bankBal,
+        galaBalance: galaBal
+      });
+
+      // Refresh allocated balances
+      const salesData = [];
+      Object.values(salesByMonth).forEach(month => {
+        salesData.push(...month.sales);
+      });
+      await fetchAllocatedBalances(salesData);
+
+      alert('✅ Balance allocated successfully!\nशेष सफलतापूर्वक आवंटित किया गया!');
+      handleCloseAllocationModal();
+    } catch (err) {
+      console.error('Error allocating balance:', err);
+      setAllocationError(err.response?.data?.error || 'Failed to allocate balance');
+    }
+  };
+
+  const isBalanceAllocated = (saleId) => {
+    return !!allocatedBalances[saleId];
   };
 
   if (loading) {
@@ -257,7 +405,12 @@ const SalesReportTab = () => {
                         Total
                       </div>
                     </th>
-                    <th style={{ color: 'white', padding: '1.25rem 1rem', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Submitted</th>
+                    <th style={{ color: 'white', padding: '1.25rem 1rem', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Wallet size={16} />
+                        Balances
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,6 +419,7 @@ const SalesReportTab = () => {
                     const total = parseFloat(sale.cash_collected || 0) +
                                   parseFloat(sale.upi || 0) -
                                   creditSum;
+                    const allocated = isBalanceAllocated(sale.id);
 
                     return (
                       <tr
@@ -305,7 +459,40 @@ const SalesReportTab = () => {
                           )}
                         </td>
                         <td style={{ padding: '1rem', fontWeight: '700', fontSize: '1.125rem', color: '#2196F3' }}>₹{total.toFixed(2)}</td>
-                        <td style={{ padding: '1rem', color: '#666', fontSize: '0.875rem' }}>{new Date(sale.created_at).toLocaleString()}</td>
+                        <td style={{ padding: '1rem' }} onClick={(e) => e.stopPropagation()}>
+                          {allocated ? (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.5rem 1rem',
+                              backgroundColor: '#d4edda',
+                              color: '#155724',
+                              borderRadius: '8px',
+                              border: '1px solid #28a745',
+                              fontSize: '0.875rem',
+                              fontWeight: '600'
+                            }}>
+                              <CheckCircle size={16} />
+                              Allocated
+                            </div>
+                          ) : (
+                            <button
+                              className="btn btn-primary"
+                              onClick={(e) => handleAllocateBalance(sale, e)}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                fontSize: '0.875rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                              }}
+                            >
+                              <Wallet size={16} />
+                              Allocate
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -330,7 +517,273 @@ const SalesReportTab = () => {
         </>
       )}
 
-      {/* Detailed Sales Modal */}
+      {/* Balance Allocation Modal */}
+      {showAllocationModal && allocationSale && (
+        <div
+          className="modal-overlay"
+          onClick={handleCloseAllocationModal}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+            }}
+          >
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              padding: '2rem',
+              borderTopLeftRadius: '16px',
+              borderTopRightRadius: '16px',
+              position: 'relative'
+            }}>
+              <button
+                onClick={handleCloseAllocationModal}
+                style={{
+                  position: 'absolute',
+                  top: '1rem',
+                  right: '1rem',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+              <h3 style={{ color: 'white', margin: 0, fontSize: '1.5rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Wallet size={28} />
+                Allocate Balance | शेष आवंटित करें
+              </h3>
+              <p style={{ color: 'rgba(255, 255, 255, 0.9)', margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
+                {new Date(allocationSale.date).toLocaleDateString()} - {allocationSale.username}
+              </p>
+            </div>
+
+            <div style={{ padding: '2rem' }}>
+              {allocationError && (
+                <div style={{
+                  padding: '1rem',
+                  backgroundColor: '#f8d7da',
+                  color: '#721c24',
+                  borderRadius: '8px',
+                  marginBottom: '1.5rem',
+                  border: '1px solid #f5c6cb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <AlertCircle size={20} />
+                  {allocationError}
+                </div>
+              )}
+
+              {/* Collection Summary */}
+              <div style={{
+                padding: '1.5rem',
+                backgroundColor: '#e3f2fd',
+                borderRadius: '12px',
+                marginBottom: '1.5rem',
+                border: '2px solid #2196f3'
+              }}>
+                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#1565c0', fontWeight: '600' }}>
+                  Total Collection Available:
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0d47a1' }}>
+                  ₹{(() => {
+                    const totalCollection = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
+                    const totalCredit = calculateCreditSum(allocationSale);
+                    return (totalCollection - totalCredit).toFixed(2);
+                  })()}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#1565c0', marginTop: '0.25rem' }}>
+                  = Cash (₹{parseFloat(allocationSale.cash_collected || 0).toFixed(2)}) + UPI (₹{parseFloat(allocationSale.upi || 0).toFixed(2)}) - Credit (₹{calculateCreditSum(allocationSale).toFixed(2)})
+                </div>
+              </div>
+
+              {/* Allocation Form */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '1rem', fontWeight: '600' }}>
+                    Cash Balance | नकद शेष
+                  </label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={allocationForm.cashBalance}
+                    onChange={(e) => handleAllocationFieldChange('cashBalance', e.target.value)}
+                    placeholder="₹ 0.00"
+                    step="0.01"
+                    min="0"
+                    style={{ fontSize: '1.25rem', padding: '1rem' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '1rem', fontWeight: '600' }}>
+                    Gala Balance | गला शेष
+                  </label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={allocationForm.galaBalance}
+                    onChange={(e) => handleAllocationFieldChange('galaBalance', e.target.value)}
+                    placeholder="₹ 0.00"
+                    step="0.01"
+                    min="0"
+                    style={{ fontSize: '1.25rem', padding: '1rem' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '1rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Bank Balance | बैंक शेष
+                    <span style={{ fontSize: '0.75rem', fontWeight: '400', color: '#666' }}>
+                      (Auto-calculated | स्वतः गणना)
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={allocationForm.bankBalance}
+                    disabled
+                    placeholder="₹ 0.00"
+                    step="0.01"
+                    min="0"
+                    style={{
+                      fontSize: '1.25rem',
+                      padding: '1rem',
+                      backgroundColor: '#e9ecef',
+                      cursor: 'not-allowed',
+                      fontWeight: '600'
+                    }}
+                  />
+                </div>
+
+                {/* Total Allocated Display */}
+                {(() => {
+                  const cashBal = parseFloat(allocationForm.cashBalance || 0);
+                  const bankBal = parseFloat(allocationForm.bankBalance || 0);
+                  const galaBal = parseFloat(allocationForm.galaBalance || 0);
+                  const totalAllocated = cashBal + bankBal + galaBal;
+
+                  const totalCollection = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
+                  const totalCredit = calculateCreditSum(allocationSale);
+                  const maxAllowed = totalCollection - totalCredit;
+                  const remaining = maxAllowed - totalAllocated;
+
+                  if (totalAllocated > 0) {
+                    return (
+                      <div style={{
+                        padding: '1rem',
+                        borderRadius: '8px',
+                        border: `2px solid ${totalAllocated > maxAllowed ? '#dc3545' : '#28a745'}`,
+                        backgroundColor: totalAllocated > maxAllowed ? '#f8d7da' : '#d4edda'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '0.875rem', color: '#666' }}>Total Allocated:</span>
+                          <span style={{ fontSize: '1.125rem', fontWeight: '700' }}>
+                            ₹{totalAllocated.toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '0.875rem', color: '#666' }}>Max Allowed:</span>
+                          <span style={{ fontSize: '1.125rem', fontWeight: '700' }}>
+                            ₹{maxAllowed.toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          paddingTop: '0.5rem',
+                          borderTop: '1px solid #ccc'
+                        }}>
+                          <span style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                            {remaining >= 0 ? 'Remaining:' : 'Exceeds by:'}
+                          </span>
+                          <span style={{
+                            fontSize: '1.25rem',
+                            fontWeight: '700',
+                            color: remaining >= 0 ? '#28a745' : '#dc3545'
+                          }}>
+                            ₹{Math.abs(remaining).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+
+              {/* Warning */}
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#fff3cd',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                border: '1px solid #ffc107',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.5rem'
+              }}>
+                <AlertCircle size={20} style={{ color: '#856404', marginTop: '2px' }} />
+                <div style={{ fontSize: '0.875rem', color: '#856404' }}>
+                  <strong>Warning:</strong> Once allocated, balances cannot be edited. Please verify before submitting.<br />
+                  <strong>चेतावनी:</strong> एक बार आवंटित होने के बाद, शेष राशि संपादित नहीं की जा सकती।
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSubmitAllocation}
+                  style={{ flex: 1, padding: '1rem', fontSize: '1rem', fontWeight: '600' }}
+                >
+                  Allocate Balance | आवंटित करें
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleCloseAllocationModal}
+                  style={{ flex: 1, padding: '1rem', fontSize: '1rem' }}
+                >
+                  Cancel | रद्द करें
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detailed Sales Modal (existing) */}
       {selectedSale && (
         <div
           style={{

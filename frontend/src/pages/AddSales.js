@@ -160,7 +160,6 @@ const AddSales = () => {
   };
 
   const handleSubmit = async () => {
-
     // Final check for duplicate sale before submission using local time
     try {
       const response = await api.get('/sales');

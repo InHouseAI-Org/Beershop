@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "init-db": "node src/config/init-db.js"
+    "init-db": "node src/config/init-db.js",
+    "create-superadmin": "node src/config/create-superadmin.js",
+    "migrate:financial": "node src/config/migrations/run_financial_migration.js"
   },
   "keywords": [],
   "author": "",

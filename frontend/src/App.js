@@ -3,8 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import UserDashboard from './pages/UserDashboard';
 import AddSales from './pages/AddSales';
+import RoleRedirect from './components/RoleRedirect';
 
 function App() {
   return (
@@ -12,23 +15,47 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+
+          {/* Superadmin route - only accessible by superadmin */}
+          <Route
+            path="/superadmin"
+            element={
+              <ProtectedRoute requireSuperAdmin={true}>
+                <SuperAdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin route - only accessible by admin */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requireAdmin={true}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* User routes - only accessible by regular users */}
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
-                <Dashboard />
+              <ProtectedRoute requireUser={true}>
+                <UserDashboard />
               </ProtectedRoute>
             }
           />
           <Route
             path="/add-sales"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireUser={true}>
                 <AddSales />
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+
+          {/* Root redirect based on role */}
+          <Route path="/" element={<RoleRedirect />} />
         </Routes>
       </AuthProvider>
     </Router>

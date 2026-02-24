@@ -21,10 +21,15 @@ const dataHelpers = {
 
   createOrganisation: async (organisationData) => {
     const result = await pool.query(
-      `INSERT INTO organisations (organisation_name)
-       VALUES ($1)
+      `INSERT INTO organisations (organisation_name, cash_balance, bank_balance, gala_balance)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [organisationData.organisationName]
+      [
+        organisationData.organisationName,
+        organisationData.initialCashBalance || 0,
+        organisationData.initialBankBalance || 0,
+        organisationData.initialGalaBalance || 0
+      ]
     );
     return result.rows[0];
   },
@@ -291,7 +296,11 @@ const dataHelpers = {
   // ==================== INVENTORY ====================
   getInventoryByOrganisationId: async (organisationId) => {
     const result = await pool.query(
-      `SELECT i.*, p.product_name, p.sale_price
+      `SELECT i.*,
+              p.product_name,
+              p.sale_price,
+              p.average_buy_price,
+              (COALESCE(i.qty, 0) * COALESCE(p.sale_price, 0)) as inventory_value
        FROM inventory i
        JOIN products p ON i.product_id = p.id
        WHERE i.organisation_id = $1
@@ -701,8 +710,8 @@ const dataHelpers = {
       `INSERT INTO credit_collection_history (
         organisation_id, credit_holder_id, amount_collected,
         previous_outstanding, new_outstanding, collected_by, notes,
-        transaction_type, sale_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        transaction_type, sale_id, collected_in
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
       [
         historyData.organisationId,
@@ -713,7 +722,8 @@ const dataHelpers = {
         historyData.collectedBy,
         historyData.notes || null,
         historyData.transactionType || 'collected',
-        historyData.saleId || null
+        historyData.saleId || null,
+        historyData.collectedIn || null
       ]
     );
     return result.rows[0];
@@ -754,8 +764,8 @@ const dataHelpers = {
     const result = await pool.query(
       `INSERT INTO distributor_payment_history (
         organisation_id, distributor_id, amount_paid,
-        previous_outstanding, new_outstanding, paid_by, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        previous_outstanding, new_outstanding, paid_by, notes, paid_from
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
       [
         historyData.organisationId,
@@ -764,7 +774,8 @@ const dataHelpers = {
         historyData.previousOutstanding,
         historyData.newOutstanding,
         historyData.paidBy,
-        historyData.notes || null
+        historyData.notes || null,
+        historyData.paidFrom || null
       ]
     );
     return result.rows[0];
@@ -793,6 +804,214 @@ const dataHelpers = {
       [distributorId]
     );
     return result.rows;
+  },
+
+  // ==================== BALANCES ====================
+  createBalance: async (balanceData) => {
+    const result = await pool.query(
+      `INSERT INTO balances (
+        organisation_id, sales_id, date,
+        cash_balance, bank_balance, gala_balance
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (sales_id)
+      DO UPDATE SET
+        cash_balance = $4,
+        bank_balance = $5,
+        gala_balance = $6,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *`,
+      [
+        balanceData.organisationId,
+        balanceData.salesId,
+        balanceData.date,
+        balanceData.cashBalance || 0,
+        balanceData.bankBalance || 0,
+        balanceData.galaBalance || 0
+      ]
+    );
+    return result.rows[0];
+  },
+
+  getBalancesByOrganisationId: async (organisationId) => {
+    const result = await pool.query(
+      `SELECT b.*, s.date as sales_date
+       FROM balances b
+       LEFT JOIN sales s ON b.sales_id = s.id
+       WHERE b.organisation_id = $1
+       ORDER BY b.date DESC`,
+      [organisationId]
+    );
+    return result.rows;
+  },
+
+  getBalanceBySalesId: async (salesId) => {
+    const result = await pool.query(
+      `SELECT * FROM balances WHERE sales_id = $1`,
+      [salesId]
+    );
+    return result.rows[0];
+  },
+
+  getOrganisationBalances: async (organisationId) => {
+    const result = await pool.query(
+      `SELECT cash_balance, bank_balance, gala_balance
+       FROM organisations
+       WHERE id = $1`,
+      [organisationId]
+    );
+    return result.rows[0];
+  },
+
+  updateOrganisationBalances: async (organisationId, balances) => {
+    const fields = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (balances.cashBalance !== undefined) {
+      fields.push(`cash_balance = $${paramCount}`);
+      values.push(balances.cashBalance);
+      paramCount++;
+    }
+
+    if (balances.bankBalance !== undefined) {
+      fields.push(`bank_balance = $${paramCount}`);
+      values.push(balances.bankBalance);
+      paramCount++;
+    }
+
+    if (balances.galaBalance !== undefined) {
+      fields.push(`gala_balance = $${paramCount}`);
+      values.push(balances.galaBalance);
+      paramCount++;
+    }
+
+    if (fields.length === 0) return null;
+
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(organisationId);
+
+    const result = await pool.query(
+      `UPDATE organisations SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    return result.rows[0] || null;
+  },
+
+  incrementOrganisationBalances: async (organisationId, balances) => {
+    const fields = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (balances.cashBalance !== undefined) {
+      fields.push(`cash_balance = cash_balance + $${paramCount}`);
+      values.push(balances.cashBalance);
+      paramCount++;
+    }
+
+    if (balances.bankBalance !== undefined) {
+      fields.push(`bank_balance = bank_balance + $${paramCount}`);
+      values.push(balances.bankBalance);
+      paramCount++;
+    }
+
+    if (balances.galaBalance !== undefined) {
+      fields.push(`gala_balance = gala_balance + $${paramCount}`);
+      values.push(balances.galaBalance);
+      paramCount++;
+    }
+
+    if (fields.length === 0) return null;
+
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(organisationId);
+
+    const result = await pool.query(
+      `UPDATE organisations SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    return result.rows[0] || null;
+  },
+
+  // ==================== EXPENSES ====================
+  createExpense: async (expenseData) => {
+    const result = await pool.query(
+      `INSERT INTO expenses (
+        organisation_id, expense_name, description,
+        expense_from, expense_amount, date
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *`,
+      [
+        expenseData.organisationId,
+        expenseData.expenseName,
+        expenseData.description || null,
+        expenseData.expenseFrom,
+        expenseData.expenseAmount,
+        expenseData.date || new Date()
+      ]
+    );
+    return result.rows[0];
+  },
+
+  getExpensesByOrganisationId: async (organisationId) => {
+    const result = await pool.query(
+      `SELECT * FROM expenses
+       WHERE organisation_id = $1
+       ORDER BY date DESC, created_at DESC`,
+      [organisationId]
+    );
+    return result.rows;
+  },
+
+  getExpenseById: async (id) => {
+    const result = await pool.query(
+      `SELECT * FROM expenses WHERE id = $1`,
+      [id]
+    );
+    return result.rows[0];
+  },
+
+  updateExpense: async (id, updates) => {
+    const fields = [];
+    const values = [];
+    let paramCount = 1;
+
+    const fieldMap = {
+      expenseName: 'expense_name',
+      description: 'description',
+      expenseFrom: 'expense_from',
+      expenseAmount: 'expense_amount',
+      date: 'date'
+    };
+
+    Object.keys(updates).forEach(key => {
+      if (fieldMap[key]) {
+        fields.push(`${fieldMap[key]} = $${paramCount}`);
+        values.push(updates[key]);
+        paramCount++;
+      }
+    });
+
+    if (fields.length === 0) return null;
+
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const result = await pool.query(
+      `UPDATE expenses SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    return result.rows[0] || null;
+  },
+
+  deleteExpense: async (id) => {
+    const result = await pool.query(
+      `DELETE FROM expenses WHERE id = $1 RETURNING id`,
+      [id]
+    );
+    return result.rowCount > 0;
   }
 };
 

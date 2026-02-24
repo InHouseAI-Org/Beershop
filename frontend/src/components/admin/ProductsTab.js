@@ -11,8 +11,7 @@ const ProductsTab = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
     productName: '',
-    salePrice: '',
-    averageBuyPrice: ''
+    salePrice: ''
   });
 
   useEffect(() => {
@@ -36,15 +35,13 @@ const ProductsTab = () => {
       setEditingProduct(product);
       setFormData({
         productName: product.product_name,
-        salePrice: product.sale_price,
-        averageBuyPrice: product.average_buy_price || ''
+        salePrice: product.sale_price
       });
     } else {
       setEditingProduct(null);
       setFormData({
         productName: '',
-        salePrice: '',
-        averageBuyPrice: ''
+        salePrice: ''
       });
     }
     setShowModal(true);
@@ -55,8 +52,7 @@ const ProductsTab = () => {
     setEditingProduct(null);
     setFormData({
       productName: '',
-      salePrice: '',
-      averageBuyPrice: ''
+      salePrice: ''
     });
   };
 
@@ -96,11 +92,6 @@ const ProductsTab = () => {
 
   const columns = [
     { key: 'product_name', label: 'Product Name' },
-    {
-      key: 'average_buy_price',
-      label: 'Avg Buy Price',
-      render: (product) => `₹${parseFloat(product.average_buy_price || 0).toFixed(2)}`
-    },
     {
       key: 'sale_price',
       label: 'Sale Price',
@@ -169,47 +160,6 @@ const ProductsTab = () => {
                   required
                 />
               </div>
-
-              {!editingProduct && (
-                <div className="form-group">
-                  <label htmlFor="averageBuyPrice">Initial Buy Price (Optional)</label>
-                  <input
-                    type="number"
-                    id="averageBuyPrice"
-                    className="form-control"
-                    value={formData.averageBuyPrice}
-                    onChange={(e) => setFormData({ ...formData, averageBuyPrice: e.target.value })}
-                    step="0.01"
-                    min="0"
-                    placeholder="Will be auto-calculated from orders"
-                  />
-                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                    Buy price will be automatically updated based on order prices
-                  </small>
-                </div>
-              )}
-
-              {editingProduct && (
-                <div className="form-group">
-                  <label htmlFor="averageBuyPrice">Average Buy Price (Auto-Calculated)</label>
-                  <input
-                    type="number"
-                    id="averageBuyPrice"
-                    className="form-control"
-                    value={formData.averageBuyPrice}
-                    readOnly
-                    style={{
-                      backgroundColor: '#e9ecef',
-                      cursor: 'not-allowed',
-                      fontWeight: '600',
-                      color: '#000'
-                    }}
-                  />
-                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                    Buy price is automatically calculated from all orders
-                  </small>
-                </div>
-              )}
 
               <div className="form-group">
                 <label htmlFor="salePrice">Sale Price</label>

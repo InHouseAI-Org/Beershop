@@ -15,7 +15,10 @@ const SuperAdminDashboard = () => {
     username: '',
     password: '',
     organisationName: '',
-    email: ''
+    email: '',
+    initialCashBalance: '',
+    initialBankBalance: '',
+    initialGalaBalance: ''
   });
 
   useEffect(() => {
@@ -54,7 +57,10 @@ const SuperAdminDashboard = () => {
         username: admin.username,
         password: '',
         organisationName: admin.organisationName || '',
-        email: admin.email || ''
+        email: admin.email || '',
+        initialCashBalance: '',
+        initialBankBalance: '',
+        initialGalaBalance: ''
       });
     } else {
       setEditingAdmin(null);
@@ -62,7 +68,10 @@ const SuperAdminDashboard = () => {
         username: '',
         password: '',
         organisationName: '',
-        email: ''
+        email: '',
+        initialCashBalance: '',
+        initialBankBalance: '',
+        initialGalaBalance: ''
       });
     }
     setShowModal(true);
@@ -75,7 +84,10 @@ const SuperAdminDashboard = () => {
       username: '',
       password: '',
       organisationName: '',
-      email: ''
+      email: '',
+      initialCashBalance: '',
+      initialBankBalance: '',
+      initialGalaBalance: ''
     });
   };
 
@@ -348,6 +360,74 @@ const SuperAdminDashboard = () => {
                   placeholder="admin@example.com"
                 />
               </div>
+
+              {!editingAdmin && (
+                <>
+                  <div style={{
+                    marginTop: '1.5rem',
+                    marginBottom: '1rem',
+                    padding: '0.75rem',
+                    backgroundColor: '#e8f5e9',
+                    borderRadius: '8px',
+                    border: '1px solid #4caf50'
+                  }}>
+                    <strong style={{ color: '#2e7d32', fontSize: '0.95rem' }}>
+                      Initial Balances (शुरुआती शेष राशि)
+                    </strong>
+                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#555' }}>
+                      Set opening balances for this organisation
+                    </p>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="initialCashBalance">
+                      Initial Cash Balance / प्रारंभिक नकद शेष (₹)
+                    </label>
+                    <input
+                      type="number"
+                      id="initialCashBalance"
+                      className="form-control"
+                      value={formData.initialCashBalance}
+                      onChange={(e) => setFormData({ ...formData, initialCashBalance: e.target.value })}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="initialBankBalance">
+                      Initial Bank Balance / प्रारंभिक बैंक शेष (₹)
+                    </label>
+                    <input
+                      type="number"
+                      id="initialBankBalance"
+                      className="form-control"
+                      value={formData.initialBankBalance}
+                      onChange={(e) => setFormData({ ...formData, initialBankBalance: e.target.value })}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="initialGalaBalance">
+                      Initial Gala Balance / प्रारंभिक गाला शेष (₹)
+                    </label>
+                    <input
+                      type="number"
+                      id="initialGalaBalance"
+                      className="form-control"
+                      value={formData.initialGalaBalance}
+                      onChange={(e) => setFormData({ ...formData, initialGalaBalance: e.target.value })}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="modal-buttons">
                 <button type="submit" className="btn btn-primary">

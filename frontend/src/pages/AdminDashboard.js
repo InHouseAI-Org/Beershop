@@ -9,6 +9,8 @@ import DistributorsTab from '../components/admin/DistributorsTab';
 import OrdersTab from '../components/admin/OrdersTab';
 import UsersTab from '../components/admin/UsersTab';
 import SalesReportTab from '../components/admin/SalesReportTab';
+import BalanceTab from '../components/admin/BalanceTab';
+import ExpenseTab from '../components/admin/ExpenseTab';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -33,6 +35,8 @@ const AdminDashboard = () => {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'salesReport', label: 'Sales Report' },
+    { id: 'balances', label: 'Balances' },
+    { id: 'expenses', label: 'Expenses' },
     { id: 'products', label: 'Products' },
     { id: 'creditHolders', label: 'Credit Holders' },
     { id: 'orders', label: 'Orders' },
@@ -174,37 +178,48 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="container">
-        {/* Tab Navigation */}
+      <div style={{ display: 'flex', minHeight: 'calc(100vh - 120px)' }}>
+        {/* Left Sidebar Navigation */}
         <div style={{
-          display: 'flex',
-          gap: '0.2rem',
-          marginBottom: '2rem',
-          borderBottom: '3px solid #000',
-          overflowX: 'auto',
-          flexWrap: 'wrap',
-          backgroundColor: 'white',
-          padding: '0.5rem',
-          borderRadius: '12px 12px 0 0',
-          justifyContent: 'space-between',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)'
+          width: '20%',
+          minWidth: '150px',
+          backgroundColor: '#fff',
+          borderRight: '2px solid #e0e0e0',
+          padding: '1rem 0',
+          position: 'relative',
+          height: '100%',
+          overflowY: 'auto'
         }}>
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '1rem 1rem',
+                width: '100%',
+                padding: '1rem 1.5rem',
                 background: activeTab === tab.id ? '#000' : 'transparent',
                 border: 'none',
-                borderRadius: '8px',
-                color: activeTab === tab.id ? 'white' : '#666',
-                fontWeight: activeTab === tab.id ? '700' : '600',
+                borderLeft: activeTab === tab.id ? '4px solid #000' : '4px solid transparent',
+                color: activeTab === tab.id ? '#fff' : '#666',
+                fontWeight: activeTab === tab.id ? '700' : '500',
                 cursor: 'pointer',
-                fontSize: '1rem',
-                transition: 'all 0.3s',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
+                fontSize: '0.95rem',
+                textAlign: 'left',
+                transition: 'all 0.2s ease',
+                display: 'block',
+                marginBottom: '0.25rem'
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== tab.id) {
+                  e.target.style.backgroundColor = '#f5f5f5';
+                  e.target.style.borderLeftColor = '#666';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== tab.id) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.borderLeftColor = 'transparent';
+                }
               }}
             >
               {tab.label}
@@ -212,15 +227,19 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* Tab Content */}
-        {activeTab === 'dashboard' && <DashboardTab />}
-        {activeTab === 'salesReport' && <SalesReportTab />}
-        {activeTab === 'inventory' && <InventoryTab />}
-        {activeTab === 'products' && <ProductsTab />}
-        {activeTab === 'creditHolders' && <CreditHoldersTab />}
-        {activeTab === 'distributors' && <DistributorsTab />}
-        {activeTab === 'orders' && <OrdersTab />}
-        {activeTab === 'users' && <UsersTab />}
+        {/* Main Content Area */}
+        <div style={{ flex: 1, padding: '2rem', backgroundColor: '#f8f9fa', overflowY: 'auto' }}>
+          {activeTab === 'dashboard' && <DashboardTab />}
+          {activeTab === 'salesReport' && <SalesReportTab />}
+          {activeTab === 'balances' && <BalanceTab />}
+          {activeTab === 'expenses' && <ExpenseTab />}
+          {activeTab === 'inventory' && <InventoryTab />}
+          {activeTab === 'products' && <ProductsTab />}
+          {activeTab === 'creditHolders' && <CreditHoldersTab />}
+          {activeTab === 'distributors' && <DistributorsTab />}
+          {activeTab === 'orders' && <OrdersTab />}
+          {activeTab === 'users' && <UsersTab />}
+        </div>
       </div>
     </>
   );

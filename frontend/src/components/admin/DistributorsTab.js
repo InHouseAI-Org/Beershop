@@ -18,7 +18,8 @@ const DistributorsTab = () => {
   });
   const [paymentData, setPaymentData] = useState({
     distributorId: '',
-    amountPaid: ''
+    amountPaid: '',
+    paidFrom: 'cash_balance'
   });
 
   useEffect(() => {
@@ -105,7 +106,8 @@ const DistributorsTab = () => {
   const handleOpenPaymentModal = () => {
     setPaymentData({
       distributorId: '',
-      amountPaid: ''
+      amountPaid: '',
+      paidFrom: 'cash_balance'
     });
     setShowPaymentModal(true);
     setError('');
@@ -116,7 +118,8 @@ const DistributorsTab = () => {
     setShowPaymentModal(false);
     setPaymentData({
       distributorId: '',
-      amountPaid: ''
+      amountPaid: '',
+      paidFrom: 'cash_balance'
     });
   };
 
@@ -151,7 +154,8 @@ const DistributorsTab = () => {
     try {
       await api.post('/distributors/pay', {
         distributorId: paymentData.distributorId,
-        amountPaid: amountPaid
+        amountPaid: amountPaid,
+        paidFrom: paymentData.paidFrom
       });
 
       setSuccess(`Successfully paid ₹${amountPaid.toFixed(2)} to ${selectedDistributor.name}`);
@@ -359,6 +363,32 @@ const DistributorsTab = () => {
                 />
               </div>
 
+              <div className="form-group">
+                <label htmlFor="paidFrom">Paid From | से भुगतान</label>
+                <select
+                  id="paidFrom"
+                  className="form-control"
+                  value={paymentData.paidFrom}
+                  onChange={(e) => setPaymentData({ ...paymentData, paidFrom: e.target.value })}
+                  required
+                  style={{ padding: '0.75rem', fontSize: '1rem' }}
+                >
+                  <option value="cash_balance">Cash Balance | नकद शेष</option>
+                  <option value="bank_balance">Bank Balance | बैंक शेष</option>
+                  <option value="gala_balance">Gala Balance | गला शेष</option>
+                </select>
+                <div style={{
+                  marginTop: '0.5rem',
+                  padding: '0.5rem',
+                  backgroundColor: '#fff3cd',
+                  borderRadius: '4px',
+                  fontSize: '0.875rem',
+                  color: '#856404'
+                }}>
+                  💡 Select which balance account to deduct this payment from
+                </div>
+              </div>
+
               {paymentData.distributorId && paymentData.amountPaid && (
                 <div style={{
                   padding: '1rem',
@@ -451,23 +481,44 @@ const DistributorsTab = () => {
                     <tr>
                       <th>Date & Time</th>
                       <th>Amount Paid</th>
+                      <th>Paid From</th>
                       <th>Previous Balance</th>
                       <th>New Balance</th>
                       <th>Paid By</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {distributorHistory.map(record => (
-                      <tr key={record.id}>
-                        <td>{new Date(record.paid_at).toLocaleString()}</td>
-                        <td style={{ color: '#2196F3', fontWeight: '700' }}>
-                          ₹{parseFloat(record.amount_paid).toFixed(2)}
-                        </td>
-                        <td>₹{parseFloat(record.previous_outstanding).toFixed(2)}</td>
-                        <td>₹{parseFloat(record.new_outstanding).toFixed(2)}</td>
-                        <td>{record.paid_by_name}</td>
-                      </tr>
-                    ))}
+                    {distributorHistory.map(record => {
+                      const paidFromDisplay = record.paid_from === 'cash_balance' ? 'Cash' :
+                        record.paid_from === 'bank_balance' ? 'Bank' :
+                        record.paid_from === 'gala_balance' ? 'Gala' : '-';
+
+                      return (
+                        <tr key={record.id}>
+                          <td>{new Date(record.paid_at).toLocaleString()}</td>
+                          <td style={{ color: '#2196F3', fontWeight: '700' }}>
+                            ₹{parseFloat(record.amount_paid).toFixed(2)}
+                          </td>
+                          <td>
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.875rem',
+                              backgroundColor: record.paid_from === 'cash_balance' ? '#fff3cd' :
+                                record.paid_from === 'bank_balance' ? '#d1ecf1' :
+                                record.paid_from === 'gala_balance' ? '#d4edda' : '#f8f9fa',
+                              color: '#000',
+                              fontWeight: '600'
+                            }}>
+                              {paidFromDisplay}
+                            </span>
+                          </td>
+                          <td>₹{parseFloat(record.previous_outstanding).toFixed(2)}</td>
+                          <td>₹{parseFloat(record.new_outstanding).toFixed(2)}</td>
+                          <td>{record.paid_by_name}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

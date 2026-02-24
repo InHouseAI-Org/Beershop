@@ -20,7 +20,8 @@ const CreditHoldersTab = () => {
   });
   const [collectData, setCollectData] = useState({
     creditHolderId: '',
-    amountCollected: ''
+    amountCollected: '',
+    collectedIn: 'cash_balance'
   });
 
   useEffect(() => {
@@ -113,7 +114,8 @@ const CreditHoldersTab = () => {
   const handleOpenCollectModal = () => {
     setCollectData({
       creditHolderId: '',
-      amountCollected: ''
+      amountCollected: '',
+      collectedIn: 'cash_balance'
     });
     setShowCollectModal(true);
     setError('');
@@ -124,7 +126,8 @@ const CreditHoldersTab = () => {
     setShowCollectModal(false);
     setCollectData({
       creditHolderId: '',
-      amountCollected: ''
+      amountCollected: '',
+      collectedIn: 'cash_balance'
     });
   };
 
@@ -133,8 +136,8 @@ const CreditHoldersTab = () => {
     setError('');
     setSuccess('');
 
-    if (!collectData.creditHolderId || !collectData.amountCollected) {
-      setError('Please select a credit holder and enter amount');
+    if (!collectData.creditHolderId || !collectData.amountCollected || !collectData.collectedIn) {
+      setError('Please select a credit holder, enter amount, and select collection account');
       return;
     }
 
@@ -159,7 +162,8 @@ const CreditHoldersTab = () => {
     try {
       await api.post('/credit-holders/collect', {
         creditHolderId: collectData.creditHolderId,
-        amountCollected: amountCollected
+        amountCollected: amountCollected,
+        collectedIn: collectData.collectedIn
       });
 
       setSuccess(`Successfully collected ₹${amountCollected.toFixed(2)} from ${selectedHolder.name}`);
@@ -396,6 +400,32 @@ const CreditHoldersTab = () => {
                 />
               </div>
 
+              <div className="form-group">
+                <label htmlFor="collectedIn">Collected In | में एकत्रित</label>
+                <select
+                  id="collectedIn"
+                  className="form-control"
+                  value={collectData.collectedIn}
+                  onChange={(e) => setCollectData({ ...collectData, collectedIn: e.target.value })}
+                  required
+                  style={{ padding: '0.75rem', fontSize: '1rem' }}
+                >
+                  <option value="cash_balance">Cash Balance | नकद शेष</option>
+                  <option value="bank_balance">Bank Balance | बैंक शेष</option>
+                  <option value="gala_balance">Gala Balance | गला शेष</option>
+                </select>
+                <div style={{
+                  marginTop: '0.5rem',
+                  padding: '0.5rem',
+                  backgroundColor: '#e8f5e9',
+                  borderRadius: '4px',
+                  fontSize: '0.875rem',
+                  color: '#2e7d32'
+                }}>
+                  💡 Select which balance account to add this collection to
+                </div>
+              </div>
+
               {collectData.creditHolderId && collectData.amountCollected && (
                 <div style={{
                   padding: '1rem',
@@ -497,6 +527,7 @@ const CreditHoldersTab = () => {
                       <th>Date & Time</th>
                       <th>Type</th>
                       <th>Amount</th>
+                      <th>Collected In</th>
                       <th>Previous Balance</th>
                       <th>New Balance</th>
                       <th>User</th>
@@ -506,6 +537,10 @@ const CreditHoldersTab = () => {
                     {creditHolderHistory.map(record => {
                       const transactionType = record.transaction_type || 'collected';
                       const isGiven = transactionType === 'given';
+                      const collectedInDisplay = record.collected_in === 'cash_balance' ? 'Cash' :
+                        record.collected_in === 'bank_balance' ? 'Bank' :
+                        record.collected_in === 'gala_balance' ? 'Gala' : '-';
+
                       return (
                         <tr key={record.id}>
                           <td>{new Date(record.collected_at).toLocaleString()}</td>
@@ -522,6 +557,22 @@ const CreditHoldersTab = () => {
                           </td>
                           <td style={{ color: isGiven ? '#dc3545' : '#4CAF50', fontWeight: '700' }}>
                             {isGiven ? '+' : '-'}₹{parseFloat(record.amount_collected).toFixed(2)}
+                          </td>
+                          <td>
+                            {!isGiven && record.collected_in ? (
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.875rem',
+                                backgroundColor: record.collected_in === 'cash_balance' ? '#fff3cd' :
+                                  record.collected_in === 'bank_balance' ? '#d1ecf1' :
+                                  record.collected_in === 'gala_balance' ? '#d4edda' : '#f8f9fa',
+                                color: '#000',
+                                fontWeight: '600'
+                              }}>
+                                {collectedInDisplay}
+                              </span>
+                            ) : '-'}
                           </td>
                           <td>₹{parseFloat(record.previous_outstanding).toFixed(2)}</td>
                           <td>₹{parseFloat(record.new_outstanding).toFixed(2)}</td>

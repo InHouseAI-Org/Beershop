@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/login', { username, password });
       localStorage.setItem('token', response.data.token);
       setUser(response.data.user);
-      return { success: true };
+      return { success: true, user: response.data.user };
     } catch (error) {
       return {
         success: false,

@@ -117,10 +117,18 @@ const deleteCreditHolder = async (req, res) => {
 
 const collectCredit = async (req, res) => {
   try {
-    const { creditHolderId, amountCollected } = req.body;
+    const { creditHolderId, amountCollected, collectedIn } = req.body;
 
-    if (!creditHolderId || !amountCollected) {
-      return res.status(400).json({ error: 'Credit holder ID and amount collected are required' });
+    if (!creditHolderId || !amountCollected || !collectedIn) {
+      return res.status(400).json({ error: 'Credit holder ID, amount collected, and collection account are required' });
+    }
+
+    // Validate collectedIn enum
+    const validCollectedIn = ['cash_balance', 'bank_balance', 'gala_balance'];
+    if (!validCollectedIn.includes(collectedIn)) {
+      return res.status(400).json({
+        error: 'collectedIn must be one of: cash_balance, bank_balance, gala_balance'
+      });
     }
 
     const amount = parseFloat(amountCollected);
@@ -155,7 +163,29 @@ const collectCredit = async (req, res) => {
       amountPayable: newPayable
     });
 
-    // Save transaction history
+    // Add collected amount to the selected balance
+    const balanceUpdate = {};
+    if (collectedIn === 'cash_balance') {
+      balanceUpdate.cashBalance = amount;
+    } else if (collectedIn === 'bank_balance') {
+      balanceUpdate.bankBalance = amount;
+    } else if (collectedIn === 'gala_balance') {
+      balanceUpdate.galaBalance = amount;
+    }
+    await db.incrementOrganisationBalances(req.user.organisationId, balanceUpdate);
+
+    // Get the updated balance for confirmation
+    const orgBalances = await db.getOrganisationBalances(req.user.organisationId);
+    let newBalance = 0;
+    if (collectedIn === 'cash_balance') {
+      newBalance = parseFloat(orgBalances.cash_balance || 0);
+    } else if (collectedIn === 'bank_balance') {
+      newBalance = parseFloat(orgBalances.bank_balance || 0);
+    } else if (collectedIn === 'gala_balance') {
+      newBalance = parseFloat(orgBalances.gala_balance || 0);
+    }
+
+    // Save transaction history with collectedIn information
     await db.createCreditCollectionHistory({
       organisationId: req.user.organisationId,
       creditHolderId: creditHolderId,
@@ -165,7 +195,8 @@ const collectCredit = async (req, res) => {
       collectedBy: req.user.id,
       notes: null,
       transactionType: 'collected',
-      saleId: null
+      saleId: null,
+      collectedIn: collectedIn
     });
 
     res.json({
@@ -173,7 +204,9 @@ const collectCredit = async (req, res) => {
       creditHolder: updatedCreditHolder,
       amountCollected: amount,
       previousPayable: currentPayable,
-      newPayable: newPayable
+      newPayable: newPayable,
+      collectedIn: collectedIn,
+      newBalance: newBalance
     });
   } catch (error) {
     console.error('Error collecting credit:', error);

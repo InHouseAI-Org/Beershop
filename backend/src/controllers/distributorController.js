@@ -113,10 +113,18 @@ const deleteDistributor = async (req, res) => {
 
 const payDistributor = async (req, res) => {
   try {
-    const { distributorId, amountPaid } = req.body;
+    const { distributorId, amountPaid, paidFrom } = req.body;
 
-    if (!distributorId || !amountPaid) {
-      return res.status(400).json({ error: 'Distributor ID and amount paid are required' });
+    if (!distributorId || !amountPaid || !paidFrom) {
+      return res.status(400).json({ error: 'Distributor ID, amount paid, and payment source are required' });
+    }
+
+    // Validate paidFrom enum
+    const validPaidFrom = ['cash_balance', 'bank_balance', 'gala_balance'];
+    if (!validPaidFrom.includes(paidFrom)) {
+      return res.status(400).json({
+        error: 'paidFrom must be one of: cash_balance, bank_balance, gala_balance'
+      });
     }
 
     const amount = parseFloat(amountPaid);
@@ -143,6 +151,32 @@ const payDistributor = async (req, res) => {
       });
     }
 
+    // Get current organisation balances to check if sufficient funds are available
+    const orgBalances = await db.getOrganisationBalances(req.user.organisationId);
+    if (!orgBalances) {
+      return res.status(404).json({ error: 'Organisation not found' });
+    }
+
+    // Check if sufficient balance is available
+    let currentBalance = 0;
+    let balanceName = '';
+    if (paidFrom === 'cash_balance') {
+      currentBalance = parseFloat(orgBalances.cash_balance || 0);
+      balanceName = 'Cash Balance';
+    } else if (paidFrom === 'bank_balance') {
+      currentBalance = parseFloat(orgBalances.bank_balance || 0);
+      balanceName = 'Bank Balance';
+    } else if (paidFrom === 'gala_balance') {
+      currentBalance = parseFloat(orgBalances.gala_balance || 0);
+      balanceName = 'Gala Balance';
+    }
+
+    if (amount > currentBalance) {
+      return res.status(400).json({
+        error: `Insufficient ${balanceName}. Available: ₹${currentBalance.toFixed(2)}, Required: ₹${amount.toFixed(2)}`
+      });
+    }
+
     // Calculate new outstanding amount
     const newOutstanding = currentOutstanding - amount;
 
@@ -151,7 +185,18 @@ const payDistributor = async (req, res) => {
       amountOutstanding: newOutstanding
     });
 
-    // Save transaction history
+    // Deduct payment amount from the selected balance
+    const balanceUpdate = {};
+    if (paidFrom === 'cash_balance') {
+      balanceUpdate.cashBalance = -amount;
+    } else if (paidFrom === 'bank_balance') {
+      balanceUpdate.bankBalance = -amount;
+    } else if (paidFrom === 'gala_balance') {
+      balanceUpdate.galaBalance = -amount;
+    }
+    await db.incrementOrganisationBalances(req.user.organisationId, balanceUpdate);
+
+    // Save transaction history with paidFrom information
     await db.createDistributorPaymentHistory({
       organisationId: req.user.organisationId,
       distributorId: distributorId,
@@ -159,7 +204,8 @@ const payDistributor = async (req, res) => {
       previousOutstanding: currentOutstanding,
       newOutstanding: newOutstanding,
       paidBy: req.user.id,
-      notes: null
+      notes: null,
+      paidFrom: paidFrom
     });
 
     res.json({
@@ -167,7 +213,9 @@ const payDistributor = async (req, res) => {
       distributor: updatedDistributor,
       amountPaid: amount,
       previousOutstanding: currentOutstanding,
-      newOutstanding: newOutstanding
+      newOutstanding: newOutstanding,
+      paidFrom: paidFrom,
+      newBalance: currentBalance - amount
     });
   } catch (error) {
     console.error('Error recording distributor payment:', error);
