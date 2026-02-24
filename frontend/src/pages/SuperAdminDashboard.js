@@ -5,12 +5,16 @@ import api from '../utils/api';
 
 const SuperAdminDashboard = () => {
   const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState('admins');
   const [admins, setAdmins] = useState([]);
+  const [organisations, setOrganisations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [showMobileWarning, setShowMobileWarning] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState(null);
+  const [editingOrganisation, setEditingOrganisation] = useState(null);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -20,9 +24,15 @@ const SuperAdminDashboard = () => {
     initialBankBalance: '',
     initialGalaBalance: ''
   });
+  const [balanceFormData, setBalanceFormData] = useState({
+    cashBalance: '',
+    bankBalance: '',
+    galaBalance: ''
+  });
 
   useEffect(() => {
     fetchAdmins();
+    fetchOrganisations();
 
     // Check if user is on mobile device
     const isMobile = window.innerWidth < 768;
@@ -47,6 +57,16 @@ const SuperAdminDashboard = () => {
       setError('Failed to fetch admins');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOrganisations = async () => {
+    try {
+      const response = await api.get('/admins/organisations/all');
+      setOrganisations(response.data);
+      setError('');
+    } catch (err) {
+      setError('Failed to fetch organisations');
     }
   };
 
@@ -124,6 +144,44 @@ const SuperAdminDashboard = () => {
       await fetchAdmins();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete admin');
+    }
+  };
+
+  const handleOpenBalanceModal = (organisation) => {
+    setEditingOrganisation(organisation);
+    setBalanceFormData({
+      cashBalance: organisation.cashBalance.toString(),
+      bankBalance: organisation.bankBalance.toString(),
+      galaBalance: organisation.galaBalance.toString()
+    });
+    setShowBalanceModal(true);
+  };
+
+  const handleCloseBalanceModal = () => {
+    setShowBalanceModal(false);
+    setEditingOrganisation(null);
+    setBalanceFormData({
+      cashBalance: '',
+      bankBalance: '',
+      galaBalance: ''
+    });
+    setError('');
+  };
+
+  const handleBalanceSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      await api.put(`/admins/organisations/${editingOrganisation.id}/balances`, {
+        cashBalance: parseFloat(balanceFormData.cashBalance),
+        bankBalance: parseFloat(balanceFormData.bankBalance),
+        galaBalance: parseFloat(balanceFormData.galaBalance)
+      });
+      await fetchOrganisations();
+      handleCloseBalanceModal();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update balances');
     }
   };
 
@@ -250,12 +308,53 @@ const SuperAdminDashboard = () => {
       <div className="container">
         {error && <div className="error" style={{ marginBottom: '1rem', fontSize: '1rem' }}>{error}</div>}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>Manage Admins</h2>
-          <button onClick={() => handleOpenModal()} className="btn btn-success">
-            Add New Admin
-          </button>
+        {/* Tab Navigation */}
+        <div style={{ marginBottom: '2rem', borderBottom: '2px solid #e0e0e0' }}>
+          <div style={{ display: 'flex', gap: '0' }}>
+            <button
+              onClick={() => setActiveTab('admins')}
+              style={{
+                padding: '1rem 2rem',
+                background: activeTab === 'admins' ? '#000' : 'transparent',
+                color: activeTab === 'admins' ? '#fff' : '#666',
+                border: 'none',
+                borderBottom: activeTab === 'admins' ? '3px solid #000' : '3px solid transparent',
+                fontSize: '1.125rem',
+                fontWeight: activeTab === 'admins' ? '700' : '400',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              Admins
+            </button>
+            <button
+              onClick={() => setActiveTab('organisations')}
+              style={{
+                padding: '1rem 2rem',
+                background: activeTab === 'organisations' ? '#000' : 'transparent',
+                color: activeTab === 'organisations' ? '#fff' : '#666',
+                border: 'none',
+                borderBottom: activeTab === 'organisations' ? '3px solid #000' : '3px solid transparent',
+                fontSize: '1.125rem',
+                fontWeight: activeTab === 'organisations' ? '700' : '400',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              Organisation Balances
+            </button>
+          </div>
         </div>
+
+        {/* Admins Tab */}
+        {activeTab === 'admins' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>Manage Admins</h2>
+              <button onClick={() => handleOpenModal()} className="btn btn-success">
+                Add New Admin
+              </button>
+            </div>
 
         <div className="table-container">
           <table className="table">
@@ -302,6 +401,62 @@ const SuperAdminDashboard = () => {
             </tbody>
           </table>
         </div>
+          </>
+        )}
+
+        {/* Organisations Tab */}
+        {activeTab === 'organisations' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>Organisation Balances</h2>
+            </div>
+
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Organisation</th>
+                    <th>Cash Balance</th>
+                    <th>Bank Balance</th>
+                    <th>Gala Balance</th>
+                    <th>Total</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {organisations.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                        No organisations found
+                      </td>
+                    </tr>
+                  ) : (
+                    organisations.map(org => {
+                      const total = org.cashBalance + org.bankBalance + org.galaBalance;
+                      return (
+                        <tr key={org.id}>
+                          <td style={{ fontWeight: '600' }}>{org.name}</td>
+                          <td>₹{org.cashBalance.toFixed(2)}</td>
+                          <td>₹{org.bankBalance.toFixed(2)}</td>
+                          <td>₹{org.galaBalance.toFixed(2)}</td>
+                          <td style={{ fontWeight: '700', color: '#2196f3' }}>₹{total.toFixed(2)}</td>
+                          <td>
+                            <button
+                              onClick={() => handleOpenBalanceModal(org)}
+                              className="btn btn-primary"
+                            >
+                              Edit Balances
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {showModal && (
@@ -434,6 +589,89 @@ const SuperAdminDashboard = () => {
                   {editingAdmin ? 'Update' : 'Create'}
                 </button>
                 <button type="button" onClick={handleCloseModal} className="btn btn-secondary">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Balance Edit Modal */}
+      {showBalanceModal && (
+        <div className="modal-overlay" onClick={handleCloseBalanceModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Edit Balances - {editingOrganisation?.name}</h2>
+            {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
+            <form onSubmit={handleBalanceSubmit}>
+              <div className="form-group">
+                <label htmlFor="cashBalance">
+                  Cash Balance / नकद शेष (₹)
+                </label>
+                <input
+                  type="number"
+                  id="cashBalance"
+                  className="form-control"
+                  value={balanceFormData.cashBalance}
+                  onChange={(e) => setBalanceFormData({ ...balanceFormData, cashBalance: e.target.value })}
+                  placeholder="0.00"
+                  step="0.01"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="bankBalance">
+                  Bank Balance / बैंक शेष (₹)
+                </label>
+                <input
+                  type="number"
+                  id="bankBalance"
+                  className="form-control"
+                  value={balanceFormData.bankBalance}
+                  onChange={(e) => setBalanceFormData({ ...balanceFormData, bankBalance: e.target.value })}
+                  placeholder="0.00"
+                  step="0.01"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="galaBalance">
+                  Gala Balance / गाला शेष (₹)
+                </label>
+                <input
+                  type="number"
+                  id="galaBalance"
+                  className="form-control"
+                  value={balanceFormData.galaBalance}
+                  onChange={(e) => setBalanceFormData({ ...balanceFormData, galaBalance: e.target.value })}
+                  placeholder="0.00"
+                  step="0.01"
+                  required
+                />
+              </div>
+
+              <div style={{
+                marginTop: '1.5rem',
+                padding: '1rem',
+                backgroundColor: '#fff3e0',
+                borderRadius: '8px',
+                border: '1px solid #ff9800'
+              }}>
+                <strong style={{ color: '#e65100', fontSize: '0.95rem', display: 'block', marginBottom: '0.5rem' }}>
+                  ⚠️ Warning / चेतावनी
+                </strong>
+                <p style={{ margin: 0, fontSize: '0.875rem', color: '#555' }}>
+                  Editing balances will directly change the organisation's financial records. Please ensure the values are accurate.
+                </p>
+              </div>
+
+              <div className="modal-buttons">
+                <button type="submit" className="btn btn-primary">
+                  Update Balances
+                </button>
+                <button type="button" onClick={handleCloseBalanceModal} className="btn btn-secondary">
                   Cancel
                 </button>
               </div>

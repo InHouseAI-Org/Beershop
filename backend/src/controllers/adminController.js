@@ -122,4 +122,75 @@ const deleteAdmin = async (req, res) => {
   }
 };
 
-module.exports = { getAllAdmins, createAdmin, updateAdmin, deleteAdmin };
+const getAllOrganisations = async (req, res) => {
+  try {
+    const organisations = await db.getAllOrganisations();
+
+    // Get balances for each organisation
+    const organisationsWithBalances = await Promise.all(
+      organisations.map(async (org) => {
+        const balances = await db.getOrganisationBalances(org.id);
+        return {
+          id: org.id,
+          name: org.organisation_name,
+          cashBalance: parseFloat(balances.cash_balance || 0),
+          bankBalance: parseFloat(balances.bank_balance || 0),
+          galaBalance: parseFloat(balances.gala_balance || 0),
+          createdAt: org.created_at,
+          updatedAt: org.updated_at
+        };
+      })
+    );
+
+    res.json(organisationsWithBalances);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const updateOrganisationBalances = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cashBalance, bankBalance, galaBalance } = req.body;
+
+    // Validate that at least one balance is provided
+    if (cashBalance === undefined && bankBalance === undefined && galaBalance === undefined) {
+      return res.status(400).json({ error: 'Please provide at least one balance to update' });
+    }
+
+    // Build the update object
+    const balances = {};
+    if (cashBalance !== undefined) balances.cashBalance = parseFloat(cashBalance);
+    if (bankBalance !== undefined) balances.bankBalance = parseFloat(bankBalance);
+    if (galaBalance !== undefined) balances.galaBalance = parseFloat(galaBalance);
+
+    // Update the balances
+    await db.updateOrganisationBalances(id, balances);
+
+    // Get updated balances
+    const updatedBalances = await db.getOrganisationBalances(id);
+    const organisation = await db.getOrganisationById(id);
+
+    res.json({
+      id: organisation.id,
+      name: organisation.organisation_name,
+      cashBalance: parseFloat(updatedBalances.cash_balance || 0),
+      bankBalance: parseFloat(updatedBalances.bank_balance || 0),
+      galaBalance: parseFloat(updatedBalances.gala_balance || 0),
+      updatedAt: organisation.updated_at
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+module.exports = {
+  getAllAdmins,
+  createAdmin,
+  updateAdmin,
+  deleteAdmin,
+  getAllOrganisations,
+  updateOrganisationBalances
+};
