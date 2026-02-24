@@ -11,6 +11,7 @@ import UsersTab from '../components/admin/UsersTab';
 import SalesReportTab from '../components/admin/SalesReportTab';
 import BalanceTab from '../components/admin/BalanceTab';
 import ExpenseTab from '../components/admin/ExpenseTab';
+import BalanceTransfersTab from '../components/admin/BalanceTransfersTab';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -36,6 +37,7 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'salesReport', label: 'Sales Report' },
     { id: 'balances', label: 'Balances' },
+    { id: 'balanceTransfers', label: 'Balance Transfers' },
     { id: 'expenses', label: 'Expenses' },
     { id: 'products', label: 'Products' },
     { id: 'creditHolders', label: 'Credit Holders' },
@@ -232,6 +234,7 @@ const AdminDashboard = () => {
           {activeTab === 'dashboard' && <DashboardTab />}
           {activeTab === 'salesReport' && <SalesReportTab />}
           {activeTab === 'balances' && <BalanceTab />}
+          {activeTab === 'balanceTransfers' && <BalanceTransfersTab />}
           {activeTab === 'expenses' && <ExpenseTab />}
           {activeTab === 'inventory' && <InventoryTab />}
           {activeTab === 'products' && <ProductsTab />}

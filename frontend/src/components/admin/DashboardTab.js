@@ -94,15 +94,6 @@ const DashboardTab = () => {
             {stats.totalDistributors}
           </p>
         </div>
-
-        <div className="card" style={{ textAlign: 'center' }}>
-          <h3 style={{ color: '#666', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>
-            Total Orders
-          </h3>
-          <p style={{ fontSize: '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
-            {stats.totalOrders}
-          </p>
-        </div>
       </div>
 
     </>
