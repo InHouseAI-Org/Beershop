@@ -542,8 +542,8 @@ const dataHelpers = {
     console.log('Credit JSON:', creditJson);
 
     const result = await pool.query(
-      `INSERT INTO sales (organisation_id, user_id, date, opening_stock, closing_stock, sale, cash_collected, upi, miscellaneous, credit, remarks, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO sales (organisation_id, user_id, date, opening_stock, closing_stock, sale, cash_collected, upi, miscellaneous, miscellaneous_type, miscellaneous_cash, miscellaneous_upi, gala_balance_today, credit, remarks, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         saleData.organisationId,
@@ -555,6 +555,10 @@ const dataHelpers = {
         saleData.cashCollected || 0,
         saleData.upi || 0,
         saleData.miscellaneous || 0,
+        saleData.miscellaneousType || 'cash',
+        saleData.miscellaneousCash || 0,
+        saleData.miscellaneousUPI || 0,
+        saleData.galaBalanceToday || 0,
         creditJson,
         saleData.remarks || null,
         saleData.status || 'approved'
@@ -713,8 +717,8 @@ const dataHelpers = {
       `INSERT INTO credit_collection_history (
         organisation_id, credit_holder_id, amount_collected,
         previous_outstanding, new_outstanding, collected_by, notes,
-        transaction_type, sale_id, collected_in
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        transaction_type, sale_id, collected_in, collection_type
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
       [
         historyData.organisationId,
@@ -726,7 +730,8 @@ const dataHelpers = {
         historyData.notes || null,
         historyData.transactionType || 'collected',
         historyData.saleId || null,
-        historyData.collectedIn || null
+        historyData.collectedIn || null,
+        historyData.collectionType || 'regular'
       ]
     );
     return result.rows[0];
@@ -1059,6 +1064,48 @@ const dataHelpers = {
   deleteBalanceTransfer: async (id) => {
     const result = await pool.query(
       `DELETE FROM balance_transfers WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return result.rows[0];
+  },
+
+  // ==================== DAILY EXPENSES ====================
+  createDailyExpense: async (expenseData) => {
+    const result = await pool.query(
+      `INSERT INTO daily_expenses (organisation_id, sale_id, name, description, amount, expense_date)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        expenseData.organisationId,
+        expenseData.saleId || null,
+        expenseData.name,
+        expenseData.description || null,
+        expenseData.amount,
+        expenseData.expenseDate || new Date()
+      ]
+    );
+    return result.rows[0];
+  },
+
+  getDailyExpensesBySaleId: async (saleId) => {
+    const result = await pool.query(
+      `SELECT * FROM daily_expenses WHERE sale_id = $1 ORDER BY created_at`,
+      [saleId]
+    );
+    return result.rows;
+  },
+
+  getDailyExpensesByOrganisation: async (organisationId) => {
+    const result = await pool.query(
+      `SELECT * FROM daily_expenses WHERE organisation_id = $1 ORDER BY expense_date DESC, created_at DESC`,
+      [organisationId]
+    );
+    return result.rows;
+  },
+
+  deleteDailyExpense: async (id) => {
+    const result = await pool.query(
+      `DELETE FROM daily_expenses WHERE id = $1 RETURNING *`,
       [id]
     );
     return result.rows[0];

@@ -274,7 +274,7 @@ const DistributorsTab = () => {
                     className="form-control"
                     value={formData.amountOutstanding}
                     onChange={(e) => setFormData({ ...formData, amountOutstanding: e.target.value })}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="₹ 0.00"
                   />
@@ -374,7 +374,7 @@ const DistributorsTab = () => {
                   className="form-control"
                   value={paymentData.amountPaid}
                   onChange={(e) => setPaymentData({ ...paymentData, amountPaid: e.target.value })}
-                  step="0.01"
+                  step="1"
                   min="0.01"
                   required
                   placeholder="Enter amount paid"

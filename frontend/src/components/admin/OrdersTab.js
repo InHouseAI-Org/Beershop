@@ -12,6 +12,7 @@ const OrdersTab = () => {
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [editingOrder, setEditingOrder] = useState(null);
+  const [lastSalesReportDate, setLastSalesReportDate] = useState(null);
   const [formData, setFormData] = useState({
     distributorId: '',
     orderDate: new Date().toISOString().split('T')[0],
@@ -27,6 +28,7 @@ const OrdersTab = () => {
     fetchOrders();
     fetchDistributors();
     fetchProducts();
+    fetchLastSalesReportDate();
   }, []);
 
   const fetchOrders = async () => {
@@ -56,6 +58,29 @@ const OrdersTab = () => {
       setProducts(response.data);
     } catch (err) {
       console.error('Failed to fetch products');
+    }
+  };
+
+  const fetchLastSalesReportDate = async () => {
+    try {
+      const response = await api.get('/sales');
+      const sales = response.data;
+
+      if (sales && sales.length > 0) {
+        // Find the most recent approved sale
+        const approvedSales = sales.filter(sale => sale.status === 'approved' || !sale.status);
+
+        if (approvedSales.length > 0) {
+          // Sort by date descending and get the most recent
+          const sortedSales = approvedSales.sort((a, b) => new Date(b.date) - new Date(a.date));
+          const lastSaleDate = new Date(sortedSales[0].date);
+          setLastSalesReportDate(lastSaleDate.toISOString().split('T')[0]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch last sales report date');
+      // If error, default to today as minimum
+      setLastSalesReportDate(new Date().toISOString().split('T')[0]);
     }
   };
 
@@ -255,26 +280,43 @@ const OrdersTab = () => {
                 <div className="form-group">
                   <label htmlFor="orderDate" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem', fontWeight: '600' }}>
                     <Calendar size={20} />
-                    Order Date (Today's Date)
+                    Order Date
                   </label>
                   <input
                     type="date"
                     id="orderDate"
                     className="form-control"
                     value={formData.orderDate}
-                    readOnly
+                    onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })}
+                    min={(() => {
+                      if (!lastSalesReportDate) return new Date().toISOString().split('T')[0];
+                      // Add 1 day to the last sales report date
+                      const minDate = new Date(lastSalesReportDate);
+                      minDate.setDate(minDate.getDate() + 1);
+                      return minDate.toISOString().split('T')[0];
+                    })()}
+                    max={new Date().toISOString().split('T')[0]}
                     style={{
                       fontSize: '1.125rem',
                       padding: '1rem',
-                      backgroundColor: '#e9ecef',
-                      cursor: 'not-allowed',
                       fontWeight: '600',
                       color: '#000'
                     }}
                   />
-                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                    Order date is automatically set to today's date
-                  </small>
+                  {lastSalesReportDate && (
+                    <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                      You can select dates from {(() => {
+                        const minDate = new Date(lastSalesReportDate);
+                        minDate.setDate(minDate.getDate() + 1);
+                        return minDate.toLocaleDateString();
+                      })()} (day after last sales report) to today
+                    </small>
+                  )}
+                  {!lastSalesReportDate && (
+                    <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                      Loading date range...
+                    </small>
+                  )}
                 </div>
               </div>
             </div>
@@ -358,7 +400,7 @@ const OrdersTab = () => {
                             className="form-control"
                             value={item.buy_price}
                             onChange={(e) => updateOrderItem(index, 'buy_price', e.target.value)}
-                            step="0.01"
+                            step="1"
                             min="0"
                             placeholder="0.00"
                             style={{ fontSize: '1rem', padding: '0.875rem' }}
@@ -395,7 +437,7 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.tax}
                     onChange={(e) => setFormData({ ...formData, tax: e.target.value })}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
@@ -412,7 +454,7 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.misc}
                     onChange={(e) => setFormData({ ...formData, misc: e.target.value })}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
@@ -429,7 +471,7 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.scheme}
                     onChange={(e) => setFormData({ ...formData, scheme: e.target.value })}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
@@ -446,7 +488,7 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.discount}
                     onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}

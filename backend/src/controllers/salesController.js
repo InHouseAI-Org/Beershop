@@ -40,7 +40,11 @@ const getSale = async (req, res) => {
 const createSale = async (req, res) => {
   try {
     // Note: openingStock from frontend is ignored - we calculate it from inventory
-    const { date, closingStock, sale, cashCollected, upi, miscellaneous, credit, remarks } = req.body;
+    const {
+      date, closingStock, sale, cashCollected, upi, miscellaneous, miscellaneousType,
+      miscellaneousCash, miscellaneousUPI,
+      galaBalanceToday, credit, creditTaken, dailyExpenses, remarks
+    } = req.body;
 
     console.log('=== CREATE SALE REQUEST ===');
     console.log('Closing Stock:', closingStock);
@@ -168,6 +172,10 @@ const createSale = async (req, res) => {
       cashCollected: cashCollected || 0,
       upi: upi || 0,
       miscellaneous: miscellaneous || 0,
+      miscellaneousType: miscellaneousType || 'cash',
+      miscellaneousCash: miscellaneousCash || 0,
+      miscellaneousUPI: miscellaneousUPI || 0,
+      galaBalanceToday: galaBalanceToday || 0,
       credit,
       remarks,
       status
@@ -233,6 +241,60 @@ const createSale = async (req, res) => {
       }
     } else {
       console.log('No credit to process (not array or empty)');
+    }
+
+    // Process credit taken (collected on shop)
+    console.log('Processing credit taken entries...');
+    if (Array.isArray(creditTaken) && creditTaken.length > 0) {
+      for (const takenItem of creditTaken) {
+        if (takenItem.creditHolderId && takenItem.amount && takenItem.collectedIn) {
+          const takenAmount = parseFloat(takenItem.amount);
+          console.log(`Processing credit taken: ${takenAmount} from holder ${takenItem.creditHolderId}`);
+
+          // Get current outstanding before decrementing
+          const creditHolder = await db.getCreditHolderById(takenItem.creditHolderId);
+          const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
+
+          // Decrement outstanding (collecting credit)
+          await db.decrementCreditHolderOutstanding(takenItem.creditHolderId, takenAmount);
+          const newOutstanding = Math.max(0, previousOutstanding - takenAmount);
+          console.log(`Reduced ${takenAmount} from credit holder ${takenItem.creditHolderId} outstanding`);
+
+          // Record transaction history with collection_type='collected_on_shop'
+          await db.createCreditCollectionHistory({
+            organisationId,
+            creditHolderId: takenItem.creditHolderId,
+            amountCollected: takenAmount,
+            previousOutstanding: previousOutstanding,
+            newOutstanding: newOutstanding,
+            collectedBy: req.user.id,
+            notes: 'Collected on shop during sales',
+            transactionType: 'collected',
+            saleId: newSale.id,
+            collectedIn: takenItem.collectedIn, // 'cash_balance' or 'bank_balance'
+            collectionType: 'collected_on_shop'
+          });
+          console.log(`Recorded credit taken in history as 'collected_on_shop'`);
+        }
+      }
+    }
+
+    // Save daily expenses
+    console.log('Processing daily expenses...');
+    if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0) {
+      for (const expense of dailyExpenses) {
+        if (expense.name && expense.amount) {
+          await db.createDailyExpense({
+            organisationId,
+            saleId: newSale.id,
+            name: expense.name,
+            description: expense.description || null,
+            amount: parseFloat(expense.amount),
+            expenseDate: date || new Date()
+          });
+          console.log(`Created expense: ${expense.name} - ₹${expense.amount}`);
+        }
+      }
     }
     } else {
       console.log('Sale created with pending status - waiting for admin approval');

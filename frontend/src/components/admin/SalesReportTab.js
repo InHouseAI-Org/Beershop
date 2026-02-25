@@ -305,13 +305,24 @@ const SalesReportTab = () => {
       });
     }
 
+    // Initialize credit taken entries from sale
+    const creditTakenData = [];
+    // Note: Credit taken is stored in credit_collection_history, fetch if needed
+
+    // Initialize daily expenses from sale
+    const dailyExpensesData = [];
+    // Note: Daily expenses are stored in daily_expenses table, fetch if needed
+
     setApprovalForm({
       date: sale.date?.split('T')[0] || new Date().toISOString().split('T')[0],
       productData: productDataMap,
-      cashCollected: sale.cash_collected || 0,
-      upi: sale.upi || 0,
-      miscellaneous: sale.miscellaneous || 0,
+      upiTotal: sale.upi || 0,
+      galaBalanceToday: sale.gala_balance_today || 0,
+      miscellaneousCash: sale.miscellaneous_cash || 0,
+      miscellaneousUPI: sale.miscellaneous_upi || 0,
       creditEntries: creditEntriesData,
+      creditTaken: creditTakenData,
+      dailyExpenses: dailyExpensesData,
       remarks: sale.remarks || ''
     });
     setApprovalError('');
@@ -371,6 +382,98 @@ const SalesReportTab = () => {
     });
   };
 
+  // Credit Taken handlers
+  const addCreditTakenInApproval = () => {
+    setApprovalForm({
+      ...approvalForm,
+      creditTaken: [...(approvalForm.creditTaken || []), { creditHolderId: '', amount: '', collectedIn: 'cash_balance' }]
+    });
+  };
+
+  const updateCreditTakenInApproval = (index, field, value) => {
+    const updated = [...(approvalForm.creditTaken || [])];
+    updated[index][field] = value;
+    setApprovalForm({
+      ...approvalForm,
+      creditTaken: updated
+    });
+  };
+
+  const removeCreditTakenInApproval = (index) => {
+    setApprovalForm({
+      ...approvalForm,
+      creditTaken: (approvalForm.creditTaken || []).filter((_, i) => i !== index)
+    });
+  };
+
+  // Daily Expenses handlers
+  const addDailyExpenseInApproval = () => {
+    setApprovalForm({
+      ...approvalForm,
+      dailyExpenses: [...(approvalForm.dailyExpenses || []), { name: '', description: '', amount: '' }]
+    });
+  };
+
+  const updateDailyExpenseInApproval = (index, field, value) => {
+    const updated = [...(approvalForm.dailyExpenses || [])];
+    updated[index][field] = value;
+    setApprovalForm({
+      ...approvalForm,
+      dailyExpenses: updated
+    });
+  };
+
+  const removeDailyExpenseInApproval = (index) => {
+    setApprovalForm({
+      ...approvalForm,
+      dailyExpenses: (approvalForm.dailyExpenses || []).filter((_, i) => i !== index)
+    });
+  };
+
+  // Calculate totals in approval modal (similar to AddSales)
+  const calculateApprovaTotals = () => {
+    if (!approvalForm.productData) return { totalSales: 0, upiSales: 0, cashSales: 0, cashCollected: 0 };
+
+    const totalSales = products.reduce((sum, product) => {
+      const data = approvalForm.productData[product.id];
+      if (!data) return sum;
+      return sum + ((parseFloat(data.sale) || 0) * (parseFloat(product.sale_price) || 0));
+    }, 0);
+
+    const totalCreditGiven = (approvalForm.creditEntries || []).reduce((sum, entry) => {
+      return sum + (entry.creditHolderId && entry.amount ? parseFloat(entry.amount) : 0);
+    }, 0);
+
+    const creditTakenCash = (approvalForm.creditTaken || [])
+      .filter(c => c.collectedIn === 'cash_balance')
+      .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+
+    const creditTakenUPI = (approvalForm.creditTaken || [])
+      .filter(c => c.collectedIn === 'bank_balance')
+      .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+
+    const miscCash = parseFloat(approvalForm.miscellaneousCash || 0);
+    const miscUPI = parseFloat(approvalForm.miscellaneousUPI || 0);
+
+    const upiTotalValue = parseFloat(approvalForm.upiTotal || 0);
+
+    const upiSales = Math.max(0, upiTotalValue - creditTakenUPI - miscUPI);
+    const cashSales = Math.max(0, totalSales - upiSales - totalCreditGiven);
+    const cashCollected = cashSales + creditTakenCash + miscCash;
+
+    return {
+      totalSales,
+      totalCreditGiven,
+      creditTakenCash,
+      creditTakenUPI,
+      miscCash,
+      miscUPI,
+      upiSales,
+      cashSales,
+      cashCollected
+    };
+  };
+
   const handleApproveSale = async () => {
     if (!approvalSale) return;
 
@@ -423,15 +526,41 @@ const SalesReportTab = () => {
         }
       });
 
+      // Prepare credit taken data
+      const creditTakenData = (approvalForm.creditTaken || [])
+        .filter(ct => ct.creditHolderId && ct.amount)
+        .map(ct => ({
+          creditHolderId: ct.creditHolderId,
+          amount: parseFloat(ct.amount),
+          collectedIn: ct.collectedIn
+        }));
+
+      // Prepare daily expenses data
+      const expensesData = (approvalForm.dailyExpenses || [])
+        .filter(exp => exp.name && exp.amount)
+        .map(exp => ({
+          name: exp.name,
+          description: exp.description || '',
+          amount: parseFloat(exp.amount)
+        }));
+
+      const totals = calculateApprovaTotals();
+
       const payload = {
         date: approvalForm.date,
         openingStock: openingStockData.length > 0 ? openingStockData : null,
         closingStock: closingStockData.length > 0 ? closingStockData : null,
         sale: saleData.length > 0 ? saleData : null,
-        cashCollected: parseFloat(approvalForm.cashCollected) || 0,
-        upi: parseFloat(approvalForm.upi) || 0,
-        miscellaneous: parseFloat(approvalForm.miscellaneous) || 0,
+        cashCollected: totals.cashCollected,
+        upi: parseFloat(approvalForm.upiTotal) || 0,
+        miscellaneous: (parseFloat(approvalForm.miscellaneousCash || 0) + parseFloat(approvalForm.miscellaneousUPI || 0)),
+        miscellaneousType: 'both',
+        miscellaneousCash: parseFloat(approvalForm.miscellaneousCash) || 0,
+        miscellaneousUPI: parseFloat(approvalForm.miscellaneousUPI) || 0,
+        galaBalanceToday: parseFloat(approvalForm.galaBalanceToday) || 0,
         credit: creditData.length > 0 ? creditData : null,
+        creditTaken: creditTakenData.length > 0 ? creditTakenData : null,
+        dailyExpenses: expensesData.length > 0 ? expensesData : null,
         remarks: approvalForm.remarks || null
       };
 
@@ -950,7 +1079,7 @@ const SalesReportTab = () => {
                     value={allocationForm.cashBalance}
                     onChange={(e) => handleAllocationFieldChange('cashBalance', e.target.value)}
                     placeholder="₹ 0.00"
-                    step="0.01"
+                    step="1"
                     min="0"
                     style={{ fontSize: '1.25rem', padding: '1rem' }}
                   />
@@ -966,7 +1095,7 @@ const SalesReportTab = () => {
                     value={allocationForm.galaBalance}
                     onChange={(e) => handleAllocationFieldChange('galaBalance', e.target.value)}
                     placeholder="₹ 0.00"
-                    step="0.01"
+                    step="1"
                     min="0"
                     style={{ fontSize: '1.25rem', padding: '1rem' }}
                   />
@@ -985,7 +1114,7 @@ const SalesReportTab = () => {
                     value={allocationForm.bankBalance}
                     disabled
                     placeholder="₹ 0.00"
-                    step="0.01"
+                    step="1"
                     min="0"
                     style={{
                       fontSize: '1.25rem',
@@ -1644,20 +1773,56 @@ const SalesReportTab = () => {
                 </div>
               </div>
 
-              {/* Cash, UPI & Extra */}
+              {/* UPI & Gala Balance */}
               <div style={{ marginBottom: '2rem' }}>
-                <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Collection</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>UPI & Gala Balance</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                   <div className="form-group">
                     <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
-                      Cash Collected
+                      Total UPI Received Today | आज कुल UPI प्राप्त
                     </label>
                     <input
                       type="number"
                       className="form-control"
-                      value={approvalForm.cashCollected || 0}
-                      onChange={(e) => setApprovalForm({ ...approvalForm, cashCollected: e.target.value })}
-                      step="0.01"
+                      value={approvalForm.upiTotal || 0}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, upiTotal: e.target.value })}
+                      step="1"
+                      min="0"
+                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
+                      Gala Balance Today | आज गल्ला बैलेंस
+                    </label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={approvalForm.galaBalanceToday || 0}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, galaBalanceToday: e.target.value })}
+                      step="1"
+                      min="0"
+                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Miscellaneous */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Extra (Chakhna, Bag, etc) | अतिरिक्त</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
+                      Cash
+                    </label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={approvalForm.miscellaneousCash || 0}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, miscellaneousCash: e.target.value })}
+                      step="1"
                       min="0"
                       style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                     />
@@ -1670,29 +1835,225 @@ const SalesReportTab = () => {
                     <input
                       type="number"
                       className="form-control"
-                      value={approvalForm.upi || 0}
-                      onChange={(e) => setApprovalForm({ ...approvalForm, upi: e.target.value })}
-                      step="0.01"
-                      min="0"
-                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
-                      Extra (Chakhna, Bag, etc)
-                    </label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      value={approvalForm.miscellaneous || 0}
-                      onChange={(e) => setApprovalForm({ ...approvalForm, miscellaneous: e.target.value })}
-                      step="0.01"
+                      value={approvalForm.miscellaneousUPI || 0}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, miscellaneousUPI: e.target.value })}
+                      step="1"
                       min="0"
                       style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Credit Taken */}
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>Credit Taken (Collect on Shop) | उधार वसूली</h4>
+                  <button
+                    type="button"
+                    onClick={addCreditTakenInApproval}
+                    className="btn btn-success"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                  >
+                    + Add Credit Taken
+                  </button>
+                </div>
+
+                {(approvalForm.creditTaken || []).map((entry, index) => {
+                  const selectedHolder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+                  const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
+                  const amountCollecting = parseFloat(entry.amount || 0);
+                  const newOutstanding = Math.max(0, currentOutstanding - amountCollecting);
+
+                  return (
+                    <div key={index} style={{ marginBottom: '1rem', padding: '1rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Credit Holder</label>
+                            <select
+                              className="form-control"
+                              value={entry.creditHolderId}
+                              onChange={(e) => updateCreditTakenInApproval(index, 'creditHolderId', e.target.value)}
+                            >
+                              <option value="">Select</option>
+                              {creditHolders.map(ch => (
+                                <option key={ch.id} value={ch.id}>{ch.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Amount</label>
+                            <input
+                              type="number"
+                              className="form-control"
+                              value={entry.amount}
+                              onChange={(e) => updateCreditTakenInApproval(index, 'amount', e.target.value)}
+                              step="1"
+                              min="0"
+                              placeholder="₹ 0.00"
+                            />
+                          </div>
+
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Collected In</label>
+                            <select
+                              className="form-control"
+                              value={entry.collectedIn}
+                              onChange={(e) => updateCreditTakenInApproval(index, 'collectedIn', e.target.value)}
+                            >
+                              <option value="cash_balance">Cash</option>
+                              <option value="bank_balance">UPI</option>
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeCreditTakenInApproval(index)}
+                            className="btn btn-danger"
+                            style={{ padding: '0.5rem 1rem' }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        {entry.creditHolderId && (
+                          <div style={{ padding: '0.75rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '1px solid #2196f3' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#1565c0', fontWeight: '600' }}>Current Outstanding:</span>
+                              <span style={{ fontSize: '1rem', fontWeight: '700', color: '#0d47a1' }}>₹{currentOutstanding.toFixed(2)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.25rem', borderTop: '1px solid #90caf9' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#1565c0', fontWeight: '600' }}>After Collection:</span>
+                              <span style={{ fontSize: '1rem', fontWeight: '700', color: '#2e7d32' }}>₹{newOutstanding.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {(!approvalForm.creditTaken || approvalForm.creditTaken.length === 0) && (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#666', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+                    No credit taken entries. Click "Add Credit Taken" to add one.
+                  </div>
+                )}
+              </div>
+
+              {/* Daily Expenses */}
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>Daily Expenses (From Gala) | दैनिक खर्चे</h4>
+                  <button
+                    type="button"
+                    onClick={addDailyExpenseInApproval}
+                    className="btn btn-success"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                  >
+                    + Add Expense
+                  </button>
+                </div>
+
+                {/* Expense Validation */}
+                {(() => {
+                  const totals = calculateApprovaTotals();
+                  const totalExpenses = (approvalForm.dailyExpenses || []).reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
+                  const galaBalanceValue = parseFloat(approvalForm.galaBalanceToday || 0);
+                  const maxAllowed = galaBalanceValue + totals.cashSales + totals.creditTakenCash - totals.totalCreditGiven;
+                  const isExceeding = totalExpenses > maxAllowed;
+
+                  return (
+                    <div style={{
+                      marginBottom: '1rem',
+                      padding: '1rem',
+                      backgroundColor: isExceeding ? '#f8d7da' : '#e3f2fd',
+                      borderRadius: '8px',
+                      border: `2px solid ${isExceeding ? '#dc3545' : '#2196f3'}`
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: isExceeding ? '#721c24' : '#1565c0', fontWeight: '600' }}>
+                          Available Funds (Gala + Cash Sales + Credit Taken Cash - Credit Given):
+                        </span>
+                        <span style={{ fontSize: '1rem', fontWeight: '700', color: isExceeding ? '#721c24' : '#0d47a1' }}>
+                          ₹{maxAllowed.toFixed(2)}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: `1px solid ${isExceeding ? '#f5c6cb' : '#90caf9'}` }}>
+                        <span style={{ fontSize: '0.75rem', color: isExceeding ? '#721c24' : '#1565c0', fontWeight: '600' }}>
+                          Total Expenses:
+                        </span>
+                        <span style={{ fontSize: '1rem', fontWeight: '700', color: isExceeding ? '#dc3545' : '#2e7d32' }}>
+                          ₹{totalExpenses.toFixed(2)}
+                        </span>
+                      </div>
+                      {isExceeding && (
+                        <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', borderRadius: '6px', border: '1px solid #ffc107' }}>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#856404', fontWeight: '600' }}>
+                            ⚠️ Warning: Total expenses exceed available funds by ₹{(totalExpenses - maxAllowed).toFixed(2)}!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {(approvalForm.dailyExpenses || []).map((expense, index) => (
+                  <div key={index} style={{ marginBottom: '1rem', padding: '1rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Name</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={expense.name}
+                          onChange={(e) => updateDailyExpenseInApproval(index, 'name', e.target.value)}
+                          placeholder="e.g., Electricity"
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Description</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={expense.description}
+                          onChange={(e) => updateDailyExpenseInApproval(index, 'description', e.target.value)}
+                          placeholder="Optional details"
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Amount</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={expense.amount}
+                          onChange={(e) => updateDailyExpenseInApproval(index, 'amount', e.target.value)}
+                          step="1"
+                          min="0"
+                          placeholder="₹ 0.00"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeDailyExpenseInApproval(index)}
+                        className="btn btn-danger"
+                        style={{ padding: '0.5rem 1rem' }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {(!approvalForm.dailyExpenses || approvalForm.dailyExpenses.length === 0) && (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#666', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+                    No expense entries. Click "Add Expense" to add one.
+                  </div>
+                )}
               </div>
 
               {/* Credit */}
@@ -1709,47 +2070,69 @@ const SalesReportTab = () => {
                   </button>
                 </div>
 
-                {(approvalForm.creditEntries || []).map((entry, index) => (
-                  <div key={index} style={{ marginBottom: '1rem', padding: '1rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Credit Holder</label>
-                        <select
-                          className="form-control"
-                          value={entry.creditHolderId}
-                          onChange={(e) => updateCreditEntryInApproval(index, 'creditHolderId', e.target.value)}
-                        >
-                          <option value="">Select</option>
-                          {creditHolders.map(ch => (
-                            <option key={ch.id} value={ch.id}>{ch.name}</option>
-                          ))}
-                        </select>
-                      </div>
+                {(approvalForm.creditEntries || []).map((entry, index) => {
+                  const selectedHolder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+                  const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
+                  const amountGiving = parseFloat(entry.amount || 0);
+                  const newOutstanding = currentOutstanding + amountGiving;
 
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Amount</label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          value={entry.amount}
-                          onChange={(e) => updateCreditEntryInApproval(index, 'amount', e.target.value)}
-                          step="0.01"
-                          min="0"
-                          placeholder="₹ 0.00"
-                        />
-                      </div>
+                  return (
+                    <div key={index} style={{ marginBottom: '1rem', padding: '1rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Credit Holder</label>
+                            <select
+                              className="form-control"
+                              value={entry.creditHolderId}
+                              onChange={(e) => updateCreditEntryInApproval(index, 'creditHolderId', e.target.value)}
+                            >
+                              <option value="">Select</option>
+                              {creditHolders.map(ch => (
+                                <option key={ch.id} value={ch.id}>{ch.name}</option>
+                              ))}
+                            </select>
+                          </div>
 
-                      <button
-                        type="button"
-                        onClick={() => removeCreditEntryInApproval(index)}
-                        className="btn btn-danger"
-                        style={{ padding: '0.5rem 1rem' }}
-                      >
-                        Remove
-                      </button>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Amount</label>
+                            <input
+                              type="number"
+                              className="form-control"
+                              value={entry.amount}
+                              onChange={(e) => updateCreditEntryInApproval(index, 'amount', e.target.value)}
+                              step="1"
+                              min="0"
+                              placeholder="₹ 0.00"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeCreditEntryInApproval(index)}
+                            className="btn btn-danger"
+                            style={{ padding: '0.5rem 1rem' }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        {entry.creditHolderId && (
+                          <div style={{ padding: '0.75rem', backgroundColor: '#fff3e0', borderRadius: '8px', border: '1px solid #ff9800' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#e65100', fontWeight: '600' }}>Current Outstanding:</span>
+                              <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e65100' }}>₹{currentOutstanding.toFixed(2)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.25rem', borderTop: '1px solid #ffb74d' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#e65100', fontWeight: '600' }}>After Giving Credit:</span>
+                              <span style={{ fontSize: '1rem', fontWeight: '700', color: '#d32f2f' }}>₹{newOutstanding.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {(!approvalForm.creditEntries || approvalForm.creditEntries.length === 0) && (
                   <div style={{ padding: '1rem', textAlign: 'center', color: '#666', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
@@ -1771,26 +2154,32 @@ const SalesReportTab = () => {
                 />
               </div>
 
-              {/* Total Summary */}
-              <div style={{
-                padding: '1.5rem',
-                backgroundColor: '#e3f2fd',
-                borderRadius: '12px',
-                border: '2px solid #2196f3',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#1565c0', fontWeight: '600' }}>
-                  Total Collection:
+              {/* Calculated Values */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Calculated Values | गणना किए गए मान</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '2px solid #4caf50' }}>
+                    <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.25rem' }}>UPI Sales | UPI बिक्री</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1b5e20' }}>
+                      ₹{calculateApprovaTotals().upiSales.toFixed(2)}
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '2px solid #2196f3' }}>
+                    <div style={{ fontSize: '0.875rem', color: '#1565c0', marginBottom: '0.25rem' }}>Cash Sales | नकद बिक्री</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0d47a1' }}>
+                      ₹{calculateApprovaTotals().cashSales.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0d47a1' }}>
-                  ₹{(() => {
-                    const creditSum = (approvalForm.creditEntries || []).reduce((sum, entry) => sum + parseFloat(entry.amount || 0), 0);
-                    const total = parseFloat(approvalForm.cashCollected || 0) +
-                                  parseFloat(approvalForm.upi || 0) +
-                                  parseFloat(approvalForm.miscellaneous || 0) -
-                                  creditSum;
-                    return total.toFixed(2);
-                  })()}
+
+                <div style={{ padding: '1.5rem', backgroundColor: '#fff3e0', borderRadius: '8px', border: '3px solid #ff9800' }}>
+                  <div style={{ fontSize: '1rem', color: '#e65100', marginBottom: '0.5rem', fontWeight: '600' }}>
+                    Cash Collected | नकद एकत्रित
+                  </div>
+                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#e65100' }}>
+                    ₹{calculateApprovaTotals().cashCollected.toFixed(2)}
+                  </div>
                 </div>
               </div>
 

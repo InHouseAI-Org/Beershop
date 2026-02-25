@@ -311,7 +311,7 @@ const CreditHoldersTab = () => {
                     className="form-control"
                     value={formData.amountPayable}
                     onChange={(e) => setFormData({ ...formData, amountPayable: e.target.value })}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="₹ 0.00"
                   />
@@ -411,7 +411,7 @@ const CreditHoldersTab = () => {
                   className="form-control"
                   value={collectData.amountCollected}
                   onChange={(e) => setCollectData({ ...collectData, amountCollected: e.target.value })}
-                  step="0.01"
+                  step="1"
                   min="0.01"
                   required
                   placeholder="Enter amount collected"

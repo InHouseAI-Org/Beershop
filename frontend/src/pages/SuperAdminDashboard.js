@@ -545,7 +545,7 @@ const SuperAdminDashboard = () => {
                       value={formData.initialCashBalance}
                       onChange={(e) => setFormData({ ...formData, initialCashBalance: e.target.value })}
                       placeholder="0.00"
-                      step="0.01"
+                      step="1"
                       min="0"
                     />
                   </div>
@@ -561,7 +561,7 @@ const SuperAdminDashboard = () => {
                       value={formData.initialBankBalance}
                       onChange={(e) => setFormData({ ...formData, initialBankBalance: e.target.value })}
                       placeholder="0.00"
-                      step="0.01"
+                      step="1"
                       min="0"
                     />
                   </div>
@@ -577,7 +577,7 @@ const SuperAdminDashboard = () => {
                       value={formData.initialGalaBalance}
                       onChange={(e) => setFormData({ ...formData, initialGalaBalance: e.target.value })}
                       placeholder="0.00"
-                      step="0.01"
+                      step="1"
                       min="0"
                     />
                   </div>
@@ -615,7 +615,7 @@ const SuperAdminDashboard = () => {
                   value={balanceFormData.cashBalance}
                   onChange={(e) => setBalanceFormData({ ...balanceFormData, cashBalance: e.target.value })}
                   placeholder="0.00"
-                  step="0.01"
+                  step="1"
                   required
                 />
               </div>
@@ -631,7 +631,7 @@ const SuperAdminDashboard = () => {
                   value={balanceFormData.bankBalance}
                   onChange={(e) => setBalanceFormData({ ...balanceFormData, bankBalance: e.target.value })}
                   placeholder="0.00"
-                  step="0.01"
+                  step="1"
                   required
                 />
               </div>
@@ -647,7 +647,7 @@ const SuperAdminDashboard = () => {
                   value={balanceFormData.galaBalance}
                   onChange={(e) => setBalanceFormData({ ...balanceFormData, galaBalance: e.target.value })}
                   placeholder="0.00"
-                  step="0.01"
+                  step="1"
                   required
                 />
               </div>

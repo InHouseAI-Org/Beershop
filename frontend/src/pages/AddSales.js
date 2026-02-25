@@ -13,15 +13,18 @@ const AddSales = () => {
   // Form data
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
   const [productData, setProductData] = useState({});
-  const [cashCollected, setCashCollected] = useState('');
-  const [upiCollected, setUpiCollected] = useState('');
-  const [miscellaneous, setMiscellaneous] = useState('');
+  const [upiTotal, setUpiTotal] = useState('');
+  const [miscellaneousCash, setMiscellaneousCash] = useState('');
+  const [miscellaneousUPI, setMiscellaneousUPI] = useState('');
   const [creditEntries, setCreditEntries] = useState([]);
+  const [creditTaken, setCreditTaken] = useState([]);
+  const [dailyExpenses, setDailyExpenses] = useState([]);
   const [remarks, setRemarks] = useState('');
   const [dateError, setDateError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [hideEmpty, setHideEmpty] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [galaBalanceYesterday, setGalaBalanceYesterday] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -29,14 +32,20 @@ const AddSales = () => {
 
   const fetchData = async () => {
     try {
-      const [productsRes, creditHoldersRes, inventoryRes] = await Promise.all([
+      const [productsRes, creditHoldersRes, inventoryRes, balancesRes] = await Promise.all([
         api.get('/products'),
         api.get('/credit-holders'),
-        api.get('/inventory')
+        api.get('/inventory'),
+        api.get('/balances/organisation')
       ]);
 
       setProducts(productsRes.data);
       setCreditHolders(creditHoldersRes.data);
+
+      // Get current gala balance from organisation (this is the actual balance in gala)
+      if (balancesRes.data) {
+        setGalaBalanceYesterday(parseFloat(balancesRes.data.galaBalance || 0));
+      }
 
       // Initialize product data with opening stock from inventory
       const initialData = {};
@@ -97,6 +106,86 @@ const AddSales = () => {
     setCreditEntries(creditEntries.filter((_, i) => i !== index));
   };
 
+  // Credit Taken handlers
+  const addCreditTaken = () => {
+    setCreditTaken([...creditTaken, { creditHolderId: '', amount: '', collectedIn: 'cash_balance' }]);
+  };
+
+  const updateCreditTaken = (index, field, value) => {
+    const updated = [...creditTaken];
+    updated[index][field] = value;
+    setCreditTaken(updated);
+  };
+
+  const removeCreditTaken = (index) => {
+    setCreditTaken(creditTaken.filter((_, i) => i !== index));
+  };
+
+  // Daily Expenses handlers
+  const addDailyExpense = () => {
+    setDailyExpenses([...dailyExpenses, { name: '', description: '', amount: '' }]);
+  };
+
+  const updateDailyExpense = (index, field, value) => {
+    const updated = [...dailyExpenses];
+    updated[index][field] = value;
+    setDailyExpenses(updated);
+  };
+
+  const removeDailyExpense = (index) => {
+    setDailyExpenses(dailyExpenses.filter((_, i) => i !== index));
+  };
+
+  // Calculate totals and derived values
+  const calculateTotals = () => {
+    // Total sales from products
+    const totalSales = products.reduce((sum, product) => {
+      return sum + ((parseFloat(productData[product.id]?.sale) || 0) * (parseFloat(product.sale_price) || 0));
+    }, 0);
+
+    // Credit given total
+    const totalCreditGiven = creditEntries.reduce((sum, entry) => {
+      return sum + (entry.creditHolderId && entry.amount ? parseFloat(entry.amount) : 0);
+    }, 0);
+
+    // Credit taken by type
+    const creditTakenCash = creditTaken
+      .filter(c => c.collectedIn === 'cash_balance')
+      .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+
+    const creditTakenUPI = creditTaken
+      .filter(c => c.collectedIn === 'bank_balance')
+      .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+
+    // Misc by type
+    const miscCash = parseFloat(miscellaneousCash || 0);
+    const miscUPI = parseFloat(miscellaneousUPI || 0);
+
+    // Expenses total
+    const totalExpenses = dailyExpenses.reduce((sum, expense) => {
+      return sum + (parseFloat(expense.amount) || 0);
+    }, 0);
+
+    // UPI Total from user input
+    const upiTotalValue = parseFloat(upiTotal || 0);
+
+    // Core calculations
+    const upiSales = Math.max(0, upiTotalValue - creditTakenUPI - miscUPI);
+    const cashSales = Math.max(0, totalSales - upiSales + miscCash );
+    const cashCollected = Math.max(0, cashSales + creditTakenCash - totalCreditGiven - totalExpenses);
+    return {
+      totalSales,
+      totalCreditGiven,
+      creditTakenCash,
+      creditTakenUPI,
+      miscCash,
+      miscUPI,
+      totalExpenses,
+      upiSales,
+      cashSales,
+      cashCollected
+    };
+  };
 
   const filteredProducts = products.filter(product => {
     // Search filter
@@ -230,15 +319,41 @@ const AddSales = () => {
         }
       });
 
+      // Get calculated values
+      const totals = calculateTotals();
+
+      // Prepare credit taken data
+      const creditTakenData = creditTaken
+        .filter(ct => ct.creditHolderId && ct.amount)
+        .map(ct => ({
+          creditHolderId: ct.creditHolderId,
+          amount: parseFloat(ct.amount),
+          collectedIn: ct.collectedIn
+        }));
+
+      // Prepare daily expenses data
+      const expensesData = dailyExpenses
+        .filter(exp => exp.name && exp.amount)
+        .map(exp => ({
+          name: exp.name,
+          description: exp.description || '',
+          amount: parseFloat(exp.amount)
+        }));
+
       const payload = {
         date: saleDate,
         openingStock: openingStockData.length > 0 ? openingStockData : null,
         closingStock: closingStockData.length > 0 ? closingStockData : null,
         sale: saleData.length > 0 ? saleData : null,
-        cashCollected: parseFloat(cashCollected) || 0,
-        upi: parseFloat(upiCollected) || 0,
-        miscellaneous: parseFloat(miscellaneous) || 0,
+        cashCollected: totals.cashCollected,
+        upi: parseFloat(upiTotal) || 0,
+        miscellaneous: (parseFloat(miscellaneousCash || 0) + parseFloat(miscellaneousUPI || 0)),
+        miscellaneousType: 'both', // Keeping for backward compatibility, but frontend now tracks both separately
+        miscellaneousCash: parseFloat(miscellaneousCash) || 0,
+        miscellaneousUPI: parseFloat(miscellaneousUPI) || 0,
         credit: creditData.length > 0 ? creditData : null,
+        creditTaken: creditTakenData.length > 0 ? creditTakenData : null,
+        dailyExpenses: expensesData.length > 0 ? expensesData : null,
         remarks: remarks || null
       };
 
@@ -555,7 +670,7 @@ const AddSales = () => {
                     className="form-control"
                     value={productData[product.id].sale}
                     onChange={(e) => handleProductChange(product.id, 'sale', e.target.value)}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="Enter sale"
                     style={{
@@ -604,59 +719,150 @@ const AddSales = () => {
           )}
         </div>
 
-        {/* Cash & UPI Collection */}
+
+        {/* Miscellaneous */}
         <div className="card" style={{ marginBottom: '2rem' }}>
           <h2 style={{ color: '#000', marginBottom: '1.5rem', fontWeight: '700' }}>
-            Cash & UPI Collection | नकद और UPI संग्रह
+            Extra (Chakhna, Bag, etc) | अतिरिक्त
           </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="form-group">
-              <label htmlFor="cashCollected" style={{fontSize: '1rem'}}>Cash Collected | नकद एकत्रित</label>
+              <label htmlFor="miscellaneousCash" style={{fontSize: '1rem'}}>Cash</label>
               <input
                 type="number"
-                id="cashCollected"
+                id="miscellaneousCash"
                 className="form-control"
-                value={cashCollected}
-                onChange={(e) => setCashCollected(e.target.value)}
+                value={miscellaneousCash}
+                onChange={(e) => setMiscellaneousCash(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
-                step="0.01"
+                step="1"
                 min="0"
                 placeholder="₹ 0.00"
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="upiCollected" style={{fontSize: '1rem'}}>UPI Collected | UPI एकत्रित</label>
+              <label htmlFor="miscellaneousUPI" style={{fontSize: '1rem'}}>UPI</label>
               <input
                 type="number"
-                id="upiCollected"
+                id="miscellaneousUPI"
                 className="form-control"
-                value={upiCollected}
-                onChange={(e) => setUpiCollected(e.target.value)}
+                value={miscellaneousUPI}
+                onChange={(e) => setMiscellaneousUPI(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
-                step="0.01"
-                min="0"
-                placeholder="₹ 0.00"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="miscellaneous" style={{fontSize: '1rem'}}>Extra (Chakhna, Bag, etc) | अतिरिक्त</label>
-              <input
-                type="number"
-                id="miscellaneous"
-                className="form-control"
-                value={miscellaneous}
-                onChange={(e) => setMiscellaneous(e.target.value)}
-                style={{ fontSize: '1.25rem', padding: '1.25rem' }}
-                step="0.01"
+                step="1"
                 min="0"
                 placeholder="₹ 0.00"
               />
             </div>
           </div>
         </div>
+
+        {/* Credit Taken (Collect on Shop) */}
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ color: '#000', marginBottom: '1.5rem', fontWeight: '700' }}>
+            Credit Taken (Collect on Shop) | उधार वसूली (दुकान पर)
+          </h2>
+
+
+          {creditHolders.length === 0 && (
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#fff3cd', border: '2px solid #ffc107', borderRadius: '8px' }}>
+              <p style={{ margin: 0, fontSize: '1rem', color: '#856404' }}>
+                No credit holders found. Please ask your admin to add credit holders first.<br/>
+                कोई उधार धारक नहीं मिला। कृपया अपने व्यवस्थापक से उधार धारक जोड़ने के लिए कहें।
+              </p>
+            </div>
+          )}
+
+          {creditTaken.map((entry, index) => {
+            const selectedHolder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+            const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
+            const amountCollecting = parseFloat(entry.amount || 0);
+            const newOutstanding = Math.max(0, currentOutstanding - amountCollecting);
+
+            return (
+              <div key={index} style={{ marginBottom: '1.5rem', padding: '1.5rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label>Credit Holder | उधार धारक</label>
+                    <select
+                      className="form-control"
+                      value={entry.creditHolderId}
+                      onChange={(e) => updateCreditTaken(index, 'creditHolderId', e.target.value)}
+                      style={{ fontSize: '1.125rem', padding: '0.875rem' }}
+                    >
+                      <option value="">Select | चुनें</option>
+                      {creditHolders.map(ch => (
+                        <option key={ch.id} value={ch.id}>{ch.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {entry.creditHolderId && (
+                    <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '1px solid #2196f3' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#1565c0', fontWeight: '600' }}>Current Outstanding | वर्तमान बकाया:</span>
+                        <span style={{ fontSize: '1.125rem', fontWeight: '700', color: '#0d47a1' }}>₹{currentOutstanding.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid #90caf9' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#1565c0', fontWeight: '600' }}>Outstanding After Collection | वसूली के बाद बकाया:</span>
+                        <span style={{ fontSize: '1.125rem', fontWeight: '700', color: '#2e7d32' }}>₹{newOutstanding.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="form-group">
+                    <label>Amount | राशि</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={entry.amount}
+                      onChange={(e) => updateCreditTaken(index, 'amount', e.target.value)}
+                      style={{ fontSize: '1.125rem', padding: '0.875rem' }}
+                      step="1"
+                      min="0"
+                      placeholder="₹ 0.00"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Collected In | में एकत्रित</label>
+                    <select
+                      className="form-control"
+                      value={entry.collectedIn}
+                      onChange={(e) => updateCreditTaken(index, 'collectedIn', e.target.value)}
+                      style={{ fontSize: '1.125rem', padding: '0.875rem' }}
+                    >
+                      <option value="cash_balance">Cash | नकद</option>
+                      <option value="bank_balance">UPI</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeCreditTaken(index)}
+                    className="btn btn-danger"
+                    style={{ padding: '0.875rem 1.5rem' }}
+                  >
+                    Remove | हटाएं
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={addCreditTaken}
+            className="btn btn-success"
+            style={{ width: '100%', fontSize: '1.125rem', padding: '1rem' }}
+          >
+            + Add Credit Taken | उधार वसूली जोड़ें
+          </button>
+        </div>
+
+        
 
         {/* Credit */}
         <div className="card" style={{ marginBottom: '2rem' }}>
@@ -673,22 +879,186 @@ const AddSales = () => {
             </div>
           )}
 
-          {creditEntries.map((entry, index) => (
+          {creditEntries.map((entry, index) => {
+            const selectedHolder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+            const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
+            const amountGiving = parseFloat(entry.amount || 0);
+            const newOutstanding = currentOutstanding + amountGiving;
+
+            return (
+              <div key={index} style={{ marginBottom: '1.5rem', padding: '1.5rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label>Credit Holder | उधार धारक</label>
+                    <select
+                      className="form-control"
+                      value={entry.creditHolderId}
+                      onChange={(e) => updateCreditEntry(index, 'creditHolderId', e.target.value)}
+                      style={{ fontSize: '1.125rem', padding: '0.875rem' }}
+                    >
+                      <option value="">Select | चुनें</option>
+                      {creditHolders.map(ch => (
+                        <option key={ch.id} value={ch.id}>{ch.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {entry.creditHolderId && (
+                    <div style={{ padding: '1rem', backgroundColor: '#fff3e0', borderRadius: '8px', border: '1px solid #ff9800' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#e65100', fontWeight: '600' }}>Current Outstanding | वर्तमान बकाया:</span>
+                        <span style={{ fontSize: '1.125rem', fontWeight: '700', color: '#e65100' }}>₹{currentOutstanding.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid #ffb74d' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#e65100', fontWeight: '600' }}>Outstanding After Giving Credit | उधार देने के बाद बकाया:</span>
+                        <span style={{ fontSize: '1.125rem', fontWeight: '700', color: '#d32f2f' }}>₹{newOutstanding.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="form-group">
+                    <label>Amount | राशि</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={entry.amount}
+                      onChange={(e) => updateCreditEntry(index, 'amount', e.target.value)}
+                      style={{ fontSize: '1.125rem', padding: '0.875rem' }}
+                      step="1"
+                      min="0"
+                      placeholder="₹ 0.00"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeCreditEntry(index)}
+                    className="btn btn-danger"
+                    style={{ padding: '0.875rem 1.5rem' }}
+                  >
+                    Remove | हटाएं
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={addCreditEntry}
+            className="btn btn-success"
+            style={{ width: '100%', fontSize: '1.125rem', padding: '1rem' }}
+          >
+            + Add Credit | उधार जोड़ें
+          </button>
+        </div>
+
+        {/* UPI & Gala Balance */}
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ color: '#000', marginBottom: '1.5rem', fontWeight: '700' }}>
+            UPI Collection | UPI संग्रह 
+          </h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="form-group">
+              <label htmlFor="upiTotal" style={{fontSize: '1rem'}}>Total UPI Received Today | आज कुल UPI प्राप्त</label>
+              <input
+                type="number"
+                id="upiTotal"
+                className="form-control"
+                value={upiTotal}
+                onChange={(e) => setUpiTotal(e.target.value)}
+                style={{ fontSize: '1.25rem', padding: '1.25rem' }}
+                step="1"
+                min="0"
+                placeholder="₹ 0.00"
+              />
+            </div>
+
+
+            <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#1565c0' }}>
+                Current Gala Balance (Opening): ₹{galaBalanceYesterday.toFixed(2)}<br/>
+                वर्तमान गल्ला बैलेंस (प्रारंभिक): ₹{galaBalanceYesterday.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Daily Expenses */}
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ color: '#000', marginBottom: '1.5rem', fontWeight: '700' }}>
+            Daily Expenses (From Gala) | दैनिक खर्चे (गल्ले से)
+          </h2>
+
+          {/* Expense Validation */}
+          {(() => {
+            const totals = calculateTotals();
+            const totalExpenses = dailyExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
+            const maxAllowed = galaBalanceYesterday + totals.cashSales + totals.creditTakenCash - totals.totalCreditGiven;
+            const isExceeding = totalExpenses > maxAllowed;
+
+            return (
+              <div style={{
+                marginBottom: '1.5rem',
+                padding: '1.5rem',
+                backgroundColor: isExceeding ? '#f8d7da' : '#e3f2fd',
+                borderRadius: '12px',
+                border: `2px solid ${isExceeding ? '#dc3545' : '#2196f3'}`
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.875rem', color: isExceeding ? '#721c24' : '#1565c0', fontWeight: '600' }}>
+                    Available Funds (Gala + Cash Sales + Credit Taken Cash - Credit Given) | उपलब्ध धनराशि:
+                  </span>
+                  <span style={{ fontSize: '1.25rem', fontWeight: '700', color: isExceeding ? '#721c24' : '#0d47a1' }}>
+                    ₹{maxAllowed.toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: `1px solid ${isExceeding ? '#f5c6cb' : '#90caf9'}` }}>
+                  <span style={{ fontSize: '0.875rem', color: isExceeding ? '#721c24' : '#1565c0', fontWeight: '600' }}>
+                    Total Expenses | कुल खर्चे:
+                  </span>
+                  <span style={{ fontSize: '1.25rem', fontWeight: '700', color: isExceeding ? '#dc3545' : '#2e7d32' }}>
+                    ₹{totalExpenses.toFixed(2)}
+                  </span>
+                </div>
+                {isExceeding && (
+                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: '#fff3cd', borderRadius: '8px', border: '1px solid #ffc107' }}>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#856404', fontWeight: '600' }}>
+                      ⚠️ Warning: Total expenses exceed available funds by ₹{(totalExpenses - maxAllowed).toFixed(2)}!<br/>
+                      चेतावनी: कुल खर्चे उपलब्ध धनराशि से अधिक हैं!
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {dailyExpenses.map((expense, index) => (
             <div key={index} style={{ marginBottom: '1.5rem', padding: '1.5rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div className="form-group">
-                  <label>Credit Holder | उधार धारक</label>
-                  <select
+                  <label>Name | नाम</label>
+                  <input
+                    type="text"
                     className="form-control"
-                    value={entry.creditHolderId}
-                    onChange={(e) => updateCreditEntry(index, 'creditHolderId', e.target.value)}
+                    value={expense.name}
+                    onChange={(e) => updateDailyExpense(index, 'name', e.target.value)}
                     style={{ fontSize: '1.125rem', padding: '0.875rem' }}
-                  >
-                    <option value="">Select | चुनें</option>
-                    {creditHolders.map(ch => (
-                      <option key={ch.id} value={ch.id}>{ch.name}</option>
-                    ))}
-                  </select>
+                    placeholder="e.g., Electricity, Supplies"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Description (Optional) | विवरण (वैकल्पिक)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={expense.description}
+                    onChange={(e) => updateDailyExpense(index, 'description', e.target.value)}
+                    style={{ fontSize: '1.125rem', padding: '0.875rem' }}
+                    placeholder="Additional details"
+                  />
                 </div>
 
                 <div className="form-group">
@@ -696,10 +1066,10 @@ const AddSales = () => {
                   <input
                     type="number"
                     className="form-control"
-                    value={entry.amount}
-                    onChange={(e) => updateCreditEntry(index, 'amount', e.target.value)}
+                    value={expense.amount}
+                    onChange={(e) => updateDailyExpense(index, 'amount', e.target.value)}
                     style={{ fontSize: '1.125rem', padding: '0.875rem' }}
-                    step="0.01"
+                    step="1"
                     min="0"
                     placeholder="₹ 0.00"
                   />
@@ -707,7 +1077,7 @@ const AddSales = () => {
 
                 <button
                   type="button"
-                  onClick={() => removeCreditEntry(index)}
+                  onClick={() => removeDailyExpense(index)}
                   className="btn btn-danger"
                   style={{ padding: '0.875rem 1.5rem' }}
                 >
@@ -719,12 +1089,45 @@ const AddSales = () => {
 
           <button
             type="button"
-            onClick={addCreditEntry}
+            onClick={addDailyExpense}
             className="btn btn-success"
             style={{ width: '100%', fontSize: '1.125rem', padding: '1rem' }}
           >
-            + Add Credit | उधार जोड़ें
+            + Add Expense | खर्चा जोड़ें
           </button>
+        </div>
+
+        {/* Calculated Values Display */}
+        <div className="card" style={{ marginBottom: '2rem', backgroundColor: '#f8f9fa', borderWidth: '3px' }}>
+          <h2 style={{ color: '#000', marginBottom: '1.5rem', fontWeight: '700' }}>
+            Calculated Values | गणना किए गए मान
+          </h2>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '2px solid #4caf50' }}>
+              <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.25rem' }}>UPI Sales | UPI बिक्री</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1b5e20' }}>
+                ₹{Math.max(0, calculateTotals().upiSales).toFixed(2)}
+              </div>
+            </div>
+
+            <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '2px solid #2196f3' }}>
+              <div style={{ fontSize: '0.875rem', color: '#1565c0', marginBottom: '0.25rem' }}>Cash Sales | नकद बिक्री</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0d47a1' }}>
+                ₹{Math.max(0,calculateTotals().cashSales.toFixed(2))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: '1.5rem', backgroundColor: '#fff3e0', borderRadius: '8px', border: '3px solid #ff9800', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '1rem', color: '#e65100', marginBottom: '0.5rem', fontWeight: '600' }}>
+              Cash Collected | नकद एकत्रित
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: '700', color: '#e65100' }}>
+              ₹{Math.max(0,calculateTotals().cashCollected.toFixed(2))}
+            </div>
+          </div>
+
         </div>
 
         {/* Remarks */}
@@ -836,39 +1239,70 @@ const AddSales = () => {
               </div>
             </div>
 
-            {/* Cash, UPI & Extra */}
-            <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-              <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50' }}>
-                <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.25rem' }}>Cash | नकद</div>
+            {/* Calculated Values */}
+            <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '2px solid #4caf50' }}>
+                <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.25rem' }}>Cash Sales | नकद बिक्री</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1b5e20' }}>
-                  ₹{parseFloat(cashCollected || 0).toFixed(2)}
+                  ₹{Math.max(0, calculateTotals().cashSales.toFixed(2))}
                 </div>
               </div>
-              <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '1px solid #2196f3' }}>
-                <div style={{ fontSize: '0.875rem', color: '#1565c0', marginBottom: '0.25rem' }}>UPI</div>
+              <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '2px solid #2196f3' }}>
+                <div style={{ fontSize: '0.875rem', color: '#1565c0', marginBottom: '0.25rem' }}>UPI Sales | UPI बिक्री</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0d47a1' }}>
-                  ₹{parseFloat(upiCollected || 0).toFixed(2)}
+                  ₹{Math.max(0, calculateTotals().upiSales).toFixed(2)}
                 </div>
               </div>
+            </div>
+
+            {/* Cash Collected */}
+            <div style={{ marginBottom: '1.5rem', padding: '1.5rem', backgroundColor: '#fff3e0', borderRadius: '8px', border: '3px solid #ff9800' }}>
+              <div style={{ fontSize: '1rem', color: '#e65100', marginBottom: '0.5rem', fontWeight: '600' }}>
+                Cash Collected | नकद एकत्रित
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#e65100' }}>
+                ₹{calculateTotals().cashCollected.toFixed(2)}
+              </div>
+            </div>
+
+            {/* UPI Total & Gala Balance */}
+            <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div style={{ padding: '1rem', backgroundColor: '#f3e5f5', borderRadius: '8px', border: '1px solid #9c27b0' }}>
-                <div style={{ fontSize: '0.875rem', color: '#6a1b9a', marginBottom: '0.25rem' }}>Extra | अतिरिक्त</div>
+                <div style={{ fontSize: '0.875rem', color: '#6a1b9a', marginBottom: '0.25rem' }}>UPI Total | कुल UPI</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#4a148c' }}>
-                  ₹{parseFloat(miscellaneous || 0).toFixed(2)}
+                  ₹{parseFloat(upiTotal || 0).toFixed(2)}
                 </div>
               </div>
             </div>
 
-            {/* Total Collection */}
-            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#fff3e0', borderRadius: '8px', border: '2px solid #ff9800' }}>
-              <div style={{ fontSize: '0.875rem', color: '#e65100', marginBottom: '0.25rem' }}>
-                Total Collection | कुल संग्रह
+            {/* Miscellaneous */}
+            {((miscellaneousCash && parseFloat(miscellaneousCash) > 0) || (miscellaneousUPI && parseFloat(miscellaneousUPI) > 0)) && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem', color: '#000' }}>
+                  Extra (Chakhna, Bag, etc) | अतिरिक्त
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  {miscellaneousCash && parseFloat(miscellaneousCash) > 0 && (
+                    <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50' }}>
+                      <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.25rem' }}>Cash</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1b5e20' }}>
+                        ₹{parseFloat(miscellaneousCash).toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                  {miscellaneousUPI && parseFloat(miscellaneousUPI) > 0 && (
+                    <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '1px solid #2196f3' }}>
+                      <div style={{ fontSize: '0.875rem', color: '#1565c0', marginBottom: '0.25rem' }}>UPI</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0d47a1' }}>
+                        ₹{parseFloat(miscellaneousUPI).toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#e65100' }}>
-                ₹{(parseFloat(cashCollected || 0) + parseFloat(upiCollected || 0) + parseFloat(miscellaneous || 0)).toFixed(2)}
-              </div>
-            </div>
+            )}
 
-            {/* Credit */}
+            {/* Credit Given */}
             {creditEntries.filter(e => e.creditHolderId && e.amount).length > 0 && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem', color: '#000' }}>
@@ -903,6 +1337,96 @@ const AddSales = () => {
                   <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#c62828' }}>
                     ₹{creditEntries
                       .filter(e => e.creditHolderId && e.amount)
+                      .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0)
+                      .toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Credit Taken */}
+            {creditTaken.filter(e => e.creditHolderId && e.amount).length > 0 && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem', color: '#000' }}>
+                  Credit Taken (Collect on Shop) | उधार वसूली
+                </h3>
+                <div style={{ border: '2px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                  {creditTaken
+                    .filter(entry => entry.creditHolderId && entry.amount)
+                    .map((entry, index) => {
+                      const holder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            padding: '0.75rem 1rem',
+                            backgroundColor: index % 2 === 0 ? '#fff' : '#f8f9fa',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: '600' }}>{holder?.name || 'Unknown'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                              {entry.collectedIn === 'bank_balance' ? 'UPI' : 'Cash'}
+                            </div>
+                          </div>
+                          <span style={{ fontWeight: '700', color: '#28a745' }}>
+                            ₹{parseFloat(entry.amount).toFixed(2)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+                <div style={{ marginTop: '0.5rem', padding: '0.75rem', backgroundColor: '#e8f5e9', borderRadius: '8px', textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#2e7d32', marginRight: '0.5rem' }}>Total Collected:</span>
+                  <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#2e7d32' }}>
+                    ₹{creditTaken
+                      .filter(e => e.creditHolderId && e.amount)
+                      .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0)
+                      .toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Daily Expenses */}
+            {dailyExpenses.filter(e => e.name && e.amount).length > 0 && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem', color: '#000' }}>
+                  Daily Expenses | दैनिक खर्चे
+                </h3>
+                <div style={{ border: '2px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                  {dailyExpenses
+                    .filter(expense => expense.name && expense.amount)
+                    .map((expense, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          backgroundColor: index % 2 === 0 ? '#fff' : '#f8f9fa'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                          <span style={{ fontWeight: '600' }}>{expense.name}</span>
+                          <span style={{ fontWeight: '700', color: '#ff9800' }}>
+                            ₹{parseFloat(expense.amount).toFixed(2)}
+                          </span>
+                        </div>
+                        {expense.description && (
+                          <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                            {expense.description}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+                <div style={{ marginTop: '0.5rem', padding: '0.75rem', backgroundColor: '#fff3e0', borderRadius: '8px', textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#e65100', marginRight: '0.5rem' }}>Total Expenses:</span>
+                  <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#e65100' }}>
+                    ₹{dailyExpenses
+                      .filter(e => e.name && e.amount)
                       .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0)
                       .toFixed(2)}
                   </span>

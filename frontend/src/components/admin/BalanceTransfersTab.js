@@ -398,7 +398,7 @@ const BalanceTransfersTab = () => {
                   className="form-control"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  step="0.01"
+                  step="1"
                   min="0.01"
                   required
                   placeholder="₹ 0.00"
