@@ -397,11 +397,15 @@ const updateSale = async (req, res) => {
 const approveSale = async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, openingStock, closingStock, sale, cashCollected, upi, credit, remarks } = req.body;
+    const {
+      date, openingStock, closingStock, sale, cashCollected, upi, credit, remarks,
+      creditTaken, dailyExpenses, miscellaneousCash, miscellaneousUPI,
+      miscellaneousType, galaBalanceToday
+    } = req.body;
 
     console.log('=== APPROVE SALE REQUEST ===');
     console.log('Sale ID:', id);
-    console.log('Updated data:', { date, cashCollected, upi, credit, remarks });
+    console.log('Updated data:', { date, cashCollected, upi, credit, creditTaken, remarks });
 
     const existingSale = await db.getSaleById(id);
 
@@ -478,12 +482,17 @@ const approveSale = async (req, res) => {
     if (upi !== undefined) updates.upi = upi;
     if (credit !== undefined) updates.credit = credit;
     if (remarks !== undefined) updates.remarks = remarks;
+    if (miscellaneousCash !== undefined) updates.miscellaneousCash = miscellaneousCash;
+    if (miscellaneousUPI !== undefined) updates.miscellaneousUPI = miscellaneousUPI;
+    if (miscellaneousType !== undefined) updates.miscellaneousType = miscellaneousType;
+    if (galaBalanceToday !== undefined) updates.galaBalanceToday = galaBalanceToday;
 
     const updatedSale = await db.updateSale(id, updates);
 
     // Use the updated sale data for inventory and credit processing
     const finalSale = updates.sale || existingSale.sale;
     const finalCredit = updates.credit || existingSale.credit;
+    const finalCreditTaken = creditTaken || [];
 
     // Update inventory: inventory_new = inventory_old - sale
     console.log('Updating inventory after approval...');
@@ -498,7 +507,7 @@ const approveSale = async (req, res) => {
     }
 
     // Update credit holder outstanding: add credit given to outstanding amount
-    console.log('Updating credit holder outstanding amounts...');
+    console.log('Updating credit holder outstanding amounts (credit given)...');
     if (Array.isArray(finalCredit) && finalCredit.length > 0) {
       for (const creditItem of finalCredit) {
         if (creditItem.credit_holder_id && creditItem.creditgiven) {
@@ -521,10 +530,64 @@ const approveSale = async (req, res) => {
             previousOutstanding: previousOutstanding,
             newOutstanding: newOutstanding,
             collectedBy: req.user.id,
-            notes: 'Approved from pending sale',
+            notes: 'Credit given - Approved from pending sale',
             transactionType: 'given',
-            saleId: updatedSale.id
+            saleId: updatedSale.id,
+            collectionType: 'regular'
           });
+        }
+      }
+    }
+
+    // Process credit taken: deduct from outstanding amount
+    console.log('Processing credit taken (credit collected on shop)...');
+    if (Array.isArray(finalCreditTaken) && finalCreditTaken.length > 0) {
+      for (const creditTakenItem of finalCreditTaken) {
+        if (creditTakenItem.creditHolderId && creditTakenItem.amount) {
+          const collectionAmount = parseFloat(creditTakenItem.amount);
+          const collectedIn = creditTakenItem.collectedIn || 'cash_balance';
+
+          // Get current outstanding before decrementing
+          const creditHolder = await db.getCreditHolderById(creditTakenItem.creditHolderId);
+          const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
+
+          // Decrement outstanding
+          await db.decrementCreditHolderOutstanding(creditTakenItem.creditHolderId, collectionAmount);
+          const newOutstanding = Math.max(0, previousOutstanding - collectionAmount);
+          console.log(`Deducted ${collectionAmount} from credit holder ${creditTakenItem.creditHolderId} outstanding`);
+
+          // Record transaction history
+          await db.createCreditCollectionHistory({
+            organisationId,
+            creditHolderId: creditTakenItem.creditHolderId,
+            amountCollected: collectionAmount,
+            previousOutstanding: previousOutstanding,
+            newOutstanding: newOutstanding,
+            collectedBy: req.user.id,
+            notes: 'Credit collected on shop - Approved from pending sale',
+            transactionType: 'collected',
+            saleId: updatedSale.id,
+            collectedIn: collectedIn,
+            collectionType: 'collected_on_shop'
+          });
+        }
+      }
+    }
+
+    // Process daily expenses
+    console.log('Processing daily expenses...');
+    if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0) {
+      for (const expense of dailyExpenses) {
+        if (expense.name && expense.amount) {
+          await db.createDailyExpense({
+            organisationId,
+            saleId: updatedSale.id,
+            name: expense.name,
+            description: expense.description || '',
+            amount: parseFloat(expense.amount),
+            expenseDate: updates.date || existingSale.date
+          });
+          console.log(`Created daily expense: ${expense.name} - ${expense.amount}`);
         }
       }
     }

@@ -441,6 +441,17 @@ const dataHelpers = {
     return result.rows[0];
   },
 
+  decrementCreditHolderOutstanding: async (creditHolderId, amount) => {
+    const result = await pool.query(
+      `UPDATE credit_holders
+       SET amount_payable = GREATEST(0, amount_payable - $1), updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING *`,
+      [amount, creditHolderId]
+    );
+    return result.rows[0];
+  },
+
   // ==================== DISTRIBUTORS ====================
   getDistributorsByOrganisationId: async (organisationId) => {
     const result = await pool.query(
