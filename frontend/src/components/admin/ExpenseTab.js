@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Plus, Edit2, Trash2, AlertCircle, Receipt, Calendar } from 'lucide-react';
+import { Plus, Edit2, Trash2, AlertCircle, Receipt } from 'lucide-react';
 import MobileTable from '../common/MobileTable';
 
 const ExpenseTab = () => {
