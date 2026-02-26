@@ -7,7 +7,6 @@ const BalanceTab = () => {
   const [organisation, setOrganisation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedBalance, setSelectedBalance] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -188,7 +187,6 @@ const BalanceTab = () => {
                   <th>Bank Balance / बैंक</th>
                   <th>Gala Balance / गला</th>
                   <th>Total / कुल</th>
-                  <th>Actions / क्रियाएं</th>
                 </tr>
               </thead>
               <tbody>
@@ -205,15 +203,6 @@ const BalanceTab = () => {
                       <td>{formatCurrency(balance.bank_balance)}</td>
                       <td>{formatCurrency(balance.gala_balance)}</td>
                       <td style={{ fontWeight: '600' }}>{formatCurrency(total)}</td>
-                      <td>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}
-                          onClick={() => setSelectedBalance(balance)}
-                        >
-                          View Details
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
@@ -260,13 +249,6 @@ const BalanceTab = () => {
                       <span style={{ fontWeight: '700', fontSize: '1rem' }}>{formatCurrency(total)}</span>
                     </div>
                   </div>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ marginTop: '1rem', width: '100%' }}
-                    onClick={() => setSelectedBalance(balance)}
-                  >
-                    View Details / विवरण देखें
-                  </button>
                 </div>
               );
             })}
@@ -274,51 +256,6 @@ const BalanceTab = () => {
         )}
       </div>
 
-      {/* Balance Details Modal */}
-      {selectedBalance && (
-        <div className="modal-overlay" onClick={() => setSelectedBalance(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginBottom: '1.5rem' }}>
-              Balance Details / शेष विवरण
-            </h3>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <strong>Date / तारीख:</strong> {formatDate(selectedBalance.date)}
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <strong>Cash Balance / नकद शेष:</strong> {formatCurrency(selectedBalance.cash_balance)}
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <strong>Bank Balance / बैंक शेष:</strong> {formatCurrency(selectedBalance.bank_balance)}
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <strong>Gala Balance / गला शेष:</strong> {formatCurrency(selectedBalance.gala_balance)}
-              </div>
-              <div style={{
-                paddingTop: '1rem',
-                borderTop: '2px solid #000',
-                fontSize: '1.125rem',
-                fontWeight: '600'
-              }}>
-                <strong>Total / कुल:</strong> {formatCurrency(
-                  parseFloat(selectedBalance.cash_balance || 0) +
-                  parseFloat(selectedBalance.bank_balance || 0) +
-                  parseFloat(selectedBalance.gala_balance || 0)
-                )}
-              </div>
-            </div>
-
-            <button
-              className="btn btn-secondary"
-              onClick={() => setSelectedBalance(null)}
-              style={{ width: '100%' }}
-            >
-              Close / बंद करें
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -15,22 +15,31 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    const result = await login(username, password);
+    try {
+      console.log('Login attempt with username:', username);
+      const result = await login(username, password);
+      console.log('Login result:', { success: result.success, error: result.error });
 
-    if (result.success) {
-      // Redirect based on user role
-      if (result.user.role === 'superadmin') {
-        navigate('/superadmin');
-      } else if (result.user.role === 'admin') {
-        navigate('/admin');
+      if (result.success) {
+        // Redirect based on user role
+        if (result.user.role === 'superadmin') {
+          navigate('/superadmin');
+        } else if (result.user.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
-        navigate('/dashboard');
+        const errorMsg = result.error || 'Login failed. Please check your credentials and try again.';
+        console.error('Login error:', errorMsg);
+        setError(errorMsg);
       }
-    } else {
-      setError(result.error);
+    } catch (err) {
+      console.error('Unexpected error during login:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

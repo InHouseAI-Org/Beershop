@@ -49,21 +49,35 @@ const DashboardTab = () => {
     return <div>Loading...</div>;
   }
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   return (
     <>
       {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
 
-      <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '2rem' }}>
+      <h2 style={{
+        color: '#000',
+        margin: 0,
+        fontSize: isMobile ? '1.5rem' : '2rem',
+        fontWeight: '700',
+        letterSpacing: '0.5px',
+        marginBottom: isMobile ? '1rem' : '2rem'
+      }}>
         Dashboard Overview
       </h2>
 
       {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: isMobile ? '1rem' : '1.5rem',
+        marginBottom: isMobile ? '1rem' : '2rem'
+      }}>
         <div className="card" style={{ textAlign: 'center' }}>
           <h3 style={{ color: '#666', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>
             Total Users
           </h3>
-          <p style={{ fontSize: '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
+          <p style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
             {stats.totalUsers}
           </p>
         </div>
@@ -72,7 +86,7 @@ const DashboardTab = () => {
           <h3 style={{ color: '#666', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>
             Total Products
           </h3>
-          <p style={{ fontSize: '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
+          <p style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
             {stats.totalProducts}
           </p>
         </div>
@@ -81,7 +95,7 @@ const DashboardTab = () => {
           <h3 style={{ color: '#666', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>
             Credit Holders
           </h3>
-          <p style={{ fontSize: '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
+          <p style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
             {stats.totalCreditHolders}
           </p>
         </div>
@@ -90,7 +104,7 @@ const DashboardTab = () => {
           <h3 style={{ color: '#666', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>
             Distributors
           </h3>
-          <p style={{ fontSize: '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
+          <p style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
             {stats.totalDistributors}
           </p>
         </div>

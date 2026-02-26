@@ -39,14 +39,26 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
+      console.log('AuthContext: Sending login request to API');
       const response = await api.post('/auth/login', { username, password });
+      console.log('AuthContext: Login response received', {
+        hasToken: !!response.data.token,
+        hasUser: !!response.data.user
+      });
+
       localStorage.setItem('token', response.data.token);
       setUser(response.data.user);
       return { success: true, user: response.data.user };
     } catch (error) {
+      console.error('AuthContext: Login error', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
       return {
         success: false,
-        error: error.response?.data?.error || 'Login failed'
+        error: error.response?.data?.error || error.message || 'Login failed. Please check your network connection.'
       };
     }
   };

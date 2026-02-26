@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
+import MobileTable from '../common/MobileTable';
 
 const UsersTab = () => {
   const [users, setUsers] = useState([]);
@@ -92,58 +93,55 @@ const UsersTab = () => {
     return <div>Loading...</div>;
   }
 
+  const columns = [
+    { key: 'username', label: 'Username' },
+    {
+      key: 'created_at',
+      label: 'Created',
+      render: (user) => new Date(user.created_at).toLocaleDateString()
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (user) => (
+        <div className="action-buttons">
+          <button
+            onClick={() => handleOpenModal(user)}
+            className="btn btn-primary"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => handleDelete(user.id)}
+            className="btn btn-danger"
+          >
+            Delete
+          </button>
+        </div>
+      )
+    }
+  ];
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>Users</h2>
+      <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>Users</h2>
         <button onClick={() => handleOpenModal()} className="btn btn-success">
           Add New User
         </button>
       </div>
 
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.length === 0 ? (
-              <tr>
-                <td colSpan="3" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-                  No users found. Create your first user!
-                </td>
-              </tr>
-            ) : (
-              users.map(user => (
-                <tr key={user.id}>
-                  <td>{user.username}</td>
-                  <td>{new Date(user.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <div className="action-buttons">
-                      <button
-                        onClick={() => handleOpenModal(user)}
-                        className="btn btn-primary"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        className="btn btn-danger"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
+
+      <MobileTable
+        columns={columns}
+        data={users}
+        enableSearch={true}
+        enableSort={true}
+        defaultSortKey="username"
+        defaultSortOrder="asc"
+      />
 
       {showModal && (
         <div className="modal-overlay" onClick={handleCloseModal}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../utils/api';
-import { Calendar, CreditCard, TrendingUp, User, X, FileText, Package, MessageSquare, Wallet, CheckCircle, AlertCircle } from 'lucide-react';
+import { Calendar, CreditCard, TrendingUp, User, X, FileText, Package, MessageSquare, Wallet, CheckCircle, AlertCircle, DollarSign } from 'lucide-react';
 
 const SalesReportTab = () => {
   const [loading, setLoading] = useState(true);
@@ -610,7 +610,8 @@ const SalesReportTab = () => {
             </div>
           </div>
 
-          <div className="table-container" style={{
+          {/* Desktop Table View */}
+          <div className="desktop-only table-container" style={{
             borderRadius: '12px',
             overflow: 'hidden',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
@@ -678,6 +679,89 @@ const SalesReportTab = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="mobile-only">
+            {pendingSalesList.map((sale) => {
+              const creditSum = calculateCreditSum(sale);
+              const total = parseFloat(sale.cash_collected || 0) +
+                            parseFloat(sale.upi || 0) -
+                            creditSum;
+
+              return (
+                <div
+                  key={sale.id}
+                  className="card"
+                  onClick={() => handleRowClick(sale)}
+                  style={{
+                    marginBottom: '1rem',
+                    padding: '1.25rem',
+                    background: 'linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%)',
+                    border: '2px solid #ffc107',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(255, 193, 7, 0.2)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#856404', fontWeight: '600', marginBottom: '0.25rem' }}>
+                        {new Date(sale.date).toLocaleDateString()}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: '#666', fontWeight: '500' }}>
+                        User: {sale.username || 'N/A'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#856404', marginBottom: '0.25rem' }}>TOTAL</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#000' }}>
+                        ₹{total.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.7)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.25rem' }}>CASH</div>
+                      <div style={{ fontSize: '1rem', fontWeight: '700', color: '#000' }}>
+                        ₹{parseFloat(sale.cash_collected || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(76, 175, 80, 0.1)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.25rem' }}>UPI</div>
+                      <div style={{ fontSize: '1rem', fontWeight: '700', color: '#4CAF50' }}>
+                        ₹{parseFloat(sale.upi || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(255, 152, 0, 0.1)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.25rem' }}>CREDIT</div>
+                      <div style={{ fontSize: '1rem', fontWeight: '700', color: '#ff9800' }}>
+                        ₹{creditSum.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    className="btn btn-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenApprovalModal(sale);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      fontSize: '0.875rem',
+                      background: '#ffc107',
+                      color: '#000',
+                      border: 'none',
+                      fontWeight: '700'
+                    }}
+                  >
+                    Review & Approve
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -689,7 +773,7 @@ const SalesReportTab = () => {
         <>
           {/* Month Summary Stats */}
           {activeMonth && salesByMonth[activeMonth] && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'clamp(0.75rem, 2vw, 1.5rem)', marginBottom: '1.5rem' }}>
               <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #000 0%, #1a1a1a 100%)', color: 'white' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <h3 style={{ color: 'white', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
@@ -748,7 +832,7 @@ const SalesReportTab = () => {
             marginBottom: '1.5rem',
             overflowX: 'auto',
             flexWrap: 'wrap',
-            padding: '1rem',
+            padding: 'clamp(0.75rem, 2vw, 1rem)',
             backgroundColor: 'white',
             borderRadius: '12px',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
@@ -782,9 +866,9 @@ const SalesReportTab = () => {
             ))}
           </div>
 
-          {/* Active Month Table */}
+          {/* Active Month Table - Desktop */}
           {activeMonth && salesByMonth[activeMonth] && (
-            <div className="table-container" style={{
+            <div className="desktop-only table-container" style={{
               borderRadius: '12px',
               overflow: 'hidden',
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
@@ -951,6 +1035,179 @@ const SalesReportTab = () => {
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          )}
+
+          {/* Active Month Cards - Mobile */}
+          {activeMonth && salesByMonth[activeMonth] && (
+            <div className="mobile-only">
+              {salesByMonth[activeMonth].sales.map((sale) => {
+                const creditSum = calculateCreditSum(sale);
+                const total = parseFloat(sale.cash_collected || 0) +
+                              parseFloat(sale.upi || 0) -
+                              creditSum;
+                const allocated = isBalanceAllocated(sale.id);
+
+                return (
+                  <div
+                    key={sale.id}
+                    className="card"
+                    onClick={() => handleRowClick(sale)}
+                    style={{
+                      marginBottom: '1rem',
+                      padding: '1.25rem',
+                      cursor: 'pointer',
+                      background: 'linear-gradient(135deg, #fff 0%, #fafafa 100%)',
+                      border: '1px solid #e0e0e0',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#666', fontWeight: '600', marginBottom: '0.25rem' }}>
+                          {new Date(sale.date).toLocaleDateString()}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#666', fontWeight: '500' }}>
+                          User: {sale.username || 'N/A'}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>TOTAL</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#2196F3' }}>
+                          ₹{total.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                      <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(0, 0, 0, 0.05)', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.25rem' }}>CASH</div>
+                        <div style={{ fontSize: '1rem', fontWeight: '700', color: '#000' }}>
+                          ₹{parseFloat(sale.cash_collected || 0).toFixed(2)}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(76, 175, 80, 0.1)', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.25rem' }}>UPI</div>
+                        <div style={{ fontSize: '1rem', fontWeight: '700', color: '#4CAF50' }}>
+                          ₹{parseFloat(sale.upi || 0).toFixed(2)}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(255, 152, 0, 0.1)', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.25rem' }}>CREDIT</div>
+                        <div style={{ fontSize: '1rem', fontWeight: '700', color: '#ff9800' }}>
+                          ₹{creditSum.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {Array.isArray(sale.credit) && sale.credit.length > 0 && (
+                      <div style={{ padding: '0.75rem', background: 'rgba(255, 152, 0, 0.05)', borderRadius: '8px', marginBottom: '1rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666', marginBottom: '0.5rem' }}>Credit Details:</div>
+                        {sale.credit.map((item, idx) => (
+                          <div key={idx} style={{ fontSize: '0.875rem', color: '#ff9800', marginBottom: '0.25rem' }}>
+                            {getCreditHolderName(item.credit_holder_id)} → ₹{parseFloat(item.creditgiven || 0).toFixed(2)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div onClick={(e) => e.stopPropagation()}>
+                      {sale.status === 'pending' ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          padding: '0.875rem',
+                          backgroundColor: '#fff3cd',
+                          color: '#856404',
+                          borderRadius: '8px',
+                          border: '1px solid #ffc107',
+                          fontSize: '0.875rem',
+                          fontWeight: '600'
+                        }}>
+                          <AlertCircle size={16} />
+                          Pending Approval
+                        </div>
+                      ) : allocated ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          padding: '0.875rem',
+                          backgroundColor: '#d4edda',
+                          color: '#155724',
+                          borderRadius: '8px',
+                          border: '1px solid #28a745',
+                          fontSize: '0.875rem',
+                          fontWeight: '600'
+                        }}>
+                          <CheckCircle size={16} />
+                          Balance Allocated
+                        </div>
+                      ) : (
+                        <button
+                          className="btn btn-primary"
+                          onClick={(e) => handleAllocateBalance(sale, e)}
+                          style={{
+                            width: '100%',
+                            padding: '0.875rem',
+                            fontSize: '0.875rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <Wallet size={16} />
+                          Allocate Balance
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Month Total Card - Mobile */}
+              <div className="card" style={{
+                background: 'linear-gradient(135deg, #000 0%, #1a1a1a 100%)',
+                color: 'white',
+                padding: '1.5rem',
+                marginTop: '1rem'
+              }}>
+                <h3 style={{ color: 'white', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>
+                  Month Total
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '0.25rem' }}>Cash</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: '700' }}>
+                      ₹{calculateMonthTotals(salesByMonth[activeMonth].sales).cash.toFixed(2)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '0.25rem' }}>UPI</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: '700' }}>
+                      ₹{calculateMonthTotals(salesByMonth[activeMonth].sales).upi.toFixed(2)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '0.25rem' }}>Credit</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: '700' }}>
+                      ₹{calculateMonthTotals(salesByMonth[activeMonth].sales).credit.toFixed(2)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '0.25rem' }}>Total</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>
+                      ₹{(calculateMonthTotals(salesByMonth[activeMonth].sales).cash +
+                         calculateMonthTotals(salesByMonth[activeMonth].sales).upi -
+                         calculateMonthTotals(salesByMonth[activeMonth].sales).credit).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </>
@@ -1343,7 +1600,8 @@ const SalesReportTab = () => {
                   <Package size={24} style={{ color: '#000' }} />
                   Product Sales Details
                 </h3>
-                <div style={{ borderRadius: '12px', overflow: 'hidden', border: '2px solid #000', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)' }}>
+                {/* Desktop View */}
+                <div className="desktop-only" style={{ borderRadius: '12px', overflow: 'hidden', border: '2px solid #000', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)' }}>
                   <table className="table" style={{ marginBottom: 0 }}>
                     <thead style={{ backgroundColor: '#000' }}>
                       <tr>
@@ -1459,6 +1717,100 @@ const SalesReportTab = () => {
                     </tfoot>
                   </table>
                 </div>
+
+                {/* Mobile View */}
+                <div className="mobile-only">
+                  {selectedSale.opening_stock && Array.isArray(selectedSale.opening_stock) && selectedSale.opening_stock.map((openingItem, index) => {
+                    const closingItem = selectedSale.closing_stock?.find(c => c.product_id === openingItem.product_id);
+                    const saleItem = selectedSale.sale?.find(s => s.product_id === openingItem.product_id);
+                    const saleQuantity = saleItem ? parseFloat(saleItem.sale || 0) : 0;
+                    const salePrice = getProductSalePrice(openingItem.product_id);
+                    const totalAmount = saleQuantity * salePrice;
+
+                    return (
+                      <div key={index} className="card" style={{ marginBottom: '1rem', border: '2px solid #000', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
+                        <div style={{ padding: '1rem', borderBottom: '2px solid #000', backgroundColor: '#000', color: 'white' }}>
+                          <div style={{ fontSize: '1.125rem', fontWeight: '700' }}>{getProductName(openingItem.product_id)}</div>
+                        </div>
+                        <div style={{ padding: '1rem' }}>
+                          <div style={{ display: 'grid', gap: '0.75rem' }}>
+                            {/* Opening Stock */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', backgroundColor: '#e3f2fd', borderRadius: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1976d2', fontSize: '0.875rem', fontWeight: '600' }}>
+                                <Package size={16} />
+                                Opening Stock
+                              </div>
+                              <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#2196F3' }}>
+                                {parseFloat(openingItem.opening_stock || 0).toFixed(2)}
+                              </div>
+                            </div>
+                            {/* Closing Stock */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', backgroundColor: '#fff3e0', borderRadius: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#e65100', fontSize: '0.875rem', fontWeight: '600' }}>
+                                <Package size={16} />
+                                Closing Stock
+                              </div>
+                              <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#ff9800' }}>
+                                {closingItem ? parseFloat(closingItem.closing_stock || 0).toFixed(2) : '0.00'}
+                              </div>
+                            </div>
+                            {/* Sale */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', backgroundColor: '#e8f5e9', borderRadius: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#2e7d32', fontSize: '0.875rem', fontWeight: '600' }}>
+                                <TrendingUp size={16} />
+                                Sale
+                              </div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#4CAF50' }}>
+                                {saleQuantity.toFixed(2)}
+                              </div>
+                            </div>
+                            {/* Sale Price */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', backgroundColor: '#f3e5f5', borderRadius: '8px' }}>
+                              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6a1b9a' }}>
+                                Sale Price
+                              </div>
+                              <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#9c27b0' }}>
+                                ₹{salePrice.toFixed(2)}
+                              </div>
+                            </div>
+                            {/* Total */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: '#fff9c4', borderRadius: '8px', border: '2px solid #f9a825' }}>
+                              <div style={{ fontSize: '1rem', fontWeight: '700', color: '#000', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Total
+                              </div>
+                              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#000' }}>
+                                ₹{totalAmount.toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Grand Total Card */}
+                  <div className="card" style={{ backgroundColor: '#000', color: 'white', padding: '1.5rem', marginTop: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Grand Total
+                      </div>
+                      <div style={{ fontSize: '1.75rem', fontWeight: '700' }}>
+                        ₹{(() => {
+                          let grandTotal = 0;
+                          if (selectedSale.opening_stock && Array.isArray(selectedSale.opening_stock)) {
+                            selectedSale.opening_stock.forEach(openingItem => {
+                              const saleItem = selectedSale.sale?.find(s => s.product_id === openingItem.product_id);
+                              const saleQuantity = saleItem ? parseFloat(saleItem.sale || 0) : 0;
+                              const salePrice = getProductSalePrice(openingItem.product_id);
+                              grandTotal += saleQuantity * salePrice;
+                            });
+                          }
+                          return grandTotal.toFixed(2);
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Collections */}
@@ -1486,6 +1838,50 @@ const SalesReportTab = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Gala Balance & Miscellaneous */}
+              {(selectedSale.gala_balance_today || selectedSale.miscellaneous_cash || selectedSale.miscellaneous_upi) && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{ color: '#000', fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Additional Collections
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                    {selectedSale.gala_balance_today && (
+                      <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                          <DollarSign size={20} />
+                          <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Gala Balance</p>
+                        </div>
+                        <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                          ₹{parseFloat(selectedSale.gala_balance_today || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                    {selectedSale.miscellaneous_cash && (
+                      <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                          <Package size={20} />
+                          <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Extra (Cash)</p>
+                        </div>
+                        <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                          ₹{parseFloat(selectedSale.miscellaneous_cash || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                    {selectedSale.miscellaneous_upi && (
+                      <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                          <CreditCard size={20} />
+                          <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Extra (UPI)</p>
+                        </div>
+                        <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                          ₹{parseFloat(selectedSale.miscellaneous_upi || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Credit Given */}
               {selectedSale.credit && Array.isArray(selectedSale.credit) && selectedSale.credit.length > 0 && (
@@ -1595,7 +1991,6 @@ const SalesReportTab = () => {
               borderRadius: '16px',
               maxWidth: '1200px',
               width: '100%',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
               marginBottom: '2rem'
             }}
           >
@@ -1608,26 +2003,6 @@ const SalesReportTab = () => {
               borderTopRightRadius: '16px',
               position: 'relative'
             }}>
-              <button
-                onClick={handleCloseApprovalModal}
-                style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  background: 'rgba(0, 0, 0, 0.2)',
-                  color: '#000',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '36px',
-                  height: '36px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <X size={20} />
-              </button>
 
               <h3 style={{ color: '#000', margin: 0, fontSize: '1.5rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <AlertCircle size={28} />
@@ -1667,7 +2042,8 @@ const SalesReportTab = () => {
               {/* Products Table */}
               <div style={{ marginBottom: '2rem' }}>
                 <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Product Sales</h4>
-                <div style={{ overflowX: 'auto', border: '2px solid #e0e0e0', borderRadius: '12px' }}>
+                {/* Desktop View */}
+                <div className="desktop-only" style={{ overflowX: 'auto', border: '2px solid #e0e0e0', borderRadius: '12px' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead style={{ backgroundColor: '#000', color: 'white' }}>
                       <tr>
@@ -1771,12 +2147,135 @@ const SalesReportTab = () => {
                     </tfoot>
                   </table>
                 </div>
+
+                {/* Mobile View */}
+                <div className="mobile-only">
+                  {products.map((product, index) => {
+                    const productData = approvalForm.productData[product.id] || { openingStock: 0, closingStock: 0, sale: 0 };
+                    const saleQuantity = parseFloat(productData.sale) || 0;
+                    const salePrice = parseFloat(product.sale_price) || 0;
+                    const saleValue = saleQuantity * salePrice;
+
+                    return (
+                      <div key={product.id} className="card" style={{ marginBottom: '1rem', border: '2px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)' }}>
+                        <div style={{ padding: '0.75rem', borderBottom: '2px solid #000', backgroundColor: '#000', color: 'white' }}>
+                          <div style={{ fontSize: '1rem', fontWeight: '700' }}>{product.product_name}</div>
+                        </div>
+                        <div style={{ padding: '1rem' }}>
+                          <div style={{ display: 'grid', gap: '0.75rem' }}>
+                            {/* Opening Stock */}
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666', display: 'block', marginBottom: '0.25rem' }}>
+                                Opening Stock
+                              </label>
+                              <input
+                                type="number"
+                                value={productData.openingStock}
+                                readOnly
+                                style={{
+                                  width: '100%',
+                                  padding: '0.75rem',
+                                  border: '2px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  textAlign: 'center',
+                                  backgroundColor: '#f5f5f5',
+                                  fontWeight: '700',
+                                  fontSize: '1.125rem',
+                                  color: '#2196F3'
+                                }}
+                              />
+                            </div>
+                            {/* Closing Stock */}
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666', display: 'block', marginBottom: '0.25rem' }}>
+                                Closing Stock
+                              </label>
+                              <input
+                                type="number"
+                                value={productData.closingStock}
+                                onChange={(e) => handleProductChangeInApproval(product.id, 'closingStock', e.target.value)}
+                                step="1"
+                                min="0"
+                                style={{
+                                  width: '100%',
+                                  padding: '0.75rem',
+                                  border: '2px solid #4CAF50',
+                                  borderRadius: '8px',
+                                  textAlign: 'center',
+                                  fontWeight: '700',
+                                  fontSize: '1.125rem',
+                                  color: '#ff9800'
+                                }}
+                              />
+                            </div>
+                            {/* Sale */}
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666', display: 'block', marginBottom: '0.25rem' }}>
+                                Sale
+                              </label>
+                              <input
+                                type="number"
+                                value={productData.sale}
+                                onChange={(e) => handleProductChangeInApproval(product.id, 'sale', e.target.value)}
+                                step="1"
+                                min="0"
+                                style={{
+                                  width: '100%',
+                                  padding: '0.75rem',
+                                  border: '2px solid #2196F3',
+                                  borderRadius: '8px',
+                                  textAlign: 'center',
+                                  fontWeight: '700',
+                                  fontSize: '1.25rem',
+                                  color: '#2196F3'
+                                }}
+                              />
+                            </div>
+                            {/* Sale Price */}
+                            <div style={{ padding: '0.75rem', backgroundColor: '#f3e5f5', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6a1b9a' }}>Sale Price</span>
+                              <span style={{ fontSize: '1.125rem', fontWeight: '700', color: '#9c27b0' }}>₹{salePrice.toFixed(2)}</span>
+                            </div>
+                            {/* Sale Value */}
+                            <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '2px solid #4CAF50' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '1rem', fontWeight: '700', color: '#2e7d32', textTransform: 'uppercase' }}>Sale Value</span>
+                                <span style={{ fontSize: '1.5rem', fontWeight: '700', color: '#2e7d32' }}>₹{saleValue.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Total Sale Value Card */}
+                  <div className="card" style={{ backgroundColor: '#fff3e0', border: '2px solid #e65100', padding: '1.25rem', marginTop: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: '700', color: '#e65100', textTransform: 'uppercase' }}>
+                        Total Sale Value
+                      </div>
+                      <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#e65100' }}>
+                        ₹{(() => {
+                          let total = 0;
+                          products.forEach(product => {
+                            const productData = approvalForm.productData[product.id] || { sale: 0 };
+                            const saleQuantity = parseFloat(productData.sale) || 0;
+                            const salePrice = parseFloat(product.sale_price) || 0;
+                            total += saleQuantity * salePrice;
+                          });
+                          return total.toFixed(2);
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* UPI & Gala Balance */}
               <div style={{ marginBottom: '2rem' }}>
                 <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>UPI & Gala Balance</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5rem' }}>
                   <div className="form-group">
                     <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
                       Total UPI Received Today | आज कुल UPI प्राप्त
@@ -1812,7 +2311,7 @@ const SalesReportTab = () => {
               {/* Miscellaneous */}
               <div style={{ marginBottom: '2rem' }}>
                 <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Extra (Chakhna, Bag, etc) | अतिरिक्त</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5rem' }}>
                   <div className="form-group">
                     <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
                       Cash
@@ -1847,7 +2346,7 @@ const SalesReportTab = () => {
 
               {/* Credit Taken */}
               <div style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h4 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>Credit Taken (Collect on Shop) | उधार वसूली</h4>
                   <button
                     type="button"
@@ -1868,7 +2367,7 @@ const SalesReportTab = () => {
                   return (
                     <div key={index} style={{ marginBottom: '1rem', padding: '1rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Credit Holder</label>
                             <select
@@ -2001,7 +2500,7 @@ const SalesReportTab = () => {
 
                 {(approvalForm.dailyExpenses || []).map((expense, index) => (
                   <div key={index} style={{ marginBottom: '1rem', padding: '1rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div className="form-group" style={{ marginBottom: 0 }}>
                         <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Name</label>
                         <input
@@ -2079,7 +2578,7 @@ const SalesReportTab = () => {
                   return (
                     <div key={index} style={{ marginBottom: '1rem', padding: '1rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Credit Holder</label>
                             <select
@@ -2217,6 +2716,245 @@ const SalesReportTab = () => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @media (min-width: 768px) {
+          .desktop-only {
+            display: block !important;
+          }
+          .mobile-only {
+            display: none !important;
+          }
+        }
+        @media (max-width: 767px) {
+          .desktop-only {
+            display: none !important;
+          }
+          .mobile-only {
+            display: block !important;
+          }
+
+          /* Modal Optimizations for Mobile */
+          .modal-overlay {
+            padding: 0.5rem !important;
+            align-items: flex-start !important;
+          }
+
+          .modal {
+            max-width: 100% !important;
+            max-height: 95vh !important;
+            margin: 0.5rem 0 !important;
+          }
+
+          /* Modal Headers */
+          .modal h3,
+          .modal h2 {
+            font-size: clamp(1.125rem, 4vw, 1.5rem) !important;
+          }
+
+          .modal h4 {
+            font-size: clamp(1rem, 3.5vw, 1.125rem) !important;
+          }
+
+          /* Modal Padding */
+          .modal > div[style*="padding: 2rem"],
+          .modal > div > div[style*="padding: 2rem"] {
+            padding: 1rem !important;
+          }
+
+          /* Grid Layouts - Stack on Mobile */
+          .modal div[style*="gridTemplateColumns: 'repeat(2, 1fr')"],
+          .modal div[style*="gridTemplateColumns: repeat(2, 1fr)"],
+          .modal div[style*="gridTemplateColumns: 'repeat(auto-fit"],
+          .modal div[style*="gridTemplateColumns: repeat(auto-fit"] {
+            grid-template-columns: 1fr !important;
+          }
+
+          /* Dynamic Entry Grids (Credit Taken, Daily Expenses, Credit Given) */
+          .modal div[style*="gridTemplateColumns: '2fr 1fr 1fr auto'"],
+          .modal div[style*="gridTemplateColumns: 2fr 1fr 1fr auto"],
+          .modal div[style*="gridTemplateColumns: '1fr 2fr 1fr auto'"],
+          .modal div[style*="gridTemplateColumns: 1fr 2fr 1fr auto"],
+          .modal div[style*="gridTemplateColumns: '2fr 1fr auto'"],
+          .modal div[style*="gridTemplateColumns: 2fr 1fr auto"] {
+            grid-template-columns: 1fr !important;
+          }
+
+          /* Button Containers */
+          .modal div[style*="display: 'flex'"][style*="gap: '1rem'"] button,
+          .modal div[style*="display: flex"][style*="gap: 1rem"] button {
+            font-size: 0.9375rem !important;
+            padding: 0.875rem !important;
+          }
+
+          /* Close Button in Header */
+          .modal button[style*="position: absolute"][style*="top: '1rem'"],
+          .modal button[style*="position: absolute"][style*="top: 1rem"],
+          .modal button[style*="position: absolute"][style*="top: '1.5rem'"],
+          .modal button[style*="position: absolute"][style*="top: 1.5rem"] {
+            top: 0.75rem !important;
+            right: 0.75rem !important;
+            width: 32px !important;
+            height: 32px !important;
+          }
+
+          /* Form Controls */
+          .modal .form-control {
+            font-size: 1rem !important;
+            padding: 0.75rem !important;
+          }
+
+          .modal select.form-control {
+            padding: 0.75rem 0.5rem !important;
+          }
+
+          .modal textarea.form-control {
+            min-height: 100px !important;
+          }
+
+          /* Input Fields with Large Font Sizes */
+          .modal input[style*="fontSize: '1.25rem'"],
+          .modal input[style*="fontSize: 1.25rem"],
+          .modal input[style*="fontSize: '1.125rem'"],
+          .modal input[style*="fontSize: 1.125rem"] {
+            font-size: 1rem !important;
+            padding: 0.75rem 0.5rem !important;
+          }
+
+          /* Table Horizontal Scroll */
+          .modal div[style*="overflowX: 'auto'"],
+          .modal div[style*="overflowX: auto"],
+          .modal div[style*="overflow-x: auto"] {
+            -webkit-overflow-scrolling: touch !important;
+          }
+
+          .modal table {
+            min-width: 700px !important;
+            font-size: 0.875rem !important;
+          }
+
+          .modal table th,
+          .modal table td {
+            padding: 0.5rem !important;
+            font-size: 0.8125rem !important;
+          }
+
+          .modal table input {
+            width: 70px !important;
+            padding: 0.375rem !important;
+            font-size: 0.875rem !important;
+          }
+
+          /* Product Sales Table in Approval Modal */
+          .modal table thead th[style*="fontSize: '0.875rem'"],
+          .modal table thead th[style*="fontSize: 0.875rem"] {
+            font-size: 0.75rem !important;
+            padding: 0.625rem 0.375rem !important;
+          }
+
+          .modal table tbody td {
+            padding: 0.5rem 0.375rem !important;
+          }
+
+          /* Collection Cards and Summary Cards */
+          .modal .card {
+            padding: 1rem !important;
+          }
+
+          .modal .card[style*="padding: '1.5rem'"],
+          .modal .card[style*="padding: 1.5rem"],
+          .modal .card[style*="padding: '2rem'"],
+          .modal .card[style*="padding: 2rem"] {
+            padding: 1rem !important;
+          }
+
+          .modal .card p[style*="fontSize: '2rem'"],
+          .modal .card p[style*="fontSize: 2rem"],
+          .modal .card p[style*="fontSize: '3rem'"],
+          .modal .card p[style*="fontSize: 3rem"] {
+            font-size: clamp(1.5rem, 6vw, 2.5rem) !important;
+          }
+
+          .modal .card div[style*="fontSize: '1.5rem'"],
+          .modal .card div[style*="fontSize: 1.5rem"],
+          .modal .card div[style*="fontSize: '2rem'"],
+          .modal .card div[style*="fontSize: 2rem"] {
+            font-size: clamp(1.25rem, 5vw, 1.75rem) !important;
+          }
+
+          /* Labels */
+          .modal label {
+            font-size: 0.875rem !important;
+            margin-bottom: 0.375rem !important;
+          }
+
+          /* Info Boxes and Alerts */
+          .modal div[style*="backgroundColor: '#e3f2fd'"],
+          .modal div[style*="backgroundColor: '#fff3e0'"],
+          .modal div[style*="backgroundColor: '#fff3cd'"],
+          .modal div[style*="backgroundColor: '#f8d7da'"],
+          .modal div[style*="backgroundColor: #e3f2fd"],
+          .modal div[style*="backgroundColor: #fff3e0"],
+          .modal div[style*="backgroundColor: #fff3cd"],
+          .modal div[style*="backgroundColor: #f8d7da"] {
+            padding: 0.75rem !important;
+            font-size: 0.8125rem !important;
+          }
+
+          /* Outstanding/Balance Info in Entry Cards */
+          .modal div[style*="fontSize: '1rem'"][style*="fontWeight: '700'"] {
+            font-size: 0.9375rem !important;
+          }
+
+          .modal div[style*="fontSize: '0.75rem'"] {
+            font-size: 0.6875rem !important;
+          }
+
+          /* Summary Stats Grids */
+          .modal div[style*="background: linear-gradient"][style*="padding: '1.5rem'"],
+          .modal div[style*="background: linear-gradient"][style*="padding: 1.5rem"] {
+            padding: 1rem !important;
+          }
+
+          /* Add/Remove Buttons in Dynamic Sections */
+          .modal button[style*="padding: '0.5rem 1rem'"],
+          .modal button[style*="padding: 0.5rem 1rem"] {
+            padding: 0.625rem 0.875rem !important;
+            font-size: 0.875rem !important;
+          }
+
+          /* Entry Card Containers */
+          .modal div[style*="padding: '1rem'"][style*="border: '2px solid #e0e0e0'"],
+          .modal div[style*="padding: 1rem"][style*="border: 2px solid #e0e0e0"] {
+            padding: 0.875rem !important;
+          }
+
+          /* Detailed Sales Modal - Basic Info Grid */
+          .modal div[style*="gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr'))"],
+          .modal div[style*="gridTemplateColumns: repeat(auto-fit, minmax(200px, 1fr))"] {
+            grid-template-columns: 1fr !important;
+            gap: 1rem !important;
+          }
+
+          /* Responsive Font Sizes for Large Text */
+          .modal span[style*="fontSize: '1.125rem'"],
+          .modal span[style*="fontSize: 1.125rem"],
+          .modal span[style*="fontSize: '1.25rem'"],
+          .modal span[style*="fontSize: 1.25rem"] {
+            font-size: 1rem !important;
+          }
+
+          /* Ensure Buttons Stack Properly */
+          .modal > div > div:last-child div[style*="display: flex"][style*="gap"] {
+            flex-direction: column !important;
+            gap: 0.75rem !important;
+          }
+
+          .modal > div > div:last-child div[style*="display: flex"][style*="gap"] button {
+            width: 100% !important;
+          }
+        }
+      `}</style>
     </>
   );
 };

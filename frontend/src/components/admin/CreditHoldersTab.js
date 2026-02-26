@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
+import MobileTable from '../common/MobileTable';
 
 const CreditHoldersTab = () => {
   const [creditHolders, setCreditHolders] = useState([]);
@@ -181,85 +182,87 @@ const CreditHoldersTab = () => {
     return <div>Loading...</div>;
   }
 
+  const columns = [
+    { key: 'name', label: 'Name' },
+    { key: 'address', label: 'Address', render: (ch) => ch.address || '-' },
+    { key: 'phone', label: 'Phone', render: (ch) => ch.phone || '-' },
+    {
+      key: 'amount_payable',
+      label: 'Amount Payable',
+      render: (ch) => (
+        <span style={{ fontWeight: '700', color: '#ff9800', fontSize: '1.125rem' }}>
+          ₹{parseFloat(ch.amount_payable || 0).toFixed(2)}
+        </span>
+      )
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      render: (ch) => new Date(ch.created_at).toLocaleDateString()
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (ch) => (
+        <div className="action-buttons">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShowCreditHolderHistory(ch);
+            }}
+            className="btn btn-primary"
+          >
+            History
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenModal(ch);
+            }}
+            className="btn btn-secondary"
+          >
+            Edit
+          </button>
+        </div>
+      )
+    }
+  ];
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>Credit Holders</h2>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+      {success && <div className="success" style={{ marginBottom: '1rem' }}>{success}</div>}
+      {error && !showModal && !showCollectModal && (
+        <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>
+      )}
+
+      <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
+        <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>
+          Credit Holders
+        </h2>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             onClick={handleOpenCollectModal}
             className="btn btn-primary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: '#4CAF50',
-              padding: '0.75rem 1.5rem',
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}
+            style={{ background: '#4CAF50', borderColor: '#4CAF50' }}
           >
             Collect Credit
           </button>
           <button onClick={() => handleOpenModal()} className="btn btn-success">
-            Add New Credit Holder
+            Add New
           </button>
         </div>
       </div>
 
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Address</th>
-              <th>Phone</th>
-              <th>Amount Payable</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {creditHolders.length === 0 ? (
-              <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-                  No credit holders found. Create your first credit holder!
-                </td>
-              </tr>
-            ) : (
-              creditHolders.map(creditHolder => (
-                <tr
-                  key={creditHolder.id}
-                  onClick={() => handleShowCreditHolderHistory(creditHolder)}
-                  style={{
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
-                  title="Click to view credit history"
-                >
-                  <td>{creditHolder.name}</td>
-                  <td>{creditHolder.address || '-'}</td>
-                  <td>{creditHolder.phone || '-'}</td>
-                  <td>₹{parseFloat(creditHolder.amount_payable || 0).toFixed(2)}</td>
-                  <td>{new Date(creditHolder.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenModal(creditHolder);
-                      }}
-                      className="btn btn-primary"
-                    >
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <MobileTable
+        columns={columns}
+        data={creditHolders}
+        onRowClick={handleShowCreditHolderHistory}
+        enableSearch={true}
+        enableSort={true}
+        defaultSortKey="name"
+        defaultSortOrder="asc"
+      />
 
 
       {showModal && (

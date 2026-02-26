@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Plus, Edit2, Trash2, AlertCircle, Receipt, Calendar } from 'lucide-react';
+import MobileTable from '../common/MobileTable';
 
 const ExpenseTab = () => {
   const [expenses, setExpenses] = useState([]);
@@ -152,6 +153,79 @@ const ExpenseTab = () => {
     return <div className="loading">Loading expenses...</div>;
   }
 
+  const columns = [
+    {
+      key: 'date',
+      label: 'Date / तारीख',
+      render: (expense) => formatDate(expense.date)
+    },
+    {
+      key: 'expense_name',
+      label: 'Expense Name / व्यय का नाम',
+      render: (expense) => <span style={{ fontWeight: '600' }}>{expense.expense_name}</span>
+    },
+    {
+      key: 'description',
+      label: 'Description / विवरण',
+      render: (expense) => (
+        <span style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+          {expense.description || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'expense_from',
+      label: 'Source / स्रोत',
+      render: (expense) => (
+        <span style={{
+          padding: '0.25rem 0.75rem',
+          borderRadius: '12px',
+          fontSize: '0.75rem',
+          fontWeight: '600',
+          backgroundColor: getBalanceSourceColor(expense.expense_from) + '20',
+          color: getBalanceSourceColor(expense.expense_from),
+          border: `1px solid ${getBalanceSourceColor(expense.expense_from)}`
+        }}>
+          {getBalanceSourceLabel(expense.expense_from)}
+        </span>
+      )
+    },
+    {
+      key: 'expense_amount',
+      label: 'Amount / राशि',
+      render: (expense) => (
+        <span style={{ fontWeight: '700', color: '#dc3545' }}>
+          {formatCurrency(expense.expense_amount)}
+        </span>
+      )
+    },
+    {
+      key: 'actions',
+      label: 'Actions / क्रियाएं',
+      sortable: false,
+      render: (expense) => (
+        <div className="action-buttons">
+          <button
+            className="btn btn-secondary"
+            onClick={() => handleOpenModal(expense)}
+            title="Edit"
+          >
+            <Edit2 size={16} style={{ marginRight: '0.5rem' }} />
+            Edit
+          </button>
+          <button
+            className="btn btn-danger"
+            onClick={() => handleDelete(expense.id)}
+            title="Delete"
+          >
+            <Trash2 size={16} style={{ marginRight: '0.5rem' }} />
+            Delete
+          </button>
+        </div>
+      )
+    }
+  ];
+
   return (
     <div className="expense-tab">
       {error && !showModal && (
@@ -162,11 +236,12 @@ const ExpenseTab = () => {
       )}
 
       {/* Header */}
-      <div className="header" style={{display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', background : 'transparent', border: 'none', padding: '0'}}>
-        <h2 style={{ fontSize: '1.5rem', color: '#000', fontWeight: '700'}}>
+      <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', color: '#000', fontWeight: '700', margin: 0 }}>
           Expenses
         </h2>
         <button className="btn btn-primary" onClick={() => handleOpenModal()}>
+          <Plus size={16} style={{ marginRight: '0.5rem' }} />
           Add Expense
         </button>
       </div>
@@ -188,142 +263,14 @@ const ExpenseTab = () => {
           </button>
         </div>
       ) : (
-        <>
-          {/* Desktop Table */}
-          <div className="desktop-only">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date / तारीख</th>
-                  <th>Expense Name / व्यय का नाम</th>
-                  <th>Description / विवरण</th>
-                  <th>Source / स्रोत</th>
-                  <th>Amount / राशि</th>
-                  <th>Actions / क्रियाएं</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map((expense) => (
-                  <tr key={expense.id}>
-                    <td>{formatDate(expense.date)}</td>
-                    <td style={{ fontWeight: '600' }}>{expense.expense_name}</td>
-                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {expense.description || '-'}
-                    </td>
-                    <td>
-                      <span style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '12px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        backgroundColor: getBalanceSourceColor(expense.expense_from) + '20',
-                        color: getBalanceSourceColor(expense.expense_from),
-                        border: `1px solid ${getBalanceSourceColor(expense.expense_from)}`
-                      }}>
-                        {getBalanceSourceLabel(expense.expense_from)}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: '700', color: '#dc3545' }}>
-                      {formatCurrency(expense.expense_amount)}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
-                          onClick={() => handleOpenModal(expense)}
-                          title="Edit"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          className="btn btn-danger"
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
-                          onClick={() => handleDelete(expense.id)}
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Cards */}
-          <div className="mobile-only">
-            {expenses.map((expense) => (
-              <div key={expense.id} className="card" style={{ marginBottom: '1rem' }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: '0.75rem'
-                }}>
-                  <div>
-                    <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.25rem' }}>
-                      {expense.expense_name}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#666' }}>
-                      <Calendar size={14} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                      {formatDate(expense.date)}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#dc3545' }}>
-                    {formatCurrency(expense.expense_amount)}
-                  </div>
-                </div>
-
-                {expense.description && (
-                  <div style={{
-                    fontSize: '0.875rem',
-                    color: '#666',
-                    marginBottom: '0.75rem',
-                    paddingBottom: '0.75rem',
-                    borderBottom: '1px solid #eee'
-                  }}>
-                    {expense.description}
-                  </div>
-                )}
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <span style={{
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem',
-                    fontWeight: '600',
-                    backgroundColor: getBalanceSourceColor(expense.expense_from) + '20',
-                    color: getBalanceSourceColor(expense.expense_from),
-                    border: `1px solid ${getBalanceSourceColor(expense.expense_from)}`
-                  }}>
-                    Source: {getBalanceSourceLabel(expense.expense_from)}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => handleOpenModal(expense)}
-                    style={{ flex: 1 }}
-                  >
-                    <Edit2 size={16} style={{ marginRight: '0.5rem' }} />
-                    Edit / संपादित करें
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    onClick={() => handleDelete(expense.id)}
-                    style={{ flex: 1 }}
-                  >
-                    <Trash2 size={16} style={{ marginRight: '0.5rem' }} />
-                    Delete / हटाएं
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <MobileTable
+          columns={columns}
+          data={expenses}
+          enableSearch={true}
+          enableSort={true}
+          defaultSortKey="date"
+          defaultSortOrder="desc"
+        />
       )}
 
       {/* Add/Edit Expense Modal */}

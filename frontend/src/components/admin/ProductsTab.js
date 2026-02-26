@@ -141,7 +141,14 @@ const ProductsTab = () => {
 
       {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
 
-      <MobileTable columns={columns} data={products} />
+      <MobileTable
+        columns={columns}
+        data={products}
+        enableSearch={true}
+        enableSort={true}
+        defaultSortKey="product_name"
+        defaultSortOrder="asc"
+      />
 
       {showModal && (
         <div className="modal-overlay" onClick={handleCloseModal}>

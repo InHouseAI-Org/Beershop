@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Menu, X } from 'lucide-react';
 import DashboardTab from '../components/admin/DashboardTab';
 import InventoryTab from '../components/admin/InventoryTab';
 import ProductsTab from '../components/admin/ProductsTab';
@@ -17,6 +17,7 @@ const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showMobileWarning, setShowMobileWarning] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Check if user is on mobile device
@@ -46,6 +47,11 @@ const AdminDashboard = () => {
     { id: 'inventory', label: 'Inventory' },
     { id: 'users', label: 'Users' }
   ];
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setSidebarOpen(false); // Close sidebar on mobile after selecting a tab
+  };
 
   return (
     <>
@@ -168,11 +174,28 @@ const AdminDashboard = () => {
 
       <div className="header">
         <div className="header-content">
-          <div>
-            <h1>Admin Dashboard</h1>
-            <p style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-              Welcome, {user?.username}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {/* Hamburger Menu Button - Only visible on mobile */}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                cursor: 'pointer',
+                padding: '0.5rem',
+                color: '#ffffff',
+                backgroundColor: 'transparent',
+                border: 'none',
+                display: 'none' // Hidden by default, shown on mobile via CSS
+              }}
+              className="mobile-menu-btn"
+            >
+              {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+            <div>
+              <h1>Admin Dashboard</h1>
+              <p style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                Welcome, {user?.username}
+              </p>
+            </div>
           </div>
           <button onClick={logout} className="btn btn-secondary">
             Logout
@@ -180,22 +203,44 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', minHeight: 'calc(100vh - 120px)' }}>
+      <div style={{ display: 'flex', minHeight: 'calc(100vh - 120px)', position: 'relative' }}>
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 998,
+              display: 'none'
+            }}
+            className="sidebar-overlay"
+          />
+        )}
+
         {/* Left Sidebar Navigation */}
-        <div style={{
-          width: '20%',
-          minWidth: '150px',
-          backgroundColor: '#fff',
-          borderRight: '2px solid #e0e0e0',
-          padding: '1rem 0',
-          position: 'relative',
-          height: '100%',
-          overflowY: 'auto'
-        }}>
+        <div
+          className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}
+          style={{
+            width: '20%',
+            minWidth: '150px',
+            backgroundColor: '#fff',
+            borderRight: '2px solid #e0e0e0',
+            padding: '1rem 0',
+            position: 'relative',
+            height: '100%',
+            overflowY: 'auto',
+            transition: 'transform 0.3s ease'
+          }}
+        >
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               style={{
                 width: '100%',
                 padding: '1rem 1.5rem',

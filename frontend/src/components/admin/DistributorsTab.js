@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
+import MobileTable from '../common/MobileTable';
 
 const DistributorsTab = () => {
   const [distributors, setDistributors] = useState([]);
@@ -173,79 +174,85 @@ const DistributorsTab = () => {
     return <div>Loading...</div>;
   }
 
+  const columns = [
+    { key: 'name', label: 'Name' },
+    {
+      key: 'amount_outstanding',
+      label: 'Amount Outstanding',
+      render: (dist) => (
+        <span style={{ fontWeight: '700', color: '#e91e63', fontSize: '1.125rem' }}>
+          ₹{parseFloat(dist.amount_outstanding || 0).toFixed(2)}
+        </span>
+      )
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      render: (dist) => new Date(dist.created_at).toLocaleDateString()
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (dist) => (
+        <div className="action-buttons">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShowDistributorHistory(dist);
+            }}
+            className="btn btn-primary"
+          >
+            History
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenModal(dist);
+            }}
+            className="btn btn-secondary"
+          >
+            Edit
+          </button>
+        </div>
+      )
+    }
+  ];
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>Distributors</h2>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+      {success && <div className="success" style={{ marginBottom: '1rem' }}>{success}</div>}
+      {error && !showModal && !showPaymentModal && (
+        <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>
+      )}
+
+      <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
+        <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>
+          Distributors
+        </h2>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             onClick={handleOpenPaymentModal}
             className="btn btn-primary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: '#2196F3',
-              padding: '0.75rem 1.5rem',
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}
+            style={{ background: '#2196F3', borderColor: '#2196F3' }}
           >
             Pay Distributor
           </button>
           <button onClick={() => handleOpenModal()} className="btn btn-success">
-            Add New Distributor
+            Add New
           </button>
         </div>
       </div>
 
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Amount Outstanding</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {distributors.length === 0 ? (
-              <tr>
-                <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-                  No distributors found. Create your first distributor!
-                </td>
-              </tr>
-            ) : (
-              distributors.map(distributor => (
-                <tr key={distributor.id}>
-                  <td>
-                    <span
-                      onClick={() => handleShowDistributorHistory(distributor)}
-                      style={{
-                        cursor: 'pointer'
-                      }}
-                      title="Click to view payment history"
-                    >
-                      {distributor.name}
-                    </span>
-                  </td>
-                  <td>₹{parseFloat(distributor.amount_outstanding || 0).toFixed(2)}</td>
-                  <td>{new Date(distributor.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button
-                      onClick={() => handleOpenModal(distributor)}
-                      className="btn btn-primary"
-                    >
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <MobileTable
+        columns={columns}
+        data={distributors}
+        onRowClick={handleShowDistributorHistory}
+        enableSearch={true}
+        enableSort={true}
+        defaultSortKey="name"
+        defaultSortOrder="asc"
+      />
 
       {showModal && (
         <div className="modal-overlay" onClick={handleCloseModal}>

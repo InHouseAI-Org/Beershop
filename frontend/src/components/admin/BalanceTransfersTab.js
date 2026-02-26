@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { formatDate } from '../../utils/dateUtils';
+import MobileTable from '../common/MobileTable';
+import { Plus } from 'lucide-react';
 
 const BalanceTransfersTab = () => {
   const [transfers, setTransfers] = useState([]);
@@ -155,17 +157,87 @@ const BalanceTransfersTab = () => {
     return <div>Loading...</div>;
   }
 
+  const columns = [
+    {
+      key: 'transaction_date',
+      label: 'Date',
+      render: (transfer) => formatDate(transfer.transaction_date)
+    },
+    {
+      key: 'name',
+      label: 'Name',
+      render: (transfer) => <span style={{ fontWeight: '600' }}>{transfer.name}</span>
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      render: (transfer) => transfer.description || '-'
+    },
+    {
+      key: 'from_account',
+      label: 'From',
+      render: (transfer) => (
+        <span style={{
+          padding: '0.25rem 0.75rem',
+          borderRadius: '4px',
+          fontSize: '0.875rem',
+          backgroundColor: `${getAccountColor(transfer.from_account)}20`,
+          color: getAccountColor(transfer.from_account),
+          fontWeight: '600',
+          border: `1px solid ${getAccountColor(transfer.from_account)}`
+        }}>
+          {getAccountLabel(transfer.from_account)}
+        </span>
+      )
+    },
+    {
+      key: 'to_account',
+      label: 'To',
+      render: (transfer) => (
+        <span style={{
+          padding: '0.25rem 0.75rem',
+          borderRadius: '4px',
+          fontSize: '0.875rem',
+          backgroundColor: `${getAccountColor(transfer.to_account)}20`,
+          color: getAccountColor(transfer.to_account),
+          fontWeight: '600',
+          border: `1px solid ${getAccountColor(transfer.to_account)}`
+        }}>
+          {getAccountLabel(transfer.to_account)}
+        </span>
+      )
+    },
+    {
+      key: 'amount',
+      label: 'Amount',
+      render: (transfer) => (
+        <span style={{ fontWeight: '700', color: '#e65100', fontSize: '1.125rem' }}>
+          ₹{parseFloat(transfer.amount).toFixed(2)}
+        </span>
+      )
+    },
+    {
+      key: 'created_by_name',
+      label: 'Created By',
+      render: (transfer) => transfer.created_by_name || '-'
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (transfer) => (
+        <button
+          onClick={() => handleDelete(transfer.id)}
+          className="btn btn-danger"
+        >
+          Delete
+        </button>
+      )
+    }
+  ];
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>
-          Balance Transfers
-        </h2>
-        <button onClick={handleOpenModal} className="btn btn-success">
-          Add New Transfer
-        </button>
-      </div>
-
       {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
       {success && (
         <div className="success" style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', border: '1px solid #c3e6cb' }}>
@@ -173,30 +245,40 @@ const BalanceTransfersTab = () => {
         </div>
       )}
 
+      <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>
+          Balance Transfers
+        </h2>
+        <button onClick={handleOpenModal} className="btn btn-success">
+          <Plus size={16} style={{ marginRight: '0.5rem' }} />
+          Add Transfer
+        </button>
+      </div>
+
       {/* Current Balances */}
       {balances && (
-        <div style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-          <div style={{ padding: '1.5rem', backgroundColor: '#e8f5e9', borderRadius: '12px', border: '2px solid #4CAF50' }}>
-            <div style={{ fontSize: '0.875rem', color: '#2e7d32', marginBottom: '0.5rem', fontWeight: '600' }}>
+        <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'clamp(0.75rem, 2vw, 1rem)' }}>
+          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', backgroundColor: '#e8f5e9', borderRadius: '12px', border: '2px solid #4CAF50' }}>
+            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#2e7d32', marginBottom: '0.5rem', fontWeight: '600' }}>
               Cash Balance
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1b5e20' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#1b5e20' }}>
               ₹{parseFloat(balances.cashBalance || 0).toFixed(2)}
             </div>
           </div>
-          <div style={{ padding: '1.5rem', backgroundColor: '#e3f2fd', borderRadius: '12px', border: '2px solid #2196F3' }}>
-            <div style={{ fontSize: '0.875rem', color: '#1565c0', marginBottom: '0.5rem', fontWeight: '600' }}>
+          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', backgroundColor: '#e3f2fd', borderRadius: '12px', border: '2px solid #2196F3' }}>
+            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#1565c0', marginBottom: '0.5rem', fontWeight: '600' }}>
               Bank Balance
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0d47a1' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#0d47a1' }}>
               ₹{parseFloat(balances.bankBalance || 0).toFixed(2)}
             </div>
           </div>
-          <div style={{ padding: '1.5rem', backgroundColor: '#f3e5f5', borderRadius: '12px', border: '2px solid #9C27B0' }}>
-            <div style={{ fontSize: '0.875rem', color: '#6a1b9a', marginBottom: '0.5rem', fontWeight: '600' }}>
+          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', backgroundColor: '#f3e5f5', borderRadius: '12px', border: '2px solid #9C27B0' }}>
+            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#6a1b9a', marginBottom: '0.5rem', fontWeight: '600' }}>
               Gala Balance
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700', color: '#4a148c' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#4a148c' }}>
               ₹{parseFloat(balances.galaBalance || 0).toFixed(2)}
             </div>
           </div>
@@ -204,77 +286,14 @@ const BalanceTransfersTab = () => {
       )}
 
       {/* Transfers Table */}
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Name</th>
-              <th>Description</th>
-              <th>From</th>
-              <th>To</th>
-              <th>Amount</th>
-              <th>Created By</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transfers.length === 0 ? (
-              <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-                  No balance transfers found. Create your first transfer!
-                </td>
-              </tr>
-            ) : (
-              transfers.map(transfer => (
-                <tr key={transfer.id}>
-                  <td>{formatDate(transfer.transaction_date)}</td>
-                  <td style={{ fontWeight: '600' }}>{transfer.name}</td>
-                  <td>{transfer.description || '-'}</td>
-                  <td>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '4px',
-                      fontSize: '0.875rem',
-                      backgroundColor: `${getAccountColor(transfer.from_account)}20`,
-                      color: getAccountColor(transfer.from_account),
-                      fontWeight: '600',
-                      border: `1px solid ${getAccountColor(transfer.from_account)}`
-                    }}>
-                      {getAccountLabel(transfer.from_account)}
-                    </span>
-                  </td>
-                  <td>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '4px',
-                      fontSize: '0.875rem',
-                      backgroundColor: `${getAccountColor(transfer.to_account)}20`,
-                      color: getAccountColor(transfer.to_account),
-                      fontWeight: '600',
-                      border: `1px solid ${getAccountColor(transfer.to_account)}`
-                    }}>
-                      {getAccountLabel(transfer.to_account)}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: '700', color: '#e65100', fontSize: '1.125rem' }}>
-                    ₹{parseFloat(transfer.amount).toFixed(2)}
-                  </td>
-                  <td>{transfer.created_by_name || '-'}</td>
-                  <td>
-                    <button
-                      onClick={() => handleDelete(transfer.id)}
-                      className="btn btn-danger"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <MobileTable
+        columns={columns}
+        data={transfers}
+        enableSearch={true}
+        enableSort={true}
+        defaultSortKey="transaction_date"
+        defaultSortOrder="desc"
+      />
 
       {/* Add Transfer Modal */}
       {showModal && (
@@ -398,7 +417,7 @@ const BalanceTransfersTab = () => {
                   className="form-control"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  step="1"
+                  step="0.01"
                   min="0.01"
                   required
                   placeholder="₹ 0.00"

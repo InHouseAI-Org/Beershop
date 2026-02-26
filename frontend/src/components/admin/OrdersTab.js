@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Package, Calendar, Trash2, Plus } from 'lucide-react';
+import MobileTable from '../common/MobileTable';
 
 const OrdersTab = () => {
   const [orders, setOrders] = useState([]);
@@ -236,7 +237,7 @@ const OrdersTab = () => {
     return (
       <div style={{ minHeight: '100vh', padding: '2rem 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexDirection: 'row', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', marginBottom: '2rem' }} className="order-form-header">
             <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>
               {editingOrder ? 'Edit Order' : 'Create New Order'}
             </h2>
@@ -254,7 +255,7 @@ const OrdersTab = () => {
                 Basic Information
               </h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 <div className="form-group">
                   <label htmlFor="distributorId" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem', fontWeight: '600' }}>
                     <Package size={20} />
@@ -323,7 +324,7 @@ const OrdersTab = () => {
 
             {/* Section 2: Order Items */}
             <div style={{ marginBottom: '2rem', paddingBottom: '2rem', borderBottom: '2px solid #e0e0e0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="order-items-header">
                 <h3 style={{ fontSize: '1.5rem', fontWeight: '600', margin: 0, color: '#000' }}>
                   Order Items *
                 </h3>
@@ -346,20 +347,20 @@ const OrdersTab = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {formData.orderData.map((item, index) => (
                     <div key={index} style={{ backgroundColor: '#f8f9fa', padding: '1.5rem', borderRadius: '8px', position: 'relative' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <h4 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600' }}>Item {index + 1}</h4>
                         <button
                           type="button"
                           onClick={() => removeOrderItem(index)}
                           className="btn btn-danger"
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', marginTop: '0.5rem' }}
                         >
                           <Trash2 size={16} />
                           Remove
                         </button>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1rem' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
                         <div className="form-group">
                           <label style={{ fontWeight: '600' }}>Product *</label>
                           <select
@@ -426,7 +427,7 @@ const OrdersTab = () => {
                 Payment & Additional Charges
               </h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="form-group">
                   <label htmlFor="tax" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
                     Tax (₹)
@@ -578,85 +579,135 @@ const OrdersTab = () => {
     );
   }
 
+  const calculateGrandTotal = (order) => {
+    return (
+      getTotalOrderValue(order.order_data) +
+      parseFloat(order.tax || 0) +
+      parseFloat(order.misc || 0) -
+      parseFloat(order.scheme || 0) -
+      parseFloat(order.discount || 0)
+    );
+  };
+
+  const columns = [
+    {
+      key: 'order_date',
+      label: 'Order Date',
+      render: (order) => new Date(order.order_date).toLocaleDateString()
+    },
+    {
+      key: 'distributor_id',
+      label: 'Distributor',
+      render: (order) => getDistributorName(order.distributor_id)
+    },
+    {
+      key: 'items',
+      label: 'Items',
+      sortable: false,
+      render: (order) => (
+        <span style={{ fontWeight: '600' }}>
+          {order.order_data && Array.isArray(order.order_data) ? order.order_data.length : 0} items
+        </span>
+      )
+    },
+    {
+      key: 'items_total',
+      label: 'Items Total',
+      sortable: false,
+      render: (order) => `₹${getTotalOrderValue(order.order_data).toFixed(2)}`
+    },
+    {
+      key: 'tax',
+      label: 'Tax',
+      render: (order) => `₹${parseFloat(order.tax || 0).toFixed(2)}`
+    },
+    {
+      key: 'misc',
+      label: 'Misc',
+      render: (order) => `₹${parseFloat(order.misc || 0).toFixed(2)}`
+    },
+    {
+      key: 'scheme',
+      label: 'Scheme',
+      render: (order) => (
+        <span style={{ color: '#f57c00' }}>₹{parseFloat(order.scheme || 0).toFixed(2)}</span>
+      )
+    },
+    {
+      key: 'discount',
+      label: 'Discount',
+      render: (order) => (
+        <span style={{ color: '#f57c00' }}>₹{parseFloat(order.discount || 0).toFixed(2)}</span>
+      )
+    },
+    {
+      key: 'grand_total',
+      label: 'Grand Total',
+      sortable: false,
+      render: (order) => (
+        <span style={{ fontWeight: '700', color: '#2e7d32', fontSize: '1.125rem' }}>
+          ₹{calculateGrandTotal(order).toFixed(2)}
+        </span>
+      )
+    },
+    {
+      key: 'payment_outstanding_date',
+      label: 'Payment Date',
+      render: (order) => order.payment_outstanding_date ? new Date(order.payment_outstanding_date).toLocaleDateString() : '-'
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (order) => (
+        <div className="action-buttons">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShowOrderDetails(order);
+            }}
+            className="btn btn-primary"
+          >
+            Details
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenOrderForm(order);
+            }}
+            className="btn btn-secondary"
+          >
+            Edit
+          </button>
+        </div>
+      )
+    }
+  ];
+
   // Show orders list if not in form mode
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2 style={{ color: '#000', margin: 0, fontSize: '2rem', fontWeight: '700', letterSpacing: '0.5px' }}>Orders</h2>
+      {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
+
+      <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>
+          Orders
+        </h2>
         <button onClick={() => handleOpenOrderForm()} className="btn btn-success">
+          <Plus size={16} style={{ marginRight: '0.5rem' }} />
           Add New Order
         </button>
       </div>
 
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Order Date</th>
-              <th>Distributor</th>
-              <th>Items</th>
-              <th>Items Total</th>
-              <th>Tax</th>
-              <th>Misc</th>
-              <th>Scheme</th>
-              <th>Discount</th>
-              <th>Grand Total</th>
-              <th>Payment Date</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 ? (
-              <tr>
-                <td colSpan="11" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-                  No orders found. Create your first order!
-                </td>
-              </tr>
-            ) : (
-              orders.map(order => (
-                <tr
-                  key={order.id}
-                  onClick={() => handleShowOrderDetails(order)}
-                  style={{
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
-                  title="Click to view order details"
-                >
-                  <td>{new Date(order.order_date).toLocaleDateString()}</td>
-                  <td>{getDistributorName(order.distributor_id)}</td>
-                  <td>
-                    <span style={{ fontWeight: '600' }}>
-                      {order.order_data && Array.isArray(order.order_data) ? order.order_data.length : 0} items
-                    </span>
-                  </td>
-                  <td>₹{getTotalOrderValue(order.order_data).toFixed(2)}</td>
-                  <td>₹{parseFloat(order.tax || 0).toFixed(2)}</td>
-                  <td>₹{parseFloat(order.misc || 0).toFixed(2)}</td>
-                  <td style={{ color: '#f57c00' }}>₹{parseFloat(order.scheme || 0).toFixed(2)}</td>
-                  <td style={{ color: '#f57c00' }}>₹{parseFloat(order.discount || 0).toFixed(2)}</td>
-                  <td style={{ fontWeight: '700', color: '#2e7d32' }}>
-                    ₹{(getTotalOrderValue(order.order_data) + parseFloat(order.tax || 0) + parseFloat(order.misc || 0) - parseFloat(order.scheme || 0) - parseFloat(order.discount || 0)).toFixed(2)}
-                  </td>
-                  <td>{order.payment_outstanding_date ? new Date(order.payment_outstanding_date).toLocaleDateString() : '-'}</td>
-                  <td>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenOrderForm(order);
-                      }}
-                      className="btn btn-primary"
-                    >
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <MobileTable
+        columns={columns}
+        data={orders}
+        onRowClick={handleShowOrderDetails}
+        enableSearch={true}
+        enableSort={true}
+        defaultSortKey="order_date"
+        defaultSortOrder="desc"
+      />
 
       {showOrderDetails && selectedOrder && (
         <div className="modal-overlay" onClick={handleCloseOrderDetails}>
