@@ -76,12 +76,24 @@ const OrdersTab = () => {
           const sortedSales = approvedSales.sort((a, b) => new Date(b.date) - new Date(a.date));
           const lastSaleDate = new Date(sortedSales[0].date);
           setLastSalesReportDate(lastSaleDate.toISOString().split('T')[0]);
+        } else {
+          // No approved sales found - allow orders from 30 days ago
+          const defaultMinDate = new Date();
+          defaultMinDate.setDate(defaultMinDate.getDate() - 30);
+          setLastSalesReportDate(defaultMinDate.toISOString().split('T')[0]);
         }
+      } else {
+        // No sales reports at all - allow orders from 30 days ago
+        const defaultMinDate = new Date();
+        defaultMinDate.setDate(defaultMinDate.getDate() - 30);
+        setLastSalesReportDate(defaultMinDate.toISOString().split('T')[0]);
       }
     } catch (err) {
       console.error('Failed to fetch last sales report date');
-      // If error, default to today as minimum
-      setLastSalesReportDate(new Date().toISOString().split('T')[0]);
+      // If error, allow orders from 30 days ago
+      const defaultMinDate = new Date();
+      defaultMinDate.setDate(defaultMinDate.getDate() - 30);
+      setLastSalesReportDate(defaultMinDate.toISOString().split('T')[0]);
     }
   };
 
@@ -304,20 +316,13 @@ const OrdersTab = () => {
                       color: '#000'
                     }}
                   />
-                  {lastSalesReportDate && (
-                    <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                      You can select dates from {(() => {
-                        const minDate = new Date(lastSalesReportDate);
-                        minDate.setDate(minDate.getDate() + 1);
-                        return minDate.toLocaleDateString();
-                      })()} (day after last sales report) to today
-                    </small>
-                  )}
-                  {!lastSalesReportDate && (
-                    <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                      Loading date range...
-                    </small>
-                  )}
+                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                    You can select dates from {(() => {
+                      const minDate = new Date(lastSalesReportDate);
+                      minDate.setDate(minDate.getDate() + 1);
+                      return minDate.toLocaleDateString();
+                    })()} to today
+                  </small>
                 </div>
               </div>
             </div>
