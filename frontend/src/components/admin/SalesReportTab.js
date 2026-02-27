@@ -305,13 +305,29 @@ const SalesReportTab = () => {
       });
     }
 
-    // Initialize credit taken entries from sale
+    // Initialize credit taken entries from sale.creditTaken (now from sales.credit_taken column)
     const creditTakenData = [];
-    // Note: Credit taken is stored in credit_collection_history, fetch if needed
+    if (sale.creditTaken && Array.isArray(sale.creditTaken)) {
+      sale.creditTaken.forEach(item => {
+        creditTakenData.push({
+          creditHolderId: item.creditHolderId,
+          amount: item.amount || 0,
+          collectedIn: item.collectedIn || 'cash_balance'
+        });
+      });
+    }
 
     // Initialize daily expenses from sale
     const dailyExpensesData = [];
-    // Note: Daily expenses are stored in daily_expenses table, fetch if needed
+    if (sale.dailyExpenses && Array.isArray(sale.dailyExpenses)) {
+      sale.dailyExpenses.forEach(item => {
+        dailyExpensesData.push({
+          name: item.name || '',
+          description: item.description || '',
+          amount: item.amount || 0
+        });
+      });
+    }
 
     setApprovalForm({
       date: sale.date?.split('T')[0] || new Date().toISOString().split('T')[0],
@@ -2290,21 +2306,6 @@ const SalesReportTab = () => {
                       style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                     />
                   </div>
-
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>
-                      Gala Balance Today | आज गल्ला बैलेंस
-                    </label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      value={approvalForm.galaBalanceToday || 0}
-                      onChange={(e) => setApprovalForm({ ...approvalForm, galaBalanceToday: e.target.value })}
-                      step="1"
-                      min="0"
-                      style={{ fontSize: '1.125rem', padding: '0.75rem' }}
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -2359,7 +2360,7 @@ const SalesReportTab = () => {
                 </div>
 
                 {(approvalForm.creditTaken || []).map((entry, index) => {
-                  const selectedHolder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+                  const selectedHolder = creditHolders.find(ch => ch.id == entry.creditHolderId);
                   const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
                   const amountCollecting = parseFloat(entry.amount || 0);
                   const newOutstanding = Math.max(0, currentOutstanding - amountCollecting);
@@ -2460,7 +2461,7 @@ const SalesReportTab = () => {
                   const totals = calculateApprovaTotals();
                   const totalExpenses = (approvalForm.dailyExpenses || []).reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
                   const galaBalanceValue = parseFloat(approvalForm.galaBalanceToday || 0);
-                  const maxAllowed = galaBalanceValue + totals.cashSales + totals.creditTakenCash - totals.totalCreditGiven;
+                  const maxAllowed = Math.max(0, galaBalanceValue + totals.cashSales + totals.creditTakenCash - totals.totalCreditGiven);
                   const isExceeding = totalExpenses > maxAllowed;
 
                   return (
@@ -2570,7 +2571,7 @@ const SalesReportTab = () => {
                 </div>
 
                 {(approvalForm.creditEntries || []).map((entry, index) => {
-                  const selectedHolder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+                  const selectedHolder = creditHolders.find(ch => ch.id == entry.creditHolderId);
                   const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
                   const amountGiving = parseFloat(entry.amount || 0);
                   const newOutstanding = currentOutstanding + amountGiving;

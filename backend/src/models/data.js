@@ -545,16 +545,18 @@ const dataHelpers = {
     const closingStockJson = saleData.closingStock && (Array.isArray(saleData.closingStock) ? saleData.closingStock.length > 0 : true) ? JSON.stringify(saleData.closingStock) : null;
     const saleJson = saleData.sale && (Array.isArray(saleData.sale) ? saleData.sale.length > 0 : true) ? JSON.stringify(saleData.sale) : null;
     const creditJson = saleData.credit && (Array.isArray(saleData.credit) ? saleData.credit.length > 0 : true) ? JSON.stringify(saleData.credit) : null;
+    const creditTakenJson = saleData.creditTaken && (Array.isArray(saleData.creditTaken) ? saleData.creditTaken.length > 0 : true) ? JSON.stringify(saleData.creditTaken) : null;
 
     console.log('=== STORING TO DATABASE ===');
     console.log('Opening Stock JSON:', openingStockJson);
     console.log('Closing Stock JSON:', closingStockJson);
     console.log('Sale JSON:', saleJson);
     console.log('Credit JSON:', creditJson);
+    console.log('Credit Taken JSON:', creditTakenJson);
 
     const result = await pool.query(
-      `INSERT INTO sales (organisation_id, user_id, date, opening_stock, closing_stock, sale, cash_collected, upi, miscellaneous, miscellaneous_type, miscellaneous_cash, miscellaneous_upi, gala_balance_today, credit, remarks, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      `INSERT INTO sales (organisation_id, user_id, date, opening_stock, closing_stock, sale, cash_collected, upi, miscellaneous, miscellaneous_type, miscellaneous_cash, miscellaneous_upi, gala_balance_today, credit, credit_taken, remarks, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
         saleData.organisationId,
@@ -571,6 +573,7 @@ const dataHelpers = {
         saleData.miscellaneousUPI || 0,
         saleData.galaBalanceToday || 0,
         creditJson,
+        creditTakenJson,
         saleData.remarks || null,
         saleData.status || 'approved'
       ]
@@ -613,6 +616,10 @@ const dataHelpers = {
       } else if (key === 'credit') {
         fields.push(`credit = $${paramCount}`);
         values.push(JSON.stringify(updates.credit));
+        paramCount++;
+      } else if (key === 'creditTaken') {
+        fields.push(`credit_taken = $${paramCount}`);
+        values.push(JSON.stringify(updates.creditTaken));
         paramCount++;
       } else if (fieldMap[key]) {
         fields.push(`${fieldMap[key]} = $${paramCount}`);
@@ -774,6 +781,22 @@ const dataHelpers = {
        WHERE cch.credit_holder_id = $1
        ORDER BY cch.collected_at DESC`,
       [creditHolderId]
+    );
+    return result.rows;
+  },
+
+  getCreditCollectionHistoryBySaleId: async (saleId) => {
+    const result = await pool.query(
+      `SELECT cch.*,
+              ch.name as credit_holder_name,
+              COALESCE(a.username, u.username) as collected_by_name
+       FROM credit_collection_history cch
+       LEFT JOIN credit_holders ch ON cch.credit_holder_id = ch.id
+       LEFT JOIN admins a ON cch.collected_by = a.id
+       LEFT JOIN users u ON cch.collected_by = u.id
+       WHERE cch.sale_id = $1
+       ORDER BY cch.collected_at`,
+      [saleId]
     );
     return result.rows;
   },

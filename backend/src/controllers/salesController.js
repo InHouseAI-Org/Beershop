@@ -1,4 +1,5 @@
 const db = require('../models/data');
+const pool = require('../config/database');
 
 const getAllSales = async (req, res) => {
   try {
@@ -9,7 +10,20 @@ const getAllSales = async (req, res) => {
     }
 
     const sales = await db.getSalesByOrganisationId(organisationId);
-    res.json(sales);
+
+    // Fetch daily expenses for each sale
+    // Note: creditTaken is now in sales.credit_taken column, no need to fetch separately
+    const salesWithDetails = await Promise.all(sales.map(async (sale) => {
+      const dailyExpenses = await db.getDailyExpensesBySaleId(sale.id);
+
+      return {
+        ...sale,
+        creditTaken: sale.credit_taken || [],
+        dailyExpenses: dailyExpenses || []
+      };
+    }));
+
+    res.json(salesWithDetails);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
@@ -30,7 +44,17 @@ const getSale = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    res.json(sale);
+    // Fetch daily expenses for this sale
+    // Note: creditTaken is now in sales.credit_taken column
+    const dailyExpenses = await db.getDailyExpensesBySaleId(sale.id);
+
+    const saleWithDetails = {
+      ...sale,
+      creditTaken: sale.credit_taken || [],
+      dailyExpenses: dailyExpenses || []
+    };
+
+    res.json(saleWithDetails);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
@@ -49,7 +73,9 @@ const createSale = async (req, res) => {
     console.log('=== CREATE SALE REQUEST ===');
     console.log('Closing Stock:', closingStock);
     console.log('Sale:', sale);
-    console.log('Credit:', credit);
+    console.log('Credit (credit given):', credit);
+    console.log('Credit Taken:', creditTaken);
+    console.log('Daily Expenses:', dailyExpenses);
 
     const organisationId = req.user.organisationId;
     const userId = req.user.role === 'user' ? req.user.id : req.body.userId;
@@ -177,6 +203,7 @@ const createSale = async (req, res) => {
       miscellaneousUPI: miscellaneousUPI || 0,
       galaBalanceToday: galaBalanceToday || 0,
       credit,
+      creditTaken,
       remarks,
       status
     });
@@ -298,6 +325,25 @@ const createSale = async (req, res) => {
     }
     } else {
       console.log('Sale created with pending status - waiting for admin approval');
+
+      // For pending sales, save dailyExpenses
+      // Note: creditTaken is already saved in sales.credit_taken column
+      console.log('Processing daily expenses for pending sale...');
+      if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0) {
+        for (const expense of dailyExpenses) {
+          if (expense.name && expense.amount) {
+            await db.createDailyExpense({
+              organisationId,
+              saleId: newSale.id,
+              name: expense.name,
+              description: expense.description || null,
+              amount: parseFloat(expense.amount),
+              expenseDate: date || new Date()
+            });
+            console.log(`Created expense (pending): ${expense.name} - ₹${expense.amount}`);
+          }
+        }
+      }
     }
 
     res.status(201).json(newSale);
@@ -492,7 +538,7 @@ const approveSale = async (req, res) => {
     // Use the updated sale data for inventory and credit processing
     const finalSale = updates.sale || existingSale.sale;
     const finalCredit = updates.credit || existingSale.credit;
-    const finalCreditTaken = creditTaken || [];
+    const finalCreditTaken = creditTaken || existingSale.credit_taken || [];
 
     // Update inventory: inventory_new = inventory_old - sale
     console.log('Updating inventory after approval...');
@@ -540,7 +586,9 @@ const approveSale = async (req, res) => {
     }
 
     // Process credit taken: deduct from outstanding amount
+    // Note: creditTaken is now in sales.credit_taken column
     console.log('Processing credit taken (credit collected on shop)...');
+
     if (Array.isArray(finalCreditTaken) && finalCreditTaken.length > 0) {
       for (const creditTakenItem of finalCreditTaken) {
         if (creditTakenItem.creditHolderId && creditTakenItem.amount) {
@@ -574,9 +622,15 @@ const approveSale = async (req, res) => {
       }
     }
 
-    // Process daily expenses
+    // Process daily expenses (only add if new ones are provided and don't already exist)
     console.log('Processing daily expenses...');
-    if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0) {
+    const existingExpenses = await db.getDailyExpensesBySaleId(id);
+
+    if (existingExpenses.length > 0) {
+      console.log(`Found ${existingExpenses.length} existing daily expenses - skipping duplicate creation`);
+    }
+
+    if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0 && existingExpenses.length === 0) {
       for (const expense of dailyExpenses) {
         if (expense.name && expense.amount) {
           await db.createDailyExpense({

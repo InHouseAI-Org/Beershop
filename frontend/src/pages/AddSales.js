@@ -93,32 +93,48 @@ const AddSales = () => {
   };
 
   const addCreditEntry = () => {
-    setCreditEntries([...creditEntries, { creditHolderId: '', amount: '' }]);
+    console.log('🔵 addCreditEntry called, current entries:', creditEntries);
+    const newEntries = [...creditEntries, { creditHolderId: '', amount: '' }];
+    console.log('🔵 Setting new entries:', newEntries);
+    setCreditEntries(newEntries);
   };
 
   const updateCreditEntry = (index, field, value) => {
+    console.log('🔵 updateCreditEntry called:', { index, field, value });
     const updated = [...creditEntries];
     updated[index][field] = value;
+    console.log('🔵 Updated entries:', updated);
     setCreditEntries(updated);
   };
 
   const removeCreditEntry = (index) => {
-    setCreditEntries(creditEntries.filter((_, i) => i !== index));
+    console.log('🔵 removeCreditEntry called:', index);
+    const filtered = creditEntries.filter((_, i) => i !== index);
+    console.log('🔵 After removal:', filtered);
+    setCreditEntries(filtered);
   };
 
   // Credit Taken handlers
   const addCreditTaken = () => {
-    setCreditTaken([...creditTaken, { creditHolderId: '', amount: '', collectedIn: 'cash_balance' }]);
+    console.log('🟢 addCreditTaken called, current entries:', creditTaken);
+    const newEntries = [...creditTaken, { creditHolderId: '', amount: '', collectedIn: 'cash_balance' }];
+    console.log('🟢 Setting new entries:', newEntries);
+    setCreditTaken(newEntries);
   };
 
   const updateCreditTaken = (index, field, value) => {
+    console.log('🟢 updateCreditTaken called:', { index, field, value });
     const updated = [...creditTaken];
     updated[index][field] = value;
+    console.log('🟢 Updated entries:', updated);
     setCreditTaken(updated);
   };
 
   const removeCreditTaken = (index) => {
-    setCreditTaken(creditTaken.filter((_, i) => i !== index));
+    console.log('🟢 removeCreditTaken called:', index);
+    const filtered = creditTaken.filter((_, i) => i !== index);
+    console.log('🟢 After removal:', filtered);
+    setCreditTaken(filtered);
   };
 
   // Daily Expenses handlers
@@ -241,6 +257,12 @@ const AddSales = () => {
   };
 
   const handleSubmit = async () => {
+    console.log('🚀 handleSubmit called');
+    console.log('📊 Current state at submission:');
+    console.log('  creditEntries:', creditEntries);
+    console.log('  creditTaken:', creditTaken);
+    console.log('  dailyExpenses:', dailyExpenses);
+
     // Final check for duplicate sale before submission using local time
     try {
       const response = await api.get('/sales');
@@ -309,27 +331,40 @@ const AddSales = () => {
       console.log('Sale Data:', saleData);
 
       // Prepare credit data using credit holder IDs
+      console.log('=== PREPARING CREDIT GIVEN DATA ===');
+      console.log('creditEntries:', creditEntries);
       const creditData = [];
       creditEntries.forEach(entry => {
+        console.log('Processing credit entry:', entry);
         if (entry.creditHolderId && entry.amount) {
           creditData.push({
-            credit_holder_id: entry.creditHolderId,
+            credit_holder_id: entry.creditHolderId,  // Keep as UUID string
             creditgiven: parseFloat(entry.amount)
           });
+          console.log('Added to creditData:', { credit_holder_id: entry.creditHolderId, creditgiven: parseFloat(entry.amount) });
+        } else {
+          console.log('Skipping entry - missing creditHolderId or amount');
         }
       });
+      console.log('Final creditData:', creditData);
 
       // Get calculated values
       const totals = calculateTotals();
 
       // Prepare credit taken data
+      console.log('=== PREPARING CREDIT TAKEN DATA ===');
+      console.log('creditTaken:', creditTaken);
       const creditTakenData = creditTaken
         .filter(ct => ct.creditHolderId && ct.amount)
-        .map(ct => ({
-          creditHolderId: ct.creditHolderId,
-          amount: parseFloat(ct.amount),
-          collectedIn: ct.collectedIn
-        }));
+        .map(ct => {
+          console.log('Processing credit taken:', ct);
+          return {
+            creditHolderId: ct.creditHolderId,  // Keep as UUID string
+            amount: parseFloat(ct.amount),
+            collectedIn: ct.collectedIn
+          };
+        });
+      console.log('Final creditTakenData:', creditTakenData);
 
       // Prepare daily expenses data
       const expensesData = dailyExpenses
@@ -776,7 +811,7 @@ const AddSales = () => {
           )}
 
           {creditTaken.map((entry, index) => {
-            const selectedHolder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+            const selectedHolder = creditHolders.find(ch => ch.id == entry.creditHolderId);
             const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
             const amountCollecting = parseFloat(entry.amount || 0);
             const newOutstanding = Math.max(0, currentOutstanding - amountCollecting);
@@ -793,9 +828,16 @@ const AddSales = () => {
                       style={{ fontSize: '1.125rem', padding: '0.875rem' }}
                     >
                       <option value="">Select | चुनें</option>
-                      {creditHolders.map(ch => (
-                        <option key={ch.id} value={ch.id}>{ch.name}</option>
-                      ))}
+                      {creditHolders.map(ch => {
+                        const isAlreadySelected = creditTaken.some((ct, ctIndex) =>
+                          ctIndex !== index && ct.creditHolderId == ch.id
+                        );
+                        return (
+                          <option key={ch.id} value={ch.id} disabled={isAlreadySelected}>
+                            {ch.name}{isAlreadySelected ? ' (Already selected)' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -880,7 +922,7 @@ const AddSales = () => {
           )}
 
           {creditEntries.map((entry, index) => {
-            const selectedHolder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+            const selectedHolder = creditHolders.find(ch => ch.id == entry.creditHolderId);
             const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
             const amountGiving = parseFloat(entry.amount || 0);
             const newOutstanding = currentOutstanding + amountGiving;
@@ -897,9 +939,16 @@ const AddSales = () => {
                       style={{ fontSize: '1.125rem', padding: '0.875rem' }}
                     >
                       <option value="">Select | चुनें</option>
-                      {creditHolders.map(ch => (
-                        <option key={ch.id} value={ch.id}>{ch.name}</option>
-                      ))}
+                      {creditHolders.map(ch => {
+                        const isAlreadySelected = creditEntries.some((ce, ceIndex) =>
+                          ceIndex !== index && ce.creditHolderId == ch.id
+                        );
+                        return (
+                          <option key={ch.id} value={ch.id} disabled={isAlreadySelected}>
+                            {ch.name}{isAlreadySelected ? ' (Already selected)' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -995,7 +1044,7 @@ const AddSales = () => {
           {(() => {
             const totals = calculateTotals();
             const totalExpenses = dailyExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
-            const maxAllowed = galaBalanceYesterday + totals.cashSales + totals.creditTakenCash - totals.totalCreditGiven;
+            const maxAllowed = Math.max(0,galaBalanceYesterday + totals.cashSales + totals.creditTakenCash - totals.totalCreditGiven);
             const isExceeding = totalExpenses > maxAllowed;
 
             return (
@@ -1312,7 +1361,7 @@ const AddSales = () => {
                   {creditEntries
                     .filter(entry => entry.creditHolderId && entry.amount)
                     .map((entry, index) => {
-                      const holder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+                      const holder = creditHolders.find(ch => ch.id == entry.creditHolderId);
                       return (
                         <div
                           key={index}
@@ -1354,7 +1403,7 @@ const AddSales = () => {
                   {creditTaken
                     .filter(entry => entry.creditHolderId && entry.amount)
                     .map((entry, index) => {
-                      const holder = creditHolders.find(ch => ch.id === entry.creditHolderId);
+                      const holder = creditHolders.find(ch => ch.id == entry.creditHolderId);
                       return (
                         <div
                           key={index}
