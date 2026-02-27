@@ -2360,7 +2360,7 @@ const SalesReportTab = () => {
                 </div>
 
                 {(approvalForm.creditTaken || []).map((entry, index) => {
-                  const selectedHolder = creditHolders.find(ch => ch.id == entry.creditHolderId);
+                  const selectedHolder = creditHolders.find(ch => String(ch.id) === String(entry.creditHolderId));
                   const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
                   const amountCollecting = parseFloat(entry.amount || 0);
                   const newOutstanding = Math.max(0, currentOutstanding - amountCollecting);
@@ -2571,7 +2571,7 @@ const SalesReportTab = () => {
                 </div>
 
                 {(approvalForm.creditEntries || []).map((entry, index) => {
-                  const selectedHolder = creditHolders.find(ch => ch.id == entry.creditHolderId);
+                  const selectedHolder = creditHolders.find(ch => String(ch.id) === String(entry.creditHolderId));
                   const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
                   const amountGiving = parseFloat(entry.amount || 0);
                   const newOutstanding = currentOutstanding + amountGiving;

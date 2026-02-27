@@ -811,7 +811,7 @@ const AddSales = () => {
           )}
 
           {creditTaken.map((entry, index) => {
-            const selectedHolder = creditHolders.find(ch => ch.id == entry.creditHolderId);
+            const selectedHolder = creditHolders.find(ch => String(ch.id) === String(entry.creditHolderId));
             const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
             const amountCollecting = parseFloat(entry.amount || 0);
             const newOutstanding = Math.max(0, currentOutstanding - amountCollecting);
@@ -830,7 +830,7 @@ const AddSales = () => {
                       <option value="">Select | चुनें</option>
                       {creditHolders.map(ch => {
                         const isAlreadySelected = creditTaken.some((ct, ctIndex) =>
-                          ctIndex !== index && ct.creditHolderId == ch.id
+                          ctIndex !== index && String(ct.creditHolderId) === String(ch.id)
                         );
                         return (
                           <option key={ch.id} value={ch.id} disabled={isAlreadySelected}>
@@ -922,7 +922,7 @@ const AddSales = () => {
           )}
 
           {creditEntries.map((entry, index) => {
-            const selectedHolder = creditHolders.find(ch => ch.id == entry.creditHolderId);
+            const selectedHolder = creditHolders.find(ch => String(ch.id) === String(entry.creditHolderId));
             const currentOutstanding = selectedHolder ? parseFloat(selectedHolder.amount_payable || 0) : 0;
             const amountGiving = parseFloat(entry.amount || 0);
             const newOutstanding = currentOutstanding + amountGiving;
@@ -941,7 +941,7 @@ const AddSales = () => {
                       <option value="">Select | चुनें</option>
                       {creditHolders.map(ch => {
                         const isAlreadySelected = creditEntries.some((ce, ceIndex) =>
-                          ceIndex !== index && ce.creditHolderId == ch.id
+                          ceIndex !== index && String(ce.creditHolderId) === String(ch.id)
                         );
                         return (
                           <option key={ch.id} value={ch.id} disabled={isAlreadySelected}>
@@ -1361,7 +1361,7 @@ const AddSales = () => {
                   {creditEntries
                     .filter(entry => entry.creditHolderId && entry.amount)
                     .map((entry, index) => {
-                      const holder = creditHolders.find(ch => ch.id == entry.creditHolderId);
+                      const holder = creditHolders.find(ch => String(ch.id) === String(entry.creditHolderId));
                       return (
                         <div
                           key={index}
@@ -1403,7 +1403,7 @@ const AddSales = () => {
                   {creditTaken
                     .filter(entry => entry.creditHolderId && entry.amount)
                     .map((entry, index) => {
-                      const holder = creditHolders.find(ch => ch.id == entry.creditHolderId);
+                      const holder = creditHolders.find(ch => String(ch.id) === String(entry.creditHolderId));
                       return (
                         <div
                           key={index}
