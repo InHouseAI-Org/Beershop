@@ -8,6 +8,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import UserDashboard from './pages/UserDashboard';
 import AddSales from './pages/AddSales';
 import RoleRedirect from './components/RoleRedirect';
+import { Analytics } from "@vercel/analytics/react";
 
 function App() {
   return (
@@ -58,6 +59,7 @@ function App() {
           <Route path="/" element={<RoleRedirect />} />
         </Routes>
       </AuthProvider>
+      <Analytics />
     </Router>
   );
 }
