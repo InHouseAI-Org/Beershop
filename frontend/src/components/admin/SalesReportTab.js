@@ -944,7 +944,6 @@ const SalesReportTab = () => {
                 </thead>
                 <tbody>
                   {salesByMonth[activeMonth].sales.map((sale, index) => {
-                    const creditSum = calculateCreditSum(sale);
                     const total = parseFloat(sale.cash_collected || 0) +
                                   parseFloat(sale.upi || 0);
                     const allocated = isBalanceAllocated(sale.id);
@@ -1910,14 +1909,7 @@ const SalesReportTab = () => {
                       </p>
                     </div>
                     <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                      ₹{(() => {
-                        const cashCollected = parseFloat(selectedSale.cash_collected || 0);
-                        const miscCash = parseFloat(selectedSale.miscellaneous_cash || 0);
-                        const creditInCash = (selectedSale.creditTaken || [])
-                          .filter(item => item.collectedIn === 'cash_balance')
-                          .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-                        return (cashCollected).toFixed(2);
-                      })()}
+                      ₹{parseFloat(selectedSale.cash_collected || 0).toFixed(2)}
                     </p>
                     <p style={{ fontSize: '0.75rem', margin: '0.5rem 0 0 0', opacity: 0.9 }}>
                       (Cash + Extra Cash + Credit in Cash)
