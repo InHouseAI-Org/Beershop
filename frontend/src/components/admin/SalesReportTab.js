@@ -1874,7 +1874,7 @@ const SalesReportTab = () => {
                       <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cash Sales | नकद बिक्री</p>
                     </div>
                     <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                      ₹{parseFloat(selectedSale.cash_collected || 0).toFixed(2)}
+                      ₹{parseFloat(selectedSale.cash_collected || 0).toFixed(2) - parseFloat(selectedSale.creditTakenCash || 0).toFixed(2) + parseFloat(selectedSale.totalExpenses || 0).toFixed(2)}
                     </p>
                   </div>
 
@@ -2217,7 +2217,7 @@ const SalesReportTab = () => {
                 </div>
                 <p style={{ fontSize: '3rem', fontWeight: '700', margin: 0 }}>
                   ₹{(parseFloat(selectedSale.cash_collected || 0) +
-                     parseFloat(selectedSale.upi || 0)
+                     parseFloat(selectedSale.upi || 0)).toFixed(2)}
                 </p>
               </div>
             </div>
