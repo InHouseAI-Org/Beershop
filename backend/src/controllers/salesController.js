@@ -645,15 +645,21 @@ const approveSale = async (req, res) => {
       }
     }
 
-    // Process daily expenses (only add if new ones are provided and don't already exist)
+    // Process daily expenses - update if provided in approval
     console.log('Processing daily expenses...');
-    const existingExpenses = await db.getDailyExpensesBySaleId(id);
 
-    if (existingExpenses.length > 0) {
-      console.log(`Found ${existingExpenses.length} existing daily expenses - skipping duplicate creation`);
-    }
+    if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0) {
+      // Delete existing expenses for this sale
+      const existingExpenses = await db.getDailyExpensesBySaleId(id);
 
-    if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0 && existingExpenses.length === 0) {
+      if (existingExpenses.length > 0) {
+        console.log(`Found ${existingExpenses.length} existing daily expenses - deleting to update`);
+        for (const expense of existingExpenses) {
+          await db.deleteDailyExpense(expense.id);
+        }
+      }
+
+      // Create new expenses from approval form
       for (const expense of dailyExpenses) {
         if (expense.name && expense.amount) {
           await db.createDailyExpense({

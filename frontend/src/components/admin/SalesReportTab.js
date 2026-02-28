@@ -492,8 +492,8 @@ const SalesReportTab = () => {
     const upiTotalValue = parseFloat(approvalForm.upiTotal || 0);
 
     const upiSales = Math.max(0, upiTotalValue - creditTakenUPI - miscUPI);
-    const cashSales = Math.max(0, totalSales - upiSales - totalCreditGiven);
-    const cashCollected = cashSales + creditTakenCash + miscCash - totalExpenses;
+    const cashSales = Math.max(0, totalSales - upiSales - totalCreditGiven + miscCash);
+    const cashCollected = cashSales + creditTakenCash - totalExpenses;
 
     return {
       totalSales,
@@ -946,8 +946,7 @@ const SalesReportTab = () => {
                   {salesByMonth[activeMonth].sales.map((sale, index) => {
                     const creditSum = calculateCreditSum(sale);
                     const total = parseFloat(sale.cash_collected || 0) +
-                                  parseFloat(sale.upi || 0) -
-                                  creditSum;
+                                  parseFloat(sale.upi || 0);
                     const allocated = isBalanceAllocated(sale.id);
 
                     return (
@@ -1349,7 +1348,7 @@ const SalesReportTab = () => {
                     const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
                     const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
 
-                    return `( + Credit Collected ₹${creditTakenCash.toFixed(2)} - Credit Given ₹${totalcredit.toFixed(2)} + Misc ₹${miscCash.toFixed(2)} - Expenses ₹${expenses.toFixed(2)})`;
+                    return `+ Credit Collected ₹${creditTakenCash.toFixed(2)} - Credit Given ₹${totalcredit.toFixed(2)} + Misc ₹${miscCash.toFixed(2)} - Expenses ₹${expenses.toFixed(2)}`;
                   })()}
                 </div>
               </div>
@@ -1917,7 +1916,7 @@ const SalesReportTab = () => {
                         const creditInCash = (selectedSale.creditTaken || [])
                           .filter(item => item.collectedIn === 'cash_balance')
                           .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-                        return (cashCollected + miscCash + creditInCash).toFixed(2);
+                        return (cashCollected).toFixed(2);
                       })()}
                     </p>
                     <p style={{ fontSize: '0.75rem', margin: '0.5rem 0 0 0', opacity: 0.9 }}>
@@ -2218,8 +2217,7 @@ const SalesReportTab = () => {
                 </div>
                 <p style={{ fontSize: '3rem', fontWeight: '700', margin: 0 }}>
                   ₹{(parseFloat(selectedSale.cash_collected || 0) +
-                     parseFloat(selectedSale.upi || 0) -
-                     calculateCreditSum(selectedSale)).toFixed(2)}
+                     parseFloat(selectedSale.upi || 0)
                 </p>
               </div>
             </div>
