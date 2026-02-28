@@ -11,7 +11,6 @@ const SalesReportTab = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [products, setProducts] = useState([]);
   const [creditHolders, setCreditHolders] = useState([]);
-  const [lastSalesReportDate, setLastSalesReportDate] = useState(null);
 
   // Approval state
   const [showApprovalModal, setShowApprovalModal] = useState(false);
@@ -71,19 +70,6 @@ const SalesReportTab = () => {
 
       // Store pending sales for display
       setPendingSalesList(pendingSales);
-
-      // Calculate last sales report date for date validation
-      // Consider both approved and pending sales
-      const allSalesForDateValidation = [...approvedSales, ...pendingSales];
-      if (allSalesForDateValidation.length > 0) {
-        const sortedSales = [...allSalesForDateValidation].sort((a, b) => new Date(b.date) - new Date(a.date));
-        const lastSale = sortedSales[0];
-        const lastDate = new Date(lastSale.date);
-        lastDate.setHours(0, 0, 0, 0);
-        setLastSalesReportDate(lastDate);
-      } else {
-        setLastSalesReportDate(null);
-      }
 
       // Group approved sales by month
       const grouped = {};
