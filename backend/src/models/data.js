@@ -632,7 +632,7 @@ const dataHelpers = {
     console.log('Closing Stock JSON:', closingStockJson);
     console.log('Sale JSON:', saleJson);
     console.log('Credit JSON:', creditJson);
-    console.log('Credit Taken JSON:', creditTakenJson);
+    console.log('Credit Collected JSON:', creditTakenJson);
 
     const result = await pool.query(
       `INSERT INTO sales (organisation_id, user_id, date, opening_stock, closing_stock, sale, cash_collected, upi, miscellaneous, miscellaneous_type, miscellaneous_cash, miscellaneous_upi, gala_balance_today, credit, credit_taken, remarks, status)

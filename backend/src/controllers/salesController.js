@@ -74,7 +74,7 @@ const createSale = async (req, res) => {
     console.log('Closing Stock:', closingStock);
     console.log('Sale:', sale);
     console.log('Credit (credit given):', credit);
-    console.log('Credit Taken:', creditTaken);
+    console.log('Credit Collected:', creditTaken);
     console.log('Daily Expenses:', dailyExpenses);
 
     const organisationId = req.user.organisationId;
@@ -277,13 +277,13 @@ const createSale = async (req, res) => {
         console.log('No credit to process (not array or empty)');
       }
 
-      // Process credit taken (collected on shop)
-      console.log('Processing credit taken entries...');
+      // Process credit Collected (collected on shop)
+      console.log('Processing credit Collected entries...');
       if (Array.isArray(creditTaken) && creditTaken.length > 0) {
         for (const takenItem of creditTaken) {
           if (takenItem.creditHolderId && takenItem.amount && takenItem.collectedIn) {
             const takenAmount = parseFloat(takenItem.amount);
-            console.log(`Processing credit taken: ${takenAmount} from holder ${takenItem.creditHolderId}`);
+            console.log(`Processing credit Collected: ${takenAmount} from holder ${takenItem.creditHolderId}`);
 
             // Get current outstanding before decrementing
             const creditHolder = await db.getCreditHolderById(takenItem.creditHolderId);
@@ -308,7 +308,7 @@ const createSale = async (req, res) => {
               collectedIn: takenItem.collectedIn, // 'cash_balance' or 'bank_balance'
               collectionType: 'collected_on_shop'
             });
-            console.log(`Recorded credit taken in history as 'collected_on_shop'`);
+            console.log(`Recorded credit Collected in history as 'collected_on_shop'`);
           }
         }
       }
@@ -542,6 +542,7 @@ const approveSale = async (req, res) => {
     if (cashCollected !== undefined) updates.cashCollected = cashCollected;
     if (upi !== undefined) updates.upi = upi;
     if (credit !== undefined) updates.credit = credit;
+    if (creditTaken !== undefined) updates.creditTaken = creditTaken;
     if (remarks !== undefined) updates.remarks = remarks;
     if (miscellaneousCash !== undefined) updates.miscellaneousCash = miscellaneousCash;
     if (miscellaneousUPI !== undefined) updates.miscellaneousUPI = miscellaneousUPI;
@@ -607,9 +608,9 @@ const approveSale = async (req, res) => {
       }
     }
 
-    // Process credit taken: deduct from outstanding amount
+    // Process credit Collected: deduct from outstanding amount
     // Note: creditTaken is now in sales.credit_taken column
-    console.log('Processing credit taken (credit collected on shop)...');
+    console.log('Processing credit Collected (credit collected on shop)...');
 
     if (Array.isArray(finalCreditTaken) && finalCreditTaken.length > 0) {
       for (const creditTakenItem of finalCreditTaken) {

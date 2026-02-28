@@ -25,6 +25,7 @@ const AddSales = () => {
   const [hideEmpty, setHideEmpty] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [galaBalanceYesterday, setGalaBalanceYesterday] = useState(0);
+  const [lastSalesReportDate, setLastSalesReportDate] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -32,15 +33,27 @@ const AddSales = () => {
 
   const fetchData = async () => {
     try {
-      const [productsRes, creditHoldersRes, inventoryRes, balancesRes] = await Promise.all([
+      const [productsRes, creditHoldersRes, inventoryRes, balancesRes, salesRes] = await Promise.all([
         api.get('/products'),
         api.get('/credit-holders'),
         api.get('/inventory'),
-        api.get('/balances/organisation')
+        api.get('/balances/organisation'),
+        api.get('/sales')
       ]);
 
       setProducts(productsRes.data);
       setCreditHolders(creditHoldersRes.data);
+
+      // Find the last sales report date (consider both approved and pending)
+      const allSales = salesRes.data; // All sales regardless of status
+      if (allSales.length > 0) {
+        // Sort by date descending and get the latest
+        const sortedSales = allSales.sort((a, b) => new Date(b.date) - new Date(a.date));
+        const lastSale = sortedSales[0];
+        const lastDate = new Date(lastSale.date);
+        lastDate.setHours(0, 0, 0, 0);
+        setLastSalesReportDate(lastDate);
+      }
 
       // Get current gala balance from organisation (this is the actual balance in gala)
       if (balancesRes.data) {
@@ -114,7 +127,7 @@ const AddSales = () => {
     setCreditEntries(filtered);
   };
 
-  // Credit Taken handlers
+  // Credit Collected handlers
   const addCreditTaken = () => {
     console.log('🟢 addCreditTaken called, current entries:', creditTaken);
     const newEntries = [...creditTaken, { creditHolderId: '', amount: '', collectedIn: 'cash_balance' }];
@@ -164,7 +177,7 @@ const AddSales = () => {
       return sum + (entry.creditHolderId && entry.amount ? parseFloat(entry.amount) : 0);
     }, 0);
 
-    // Credit taken by type
+    // Credit collected by type
     const creditTakenCash = creditTaken
       .filter(c => c.collectedIn === 'cash_balance')
       .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
@@ -351,13 +364,13 @@ const AddSales = () => {
       // Get calculated values
       const totals = calculateTotals();
 
-      // Prepare credit taken data
-      console.log('=== PREPARING CREDIT TAKEN DATA ===');
+      // Prepare credit Collected data
+      console.log('=== PREPARING CREDIT Collected DATA ===');
       console.log('creditTaken:', creditTaken);
       const creditTakenData = creditTaken
         .filter(ct => ct.creditHolderId && ct.amount)
         .map(ct => {
-          console.log('Processing credit taken:', ct);
+          console.log('Processing credit Collected:', ct);
           return {
             creditHolderId: ct.creditHolderId,  // Keep as UUID string
             amount: parseFloat(ct.amount),
@@ -441,7 +454,16 @@ const AddSales = () => {
               className="form-control"
               value={saleDate}
               onChange={(e) => handleDateChange(e.target.value)}
-              min={new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+              min={(() => {
+                if (!lastSalesReportDate) {
+                  // If no last report, allow today minus 30 days
+                  return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                }
+                // Allow from day after last report
+                const minDate = new Date(lastSalesReportDate);
+                minDate.setDate(minDate.getDate() + 1);
+                return minDate.toISOString().split('T')[0];
+              })()}
               max={new Date().toISOString().split('T')[0]}
               style={{
                 fontSize: '1.25rem',
@@ -470,8 +492,25 @@ const AddSales = () => {
 
           <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
             <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>
-              You can only select dates from the last 7 days up to today.<br/>
-              आप केवल पिछले 7 दिनों से आज तक की तारीखें चुन सकते हैं।
+              {lastSalesReportDate ? (
+                <>
+                  You can select dates from {(() => {
+                    const minDate = new Date(lastSalesReportDate);
+                    minDate.setDate(minDate.getDate() + 1);
+                    return minDate.toLocaleDateString();
+                  })()} to {new Date().toLocaleDateString()}.<br/>
+                  आप {(() => {
+                    const minDate = new Date(lastSalesReportDate);
+                    minDate.setDate(minDate.getDate() + 1);
+                    return minDate.toLocaleDateString();
+                  })()} से {new Date().toLocaleDateString()} तक की तारीखें चुन सकते हैं।
+                </>
+              ) : (
+                <>
+                  You can select dates from the last 30 days up to today.<br/>
+                  आप पिछले 30 दिनों से आज तक की तारीखें चुन सकते हैं।
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -794,10 +833,10 @@ const AddSales = () => {
           </div>
         </div>
 
-        {/* Credit Taken (Collect on Shop) */}
+        {/* Credit Collected (Collect on Shop) */}
         <div className="card" style={{ marginBottom: '2rem' }}>
           <h2 style={{ color: '#000', marginBottom: '1.5rem', fontWeight: '700' }}>
-            Credit Taken (Collect on Shop) | उधार वसूली (दुकान पर)
+            Credit Collected (Collect on Shop) | उधार वसूली (दुकान पर)
           </h2>
 
 
@@ -900,7 +939,7 @@ const AddSales = () => {
             className="btn btn-success"
             style={{ width: '100%', fontSize: '1.125rem', padding: '1rem' }}
           >
-            + Add Credit Taken | उधार वसूली जोड़ें
+            + Add Credit Collected | उधार वसूली जोड़ें
           </button>
         </div>
 
@@ -1057,7 +1096,7 @@ const AddSales = () => {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                   <span style={{ fontSize: '0.875rem', color: isExceeding ? '#721c24' : '#1565c0', fontWeight: '600' }}>
-                    Available Funds (Gala + Cash Sales + Credit Taken Cash - Credit Given) | उपलब्ध धनराशि:
+                    Available Funds (Gala + Cash Sales + Credit Collected Cash - Credit Given) | उपलब्ध धनराशि:
                   </span>
                   <span style={{ fontSize: '1.25rem', fontWeight: '700', color: isExceeding ? '#721c24' : '#0d47a1' }}>
                     ₹{maxAllowed.toFixed(2)}
@@ -1393,11 +1432,11 @@ const AddSales = () => {
               </div>
             )}
 
-            {/* Credit Taken */}
+            {/* Credit Collected */}
             {creditTaken.filter(e => e.creditHolderId && e.amount).length > 0 && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem', color: '#000' }}>
-                  Credit Taken (Collect on Shop) | उधार वसूली
+                  Credit Collected (Collect on Shop) | उधार वसूली
                 </h3>
                 <div style={{ border: '2px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
                   {creditTaken

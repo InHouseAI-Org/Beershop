@@ -11,6 +11,7 @@ const SalesReportTab = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [products, setProducts] = useState([]);
   const [creditHolders, setCreditHolders] = useState([]);
+  const [lastSalesReportDate, setLastSalesReportDate] = useState(null);
 
   // Approval state
   const [showApprovalModal, setShowApprovalModal] = useState(false);
@@ -70,6 +71,19 @@ const SalesReportTab = () => {
 
       // Store pending sales for display
       setPendingSalesList(pendingSales);
+
+      // Calculate last sales report date for date validation
+      // Consider both approved and pending sales
+      const allSalesForDateValidation = [...approvedSales, ...pendingSales];
+      if (allSalesForDateValidation.length > 0) {
+        const sortedSales = [...allSalesForDateValidation].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const lastSale = sortedSales[0];
+        const lastDate = new Date(lastSale.date);
+        lastDate.setHours(0, 0, 0, 0);
+        setLastSalesReportDate(lastDate);
+      } else {
+        setLastSalesReportDate(null);
+      }
 
       // Group approved sales by month
       const grouped = {};
@@ -142,7 +156,12 @@ const SalesReportTab = () => {
   };
 
   const handleRowClick = (sale) => {
-    setSelectedSale(sale);
+    // Add allocated balances to the sale data
+    const saleWithBalances = {
+      ...sale,
+      balances: allocatedBalances[sale.id] || null
+    };
+    setSelectedSale(saleWithBalances);
   };
 
   const closeModal = () => {
@@ -153,9 +172,9 @@ const SalesReportTab = () => {
     e.stopPropagation(); // Prevent row click
 
     // Calculate total available for allocation
-    const totalCollection = parseFloat(sale.cash_collected || 0) + parseFloat(sale.upi || 0);
-    const totalCredit = calculateCreditSum(sale);
-    const maxAllowed = totalCollection - totalCredit;
+    // Note: cash_collected already includes (cashSales + creditTakenCash + miscCash - expenses)
+    // and credit given was already subtracted in cashSales calculation
+    const maxAllowed = parseFloat(sale.cash_collected || 0) + parseFloat(sale.upi || 0);
 
     setAllocationSale(sale);
     setAllocationForm({
@@ -182,9 +201,7 @@ const SalesReportTab = () => {
     if (!allocationSale) return;
 
     // Calculate total available for allocation
-    const totalCollection = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
-    const totalCredit = calculateCreditSum(allocationSale);
-    const maxAllowed = totalCollection - totalCredit;
+    const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
 
     let newForm = { ...allocationForm, [field]: value };
 
@@ -202,9 +219,7 @@ const SalesReportTab = () => {
   const handleSubmitAllocation = async () => {
     if (!allocationSale) return;
 
-    const totalCollection = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
-    const totalCredit = calculateCreditSum(allocationSale);
-    const maxAllowed = totalCollection - totalCredit;
+    const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
 
     const cashBal = parseFloat(allocationForm.cashBalance || 0);
     const bankBal = parseFloat(allocationForm.bankBalance || 0);
@@ -305,7 +320,7 @@ const SalesReportTab = () => {
       });
     }
 
-    // Initialize credit taken entries from sale.creditTaken (now from sales.credit_taken column)
+    // Initialize credit collected entries from sale.creditTaken (now from sales.credit_taken column)
     const creditTakenData = [];
     if (sale.creditTaken && Array.isArray(sale.creditTaken)) {
       sale.creditTaken.forEach(item => {
@@ -329,8 +344,20 @@ const SalesReportTab = () => {
       });
     }
 
+    // Convert date to local format for the date input
+    let localDateString;
+    if (sale.date) {
+      const saleDate = new Date(sale.date);
+      const year = saleDate.getFullYear();
+      const month = String(saleDate.getMonth() + 1).padStart(2, '0');
+      const day = String(saleDate.getDate()).padStart(2, '0');
+      localDateString = `${year}-${month}-${day}`;
+    } else {
+      localDateString = new Date().toISOString().split('T')[0];
+    }
+
     setApprovalForm({
-      date: sale.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+      date: localDateString,
       productData: productDataMap,
       upiTotal: sale.upi || 0,
       galaBalanceToday: sale.gala_balance_today || 0,
@@ -398,7 +425,7 @@ const SalesReportTab = () => {
     });
   };
 
-  // Credit Taken handlers
+  // Credit Collected handlers
   const addCreditTakenInApproval = () => {
     setApprovalForm({
       ...approvalForm,
@@ -471,11 +498,16 @@ const SalesReportTab = () => {
     const miscCash = parseFloat(approvalForm.miscellaneousCash || 0);
     const miscUPI = parseFloat(approvalForm.miscellaneousUPI || 0);
 
+    // Calculate total expenses
+    const totalExpenses = (approvalForm.dailyExpenses || []).reduce((sum, expense) => {
+      return sum + (parseFloat(expense.amount) || 0);
+    }, 0);
+
     const upiTotalValue = parseFloat(approvalForm.upiTotal || 0);
 
     const upiSales = Math.max(0, upiTotalValue - creditTakenUPI - miscUPI);
     const cashSales = Math.max(0, totalSales - upiSales - totalCreditGiven);
-    const cashCollected = cashSales + creditTakenCash + miscCash;
+    const cashCollected = cashSales + creditTakenCash + miscCash - totalExpenses;
 
     return {
       totalSales,
@@ -486,7 +518,8 @@ const SalesReportTab = () => {
       miscUPI,
       upiSales,
       cashSales,
-      cashCollected
+      cashCollected,
+      totalExpenses
     };
   };
 
@@ -542,7 +575,7 @@ const SalesReportTab = () => {
         }
       });
 
-      // Prepare credit taken data
+      // Prepare credit collected data
       const creditTakenData = (approvalForm.creditTaken || [])
         .filter(ct => ct.creditHolderId && ct.amount)
         .map(ct => ({
@@ -636,13 +669,13 @@ const SalesReportTab = () => {
             <table className="table" style={{ marginBottom: 0 }}>
               <thead style={{ backgroundColor: '#ffc107' }}>
                 <tr>
-                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Date</th>
-                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>User</th>
-                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Cash</th>
-                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>UPI</th>
-                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Credit</th>
-                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Total</th>
-                  <th style={{ color: '#000', padding: '1.25rem 1rem' }}>Action</th>
+                  <th style={{ color: '#fff', padding: '1.25rem 1rem' }}>Date</th>
+                  <th style={{ color: '#fff', padding: '1.25rem 1rem' }}>User</th>
+                  <th style={{ color: '#fff', padding: '1.25rem 1rem' }}>Cash</th>
+                  <th style={{ color: '#fff', padding: '1.25rem 1rem' }}>UPI</th>
+                  <th style={{ color: '#fff', padding: '1.25rem 1rem' }}>Credit</th>
+                  <th style={{ color: '#fff', padding: '1.25rem 1rem' }}>Total</th>
+                  <th style={{ color: '#fff', padding: '1.25rem 1rem' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -1329,14 +1362,21 @@ const SalesReportTab = () => {
                   Total Collection Available:
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0d47a1' }}>
-                  ₹{(() => {
-                    const totalCollection = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
-                    const totalCredit = calculateCreditSum(allocationSale);
-                    return (totalCollection - totalCredit).toFixed(2);
-                  })()}
+                  ₹{(parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0)).toFixed(2)}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#1565c0', marginTop: '0.25rem' }}>
-                  = Cash (₹{parseFloat(allocationSale.cash_collected || 0).toFixed(2)}) + UPI (₹{parseFloat(allocationSale.upi || 0).toFixed(2)}) - Credit (₹{calculateCreditSum(allocationSale).toFixed(2)})
+                  = Cash Collected (₹{parseFloat(allocationSale.cash_collected || 0).toFixed(2)}) + UPI (₹{parseFloat(allocationSale.upi || 0).toFixed(2)})
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#1565c0', marginTop: '0.25rem', fontStyle: 'italic' }}>
+                  {(() => {
+                    const creditTakenCash = (allocationSale.creditTaken || [])
+                      .filter(c => c.collectedIn === 'cash_balance')
+                      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+                    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
+                    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+
+                    return `(Cash includes: Credit Collected ₹${creditTakenCash.toFixed(2)} + Misc ₹${miscCash.toFixed(2)} - Expenses ₹${expenses.toFixed(2)})`;
+                  })()}
                 </div>
               </div>
 
@@ -1406,9 +1446,7 @@ const SalesReportTab = () => {
                   const galaBal = parseFloat(allocationForm.galaBalance || 0);
                   const totalAllocated = cashBal + bankBal + galaBal;
 
-                  const totalCollection = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
-                  const totalCredit = calculateCreditSum(allocationSale);
-                  const maxAllowed = totalCollection - totalCredit;
+                  const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
                   const remaining = maxAllowed - totalAllocated;
 
                   if (totalAllocated > 0) {
@@ -1829,14 +1867,128 @@ const SalesReportTab = () => {
                 </div>
               </div>
 
-              {/* Collections */}
+              {/* Calculated Values Section */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ color: '#000', fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FileText size={24} style={{ color: '#2196F3' }} />
+                  Calculated Values | गणना किए गए मान
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                  {/* UPI Sales */}
+                  <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <CreditCard size={20} />
+                      <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>UPI Sales | UPI बिक्री</p>
+                    </div>
+                    <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                      ₹{(() => {
+                        const totalSales = selectedSale.opening_stock?.reduce((total, openingItem) => {
+                          const saleItem = selectedSale.sale?.find(s => s.product_id === openingItem.product_id);
+                          const saleQuantity = saleItem ? parseFloat(saleItem.sale || 0) : 0;
+                          const salePrice = getProductSalePrice(openingItem.product_id);
+                          return total + (saleQuantity * salePrice);
+                        }, 0) || 0;
+                        const cashSales = parseFloat(selectedSale.cash_collected || 0);
+                        return (totalSales - cashSales).toFixed(2);
+                      })()}
+                    </p>
+                  </div>
+
+                  {/* Cash Sales */}
+                  <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #000 0%, #1a1a1a 100%)', color: 'white', padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <DollarSign size={20} />
+                      <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cash Sales | नकद बिक्री</p>
+                    </div>
+                    <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                      ₹{parseFloat(selectedSale.cash_collected || 0).toFixed(2)}
+                    </p>
+                  </div>
+
+                  {/* Total UPI Received */}
+                  <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)', color: 'white', padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <CreditCard size={20} />
+                      <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center' }}>
+                        Total UPI Received | कुल UPI प्राप्त
+                      </p>
+                    </div>
+                    <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                      ₹{(() => {
+                        const upiSales = parseFloat(selectedSale.upi || 0);
+                        const miscUpi = parseFloat(selectedSale.miscellaneous_upi || 0);
+                        const creditInBank = (selectedSale.creditTaken || [])
+                          .filter(item => item.collectedIn === 'bank_balance')
+                          .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                        return (upiSales + miscUpi + creditInBank).toFixed(2);
+                      })()}
+                    </p>
+                    <p style={{ fontSize: '0.75rem', margin: '0.5rem 0 0 0', opacity: 0.9 }}>
+                      (UPI + Extra UPI + Credit in Bank)
+                    </p>
+                  </div>
+
+                  {/* Total Cash Received */}
+                  <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)', color: 'white', padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <DollarSign size={20} />
+                      <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center' }}>
+                        Total Cash Received | कुल नकद प्राप्त
+                      </p>
+                    </div>
+                    <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                      ₹{(() => {
+                        const cashCollected = parseFloat(selectedSale.cash_collected || 0);
+                        const miscCash = parseFloat(selectedSale.miscellaneous_cash || 0);
+                        const creditInCash = (selectedSale.creditTaken || [])
+                          .filter(item => item.collectedIn === 'cash_balance')
+                          .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                        return (cashCollected + miscCash + creditInCash).toFixed(2);
+                      })()}
+                    </p>
+                    <p style={{ fontSize: '0.75rem', margin: '0.5rem 0 0 0', opacity: 0.9 }}>
+                      (Cash + Extra Cash + Credit in Cash)
+                    </p>
+                  </div>
+
+                  {/* Gala Balance */}
+                  {selectedSale.gala_balance_today > 0 && (
+                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', padding: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <DollarSign size={20} />
+                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Gala Balance | गाला बैलेंस</p>
+                      </div>
+                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                        ₹{parseFloat(selectedSale.gala_balance_today || 0).toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Total Expenses */}
+                  {selectedSale.dailyExpenses && selectedSale.dailyExpenses.length > 0 && (
+                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)', color: 'white', padding: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <TrendingUp size={20} />
+                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Expenses | कुल खर्च</p>
+                      </div>
+                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                        ₹{selectedSale.dailyExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0).toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Collections Breakdown */}
               <div style={{ marginBottom: '2rem' }}>
                 <h3 style={{ color: '#000', fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  Collections
+                  <Wallet size={22} style={{ color: '#2196F3' }} />
+                  Collections Breakdown | संग्रह विवरण
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
                   <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #000 0%, #1a1a1a 100%)', color: 'white', padding: '1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <DollarSign size={20} />
                       <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cash Collected</p>
                     </div>
                     <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
@@ -1852,52 +2004,30 @@ const SalesReportTab = () => {
                       ₹{parseFloat(selectedSale.upi || 0).toFixed(2)}
                     </p>
                   </div>
+                  {selectedSale.miscellaneous_cash > 0 && (
+                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <Package size={20} />
+                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Extra (Cash)</p>
+                      </div>
+                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                        ₹{parseFloat(selectedSale.miscellaneous_cash || 0).toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                  {selectedSale.miscellaneous_upi > 0 && (
+                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', padding: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <CreditCard size={20} />
+                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Extra (UPI)</p>
+                      </div>
+                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                        ₹{parseFloat(selectedSale.miscellaneous_upi || 0).toFixed(2)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Gala Balance & Miscellaneous */}
-              {(selectedSale.gala_balance_today || selectedSale.miscellaneous_cash || selectedSale.miscellaneous_upi) && (
-                <div style={{ marginBottom: '2rem' }}>
-                  <h3 style={{ color: '#000', fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    Additional Collections
-                  </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-                    {selectedSale.gala_balance_today && (
-                      <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                          <DollarSign size={20} />
-                          <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Gala Balance</p>
-                        </div>
-                        <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                          ₹{parseFloat(selectedSale.gala_balance_today || 0).toFixed(2)}
-                        </p>
-                      </div>
-                    )}
-                    {selectedSale.miscellaneous_cash && (
-                      <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                          <Package size={20} />
-                          <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Extra (Cash)</p>
-                        </div>
-                        <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                          ₹{parseFloat(selectedSale.miscellaneous_cash || 0).toFixed(2)}
-                        </p>
-                      </div>
-                    )}
-                    {selectedSale.miscellaneous_upi && (
-                      <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                          <CreditCard size={20} />
-                          <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Extra (UPI)</p>
-                        </div>
-                        <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                          ₹{parseFloat(selectedSale.miscellaneous_upi || 0).toFixed(2)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Credit Given */}
               {selectedSale.credit && Array.isArray(selectedSale.credit) && selectedSale.credit.length > 0 && (
@@ -1932,6 +2062,150 @@ const SalesReportTab = () => {
                   </div>
                 </div>
               )}
+
+              {/* Credit Collected */}
+              {selectedSale.creditTaken && Array.isArray(selectedSale.creditTaken) && selectedSale.creditTaken.length > 0 && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{ color: '#000', fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <TrendingUp size={22} style={{ color: '#4CAF50' }} />
+                    Credit Collected
+                  </h3>
+                  <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+                    <table className="table" style={{ marginBottom: 0 }}>
+                      <thead style={{ backgroundColor: '#4CAF50' }}>
+                        <tr>
+                          <th style={{ color: 'white', padding: '1rem' }}>Credit Holder</th>
+                          <th style={{ color: 'white', padding: '1rem' }}>Amount</th>
+                          <th style={{ color: 'white', padding: '1rem' }}>Collected In</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedSale.creditTaken.map((item, index) => (
+                          <tr key={index} style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa' }}>
+                            <td style={{ padding: '0.875rem', fontWeight: '600' }}>{getCreditHolderName(item.creditHolderId)}</td>
+                            <td style={{ padding: '0.875rem', fontWeight: '700', fontSize: '1.125rem', color: '#4CAF50' }}>₹{parseFloat(item.amount || 0).toFixed(2)}</td>
+                            <td style={{ padding: '0.875rem', fontWeight: '600' }}>
+                              <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '12px',
+                                backgroundColor: item.collectedIn === 'cash_balance' ? '#fff3e0' : '#e3f2fd',
+                                color: item.collectedIn === 'cash_balance' ? '#e65100' : '#1976d2',
+                                fontSize: '0.875rem',
+                                fontWeight: '600'
+                              }}>
+                                {item.collectedIn === 'cash_balance' ? 'Cash' : item.collectedIn === 'bank_balance' ? 'Bank' : 'Gala'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ fontWeight: '700', backgroundColor: '#4CAF50', color: 'white' }}>
+                          <td style={{ padding: '1rem' }}>Total</td>
+                          <td colSpan="2" style={{ padding: '1rem', fontSize: '1.25rem' }}>
+                            ₹{selectedSale.creditTaken.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Daily Expenses */}
+              {selectedSale.dailyExpenses && Array.isArray(selectedSale.dailyExpenses) && selectedSale.dailyExpenses.length > 0 && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{ color: '#000', fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <DollarSign size={22} style={{ color: '#f44336' }} />
+                    Daily Expenses
+                  </h3>
+                  <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+                    <table className="table" style={{ marginBottom: 0 }}>
+                      <thead style={{ backgroundColor: '#f44336' }}>
+                        <tr>
+                          <th style={{ color: 'white', padding: '1rem' }}>Expense Name</th>
+                          <th style={{ color: 'white', padding: '1rem' }}>Description</th>
+                          <th style={{ color: 'white', padding: '1rem' }}>Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedSale.dailyExpenses.map((expense, index) => (
+                          <tr key={index} style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa' }}>
+                            <td style={{ padding: '0.875rem', fontWeight: '600' }}>{expense.name}</td>
+                            <td style={{ padding: '0.875rem', color: '#666' }}>{expense.description || '-'}</td>
+                            <td style={{ padding: '0.875rem', fontWeight: '700', fontSize: '1.125rem', color: '#f44336' }}>₹{parseFloat(expense.amount || 0).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ fontWeight: '700', backgroundColor: '#f44336', color: 'white' }}>
+                          <td colSpan="2" style={{ padding: '1rem' }}>Total</td>
+                          <td style={{ padding: '1rem', fontSize: '1.25rem' }}>
+                            ₹{selectedSale.dailyExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Balance Allocation */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ color: '#000', fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <DollarSign size={22} style={{ color: '#2196F3' }} />
+                  Balance Allocation
+                </h3>
+                {selectedSale.balances ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #000 0%, #1a1a1a 100%)', color: 'white', padding: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <DollarSign size={20} />
+                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cash Balance</p>
+                      </div>
+                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                        ₹{parseFloat(selectedSale.balances.cash_balance || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)', color: 'white', padding: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <CreditCard size={20} />
+                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bank Balance</p>
+                      </div>
+                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                        ₹{parseFloat(selectedSale.balances.bank_balance || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', padding: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <DollarSign size={20} />
+                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Gala Balance</p>
+                      </div>
+                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                        ₹{parseFloat(selectedSale.balances.gala_balance || 0).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card" style={{
+                    padding: '2rem',
+                    textAlign: 'center',
+                    background: 'linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%)',
+                    border: '2px dashed #d63031',
+                    borderRadius: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                      <AlertCircle size={24} style={{ color: '#d63031' }} />
+                      <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#d63031', margin: 0 }}>
+                        No Allocation Done
+                      </p>
+                    </div>
+                    <p style={{ fontSize: '0.875rem', color: '#2d3436', margin: 0 }}>
+                      Balance has not been allocated for this sale yet.
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {/* Remarks */}
               {selectedSale.remarks && (
@@ -2051,8 +2325,17 @@ const SalesReportTab = () => {
                   className="form-control"
                   value={approvalForm.date}
                   onChange={(e) => setApprovalForm({ ...approvalForm, date: e.target.value })}
-                  style={{ fontSize: '1.125rem', padding: '0.75rem' }}
+                  style={{
+                    fontSize: '1.125rem',
+                    padding: '0.75rem',
+                    backgroundColor: '#f5f5f5',
+                    cursor: 'not-allowed'
+                  }}
+                  disabled={true}
                 />
+                <small style={{ color: '#666', display: 'block', marginTop: '0.5rem' }}>
+                  Date cannot be changed during review
+                </small>
               </div>
 
               {/* Products Table */}
@@ -2345,17 +2628,17 @@ const SalesReportTab = () => {
                 </div>
               </div>
 
-              {/* Credit Taken */}
+              {/* Credit Collected */}
               <div style={{ marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h4 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>Credit Taken (Collect on Shop) | उधार वसूली</h4>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>Credit Collected (Collect on Shop) | उधार वसूली</h4>
                   <button
                     type="button"
                     onClick={addCreditTakenInApproval}
                     className="btn btn-success"
                     style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
                   >
-                    + Add Credit Taken
+                    + Add Credit Collected
                   </button>
                 </div>
 
@@ -2437,7 +2720,7 @@ const SalesReportTab = () => {
 
                 {(!approvalForm.creditTaken || approvalForm.creditTaken.length === 0) && (
                   <div style={{ padding: '1rem', textAlign: 'center', color: '#666', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
-                    No credit taken entries. Click "Add Credit Taken" to add one.
+                    No credit Collected entries. Click "Add Credit Collected" to add one.
                   </div>
                 )}
               </div>
@@ -2474,7 +2757,7 @@ const SalesReportTab = () => {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                         <span style={{ fontSize: '0.75rem', color: isExceeding ? '#721c24' : '#1565c0', fontWeight: '600' }}>
-                          Available Funds (Gala + Cash Sales + Credit Taken Cash - Credit Given):
+                          Available Funds (Gala + Cash Sales + Credit Collected Cash - Credit Given):
                         </span>
                         <span style={{ fontSize: '1rem', fontWeight: '700', color: isExceeding ? '#721c24' : '#0d47a1' }}>
                           ₹{maxAllowed.toFixed(2)}
@@ -2771,7 +3054,7 @@ const SalesReportTab = () => {
             grid-template-columns: 1fr !important;
           }
 
-          /* Dynamic Entry Grids (Credit Taken, Daily Expenses, Credit Given) */
+          /* Dynamic Entry Grids (Credit Collected, Daily Expenses, Credit Given) */
           .modal div[style*="gridTemplateColumns: '2fr 1fr 1fr auto'"],
           .modal div[style*="gridTemplateColumns: 2fr 1fr 1fr auto"],
           .modal div[style*="gridTemplateColumns: '1fr 2fr 1fr auto'"],
