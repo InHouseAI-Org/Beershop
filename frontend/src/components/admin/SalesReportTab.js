@@ -844,19 +844,6 @@ const SalesReportTab = () => {
                 </p>
               </div>
 
-              <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)', color: 'white' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <FileText size={20} />
-                  <h3 style={{ color: 'white', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
-                    Total Collection
-                  </h3>
-                </div>
-                <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                  ₹{(calculateMonthTotals(salesByMonth[activeMonth].sales).cash +
-                     calculateMonthTotals(salesByMonth[activeMonth].sales).upi -
-                     calculateMonthTotals(salesByMonth[activeMonth].sales).credit).toFixed(2)}
-                </p>
-              </div>
             </div>
           )}
 
@@ -1355,13 +1342,14 @@ const SalesReportTab = () => {
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#1565c0', marginTop: '0.25rem', fontStyle: 'italic' }}>
                   {(() => {
+                    const totalcredit = calculateCreditSum(allocationSale);
                     const creditTakenCash = (allocationSale.creditTaken || [])
                       .filter(c => c.collectedIn === 'cash_balance')
                       .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
                     const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
                     const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
 
-                    return `(Cash includes: Credit Collected ₹${creditTakenCash.toFixed(2)} + Misc ₹${miscCash.toFixed(2)} - Expenses ₹${expenses.toFixed(2)})`;
+                    return `( + Credit Collected ₹${creditTakenCash.toFixed(2)} - Credit Given ₹${totalcredit.toFixed(2)} + Misc ₹${miscCash.toFixed(2)} - Expenses ₹${expenses.toFixed(2)})`;
                   })()}
                 </div>
               </div>
