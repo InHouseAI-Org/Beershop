@@ -136,6 +136,7 @@ CREATE TABLE sales (
   miscellaneous_upi DECIMAL(10, 2) DEFAULT 0,
   gala_balance_today DECIMAL(10, 2) DEFAULT 0,
   credit JSONB,
+  credit_taken JSONB,
   remarks TEXT,
   status VARCHAR(20) DEFAULT 'approved' CHECK (status IN ('pending', 'approved')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -147,6 +148,7 @@ COMMENT ON COLUMN sales.miscellaneous_type IS 'Type of miscellaneous transaction
 COMMENT ON COLUMN sales.miscellaneous_cash IS 'Extra cash sales (chakhna, bags, etc) - cash payment';
 COMMENT ON COLUMN sales.miscellaneous_upi IS 'Extra sales (chakhna, bags, etc) - UPI payment';
 COMMENT ON COLUMN sales.gala_balance_today IS 'Gala balance at end of day (user input for calculation)';
+COMMENT ON COLUMN sales.credit_taken IS 'Credit collected on shop during sales (array of {creditHolderId, amount, collectedIn})';
 COMMENT ON COLUMN sales.admin_id IS 'Admin who created/edited this sale (for super admin functionality)';
 
 -- Orders table

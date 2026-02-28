@@ -213,116 +213,123 @@ const createSale = async (req, res) => {
     if (status === 'approved') {
       // Update inventory: inventory_new = inventory_old - sale
       console.log('Updating inventory after sale...');
-    if (Array.isArray(sale) && sale.length > 0) {
-      for (const saleItem of sale) {
-        if (saleItem.product_id && saleItem.sale) {
-          const saleQty = parseFloat(saleItem.sale);
-          await db.decrementInventory(organisationId, saleItem.product_id, saleQty);
-          console.log(`Decreased inventory for product ${saleItem.product_id} by ${saleQty}`);
+      try {
+        if (Array.isArray(sale) && sale.length > 0) {
+          for (const saleItem of sale) {
+            if (saleItem.product_id && saleItem.sale) {
+              const saleQty = parseFloat(saleItem.sale);
+              await db.decrementInventory(organisationId, saleItem.product_id, saleQty);
+              console.log(`Decreased inventory for product ${saleItem.product_id} by ${saleQty}`);
+            }
+          }
+        }
+      } catch (inventoryError) {
+        console.error('Inventory error:', inventoryError);
+        // Delete the sale that was just created since inventory update failed
+        await db.deleteSale(newSale.id);
+        throw inventoryError;
+      }
+
+      // Update credit holder outstanding: add credit given to outstanding amount
+      console.log('Updating credit holder outstanding amounts...');
+      console.log('Credit array:', credit);
+      console.log('Credit is array?', Array.isArray(credit));
+      console.log('Credit length:', credit?.length);
+
+      if (Array.isArray(credit) && credit.length > 0) {
+        console.log('Processing credit entries...');
+        for (const creditItem of credit) {
+          console.log('Processing credit item:', creditItem);
+          if (creditItem.credit_holder_id && creditItem.creditgiven) {
+            const creditAmount = parseFloat(creditItem.creditgiven);
+            console.log(`Processing credit: ${creditAmount} for holder ${creditItem.credit_holder_id}`);
+
+            // Get current outstanding before incrementing
+            const creditHolder = await db.getCreditHolderById(creditItem.credit_holder_id);
+            const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
+            console.log(`Previous outstanding: ${previousOutstanding}`);
+
+            // Increment outstanding
+            await db.incrementCreditHolderOutstanding(creditItem.credit_holder_id, creditAmount);
+            const newOutstanding = previousOutstanding + creditAmount;
+            console.log(`Added ${creditAmount} to credit holder ${creditItem.credit_holder_id} outstanding`);
+            console.log(`New outstanding: ${newOutstanding}`);
+
+            // Record transaction history
+            console.log('Creating credit collection history entry...');
+            const historyEntry = await db.createCreditCollectionHistory({
+              organisationId,
+              creditHolderId: creditItem.credit_holder_id,
+              amountCollected: creditAmount,
+              previousOutstanding: previousOutstanding,
+              newOutstanding: newOutstanding,
+              collectedBy: req.user.id,
+              notes: null,
+              transactionType: 'given',
+              saleId: newSale.id
+            });
+            console.log('Created history entry:', historyEntry);
+          } else {
+            console.log('Skipping credit item - missing credit_holder_id or creditgiven');
+          }
+        }
+      } else {
+        console.log('No credit to process (not array or empty)');
+      }
+
+      // Process credit taken (collected on shop)
+      console.log('Processing credit taken entries...');
+      if (Array.isArray(creditTaken) && creditTaken.length > 0) {
+        for (const takenItem of creditTaken) {
+          if (takenItem.creditHolderId && takenItem.amount && takenItem.collectedIn) {
+            const takenAmount = parseFloat(takenItem.amount);
+            console.log(`Processing credit taken: ${takenAmount} from holder ${takenItem.creditHolderId}`);
+
+            // Get current outstanding before decrementing
+            const creditHolder = await db.getCreditHolderById(takenItem.creditHolderId);
+            const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
+
+            // Decrement outstanding (collecting credit)
+            await db.decrementCreditHolderOutstanding(takenItem.creditHolderId, takenAmount);
+            const newOutstanding = Math.max(0, previousOutstanding - takenAmount);
+            console.log(`Reduced ${takenAmount} from credit holder ${takenItem.creditHolderId} outstanding`);
+
+            // Record transaction history with collection_type='collected_on_shop'
+            await db.createCreditCollectionHistory({
+              organisationId,
+              creditHolderId: takenItem.creditHolderId,
+              amountCollected: takenAmount,
+              previousOutstanding: previousOutstanding,
+              newOutstanding: newOutstanding,
+              collectedBy: req.user.id,
+              notes: 'Collected on shop during sales',
+              transactionType: 'collected',
+              saleId: newSale.id,
+              collectedIn: takenItem.collectedIn, // 'cash_balance' or 'bank_balance'
+              collectionType: 'collected_on_shop'
+            });
+            console.log(`Recorded credit taken in history as 'collected_on_shop'`);
+          }
         }
       }
-    }
 
-    // Update credit holder outstanding: add credit given to outstanding amount
-    console.log('Updating credit holder outstanding amounts...');
-    console.log('Credit array:', credit);
-    console.log('Credit is array?', Array.isArray(credit));
-    console.log('Credit length:', credit?.length);
-
-    if (Array.isArray(credit) && credit.length > 0) {
-      console.log('Processing credit entries...');
-      for (const creditItem of credit) {
-        console.log('Processing credit item:', creditItem);
-        if (creditItem.credit_holder_id && creditItem.creditgiven) {
-          const creditAmount = parseFloat(creditItem.creditgiven);
-          console.log(`Processing credit: ${creditAmount} for holder ${creditItem.credit_holder_id}`);
-
-          // Get current outstanding before incrementing
-          const creditHolder = await db.getCreditHolderById(creditItem.credit_holder_id);
-          const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
-          console.log(`Previous outstanding: ${previousOutstanding}`);
-
-          // Increment outstanding
-          await db.incrementCreditHolderOutstanding(creditItem.credit_holder_id, creditAmount);
-          const newOutstanding = previousOutstanding + creditAmount;
-          console.log(`Added ${creditAmount} to credit holder ${creditItem.credit_holder_id} outstanding`);
-          console.log(`New outstanding: ${newOutstanding}`);
-
-          // Record transaction history
-          console.log('Creating credit collection history entry...');
-          const historyEntry = await db.createCreditCollectionHistory({
-            organisationId,
-            creditHolderId: creditItem.credit_holder_id,
-            amountCollected: creditAmount,
-            previousOutstanding: previousOutstanding,
-            newOutstanding: newOutstanding,
-            collectedBy: req.user.id,
-            notes: null,
-            transactionType: 'given',
-            saleId: newSale.id
-          });
-          console.log('Created history entry:', historyEntry);
-        } else {
-          console.log('Skipping credit item - missing credit_holder_id or creditgiven');
+      // Save daily expenses
+      console.log('Processing daily expenses...');
+      if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0) {
+        for (const expense of dailyExpenses) {
+          if (expense.name && expense.amount) {
+            await db.createDailyExpense({
+              organisationId,
+              saleId: newSale.id,
+              name: expense.name,
+              description: expense.description || null,
+              amount: parseFloat(expense.amount),
+              expenseDate: date || new Date()
+            });
+            console.log(`Created expense: ${expense.name} - ₹${expense.amount}`);
+          }
         }
       }
-    } else {
-      console.log('No credit to process (not array or empty)');
-    }
-
-    // Process credit taken (collected on shop)
-    console.log('Processing credit taken entries...');
-    if (Array.isArray(creditTaken) && creditTaken.length > 0) {
-      for (const takenItem of creditTaken) {
-        if (takenItem.creditHolderId && takenItem.amount && takenItem.collectedIn) {
-          const takenAmount = parseFloat(takenItem.amount);
-          console.log(`Processing credit taken: ${takenAmount} from holder ${takenItem.creditHolderId}`);
-
-          // Get current outstanding before decrementing
-          const creditHolder = await db.getCreditHolderById(takenItem.creditHolderId);
-          const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
-
-          // Decrement outstanding (collecting credit)
-          await db.decrementCreditHolderOutstanding(takenItem.creditHolderId, takenAmount);
-          const newOutstanding = Math.max(0, previousOutstanding - takenAmount);
-          console.log(`Reduced ${takenAmount} from credit holder ${takenItem.creditHolderId} outstanding`);
-
-          // Record transaction history with collection_type='collected_on_shop'
-          await db.createCreditCollectionHistory({
-            organisationId,
-            creditHolderId: takenItem.creditHolderId,
-            amountCollected: takenAmount,
-            previousOutstanding: previousOutstanding,
-            newOutstanding: newOutstanding,
-            collectedBy: req.user.id,
-            notes: 'Collected on shop during sales',
-            transactionType: 'collected',
-            saleId: newSale.id,
-            collectedIn: takenItem.collectedIn, // 'cash_balance' or 'bank_balance'
-            collectionType: 'collected_on_shop'
-          });
-          console.log(`Recorded credit taken in history as 'collected_on_shop'`);
-        }
-      }
-    }
-
-    // Save daily expenses
-    console.log('Processing daily expenses...');
-    if (Array.isArray(dailyExpenses) && dailyExpenses.length > 0) {
-      for (const expense of dailyExpenses) {
-        if (expense.name && expense.amount) {
-          await db.createDailyExpense({
-            organisationId,
-            saleId: newSale.id,
-            name: expense.name,
-            description: expense.description || null,
-            amount: parseFloat(expense.amount),
-            expenseDate: date || new Date()
-          });
-          console.log(`Created expense: ${expense.name} - ₹${expense.amount}`);
-        }
-      }
-    }
     } else {
       console.log('Sale created with pending status - waiting for admin approval');
 
@@ -349,6 +356,10 @@ const createSale = async (req, res) => {
     res.status(201).json(newSale);
   } catch (error) {
     console.error('Error creating sale:', error);
+    // Check if it's an inventory validation error
+    if (error.message && error.message.includes('Insufficient inventory')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -436,6 +447,10 @@ const updateSale = async (req, res) => {
     res.json(updatedSale);
   } catch (error) {
     console.error(error);
+    // Check if it's an inventory validation error
+    if (error.message && error.message.includes('Insufficient inventory')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -542,14 +557,21 @@ const approveSale = async (req, res) => {
 
     // Update inventory: inventory_new = inventory_old - sale
     console.log('Updating inventory after approval...');
-    if (Array.isArray(finalSale) && finalSale.length > 0) {
-      for (const saleItem of finalSale) {
-        if (saleItem.product_id && saleItem.sale) {
-          const saleQty = parseFloat(saleItem.sale);
-          await db.decrementInventory(organisationId, saleItem.product_id, saleQty);
-          console.log(`Decreased inventory for product ${saleItem.product_id} by ${saleQty}`);
+    try {
+      if (Array.isArray(finalSale) && finalSale.length > 0) {
+        for (const saleItem of finalSale) {
+          if (saleItem.product_id && saleItem.sale) {
+            const saleQty = parseFloat(saleItem.sale);
+            await db.decrementInventory(organisationId, saleItem.product_id, saleQty);
+            console.log(`Decreased inventory for product ${saleItem.product_id} by ${saleQty}`);
+          }
         }
       }
+    } catch (inventoryError) {
+      console.error('Inventory error during approval:', inventoryError);
+      // Revert the sale status back to pending
+      await db.updateSale(id, { status: 'pending' });
+      throw inventoryError;
     }
 
     // Update credit holder outstanding: add credit given to outstanding amount
@@ -649,6 +671,10 @@ const approveSale = async (req, res) => {
     res.json({ message: 'Sale approved successfully', sale: updatedSale });
   } catch (error) {
     console.error('Error approving sale:', error);
+    // Check if it's an inventory validation error
+    if (error.message && error.message.includes('Insufficient inventory')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };

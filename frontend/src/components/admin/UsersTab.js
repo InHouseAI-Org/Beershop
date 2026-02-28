@@ -59,15 +59,23 @@ const UsersTab = () => {
     e.preventDefault();
     setError('');
 
+    // Trim username to prevent leading/trailing spaces
+    const trimmedUsername = formData.username.trim();
+
+    if (!trimmedUsername) {
+      setError('Username cannot be empty or only whitespace');
+      return;
+    }
+
     try {
       if (editingUser) {
-        const updateData = { username: formData.username };
+        const updateData = { username: trimmedUsername };
         if (formData.password) {
           updateData.password = formData.password;
         }
         await api.put(`/users/${editingUser.id}`, updateData);
       } else {
-        await api.post('/users', formData);
+        await api.post('/users', { username: trimmedUsername, password: formData.password });
       }
       await fetchUsers();
       handleCloseModal();

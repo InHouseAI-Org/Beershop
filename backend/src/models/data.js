@@ -67,7 +67,14 @@ const dataHelpers = {
   },
 
   getAdminByUsername: async (username) => {
-    const result = await pool.query('SELECT * FROM admins WHERE username = $1', [username]);
+    // First try exact match
+    let result = await pool.query('SELECT * FROM admins WHERE username = $1', [username]);
+
+    // If not found, try trimmed match (to handle usernames with spaces in DB)
+    if (result.rows.length === 0) {
+      result = await pool.query('SELECT * FROM admins WHERE TRIM(username) = $1', [username]);
+    }
+
     return result.rows[0];
   },
 
@@ -77,13 +84,20 @@ const dataHelpers = {
   },
 
   createAdmin: async (adminData) => {
+    // Trim username to prevent leading/trailing spaces
+    const trimmedUsername = adminData.username?.trim();
+
+    if (!trimmedUsername) {
+      throw new Error('Username cannot be empty or only whitespace');
+    }
+
     const hashedPassword = bcrypt.hashSync(adminData.password, 10);
 
     const result = await pool.query(
       `INSERT INTO admins (organisation_id, username, password, email, role)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [adminData.organisationId, adminData.username, hashedPassword, adminData.email || null, 'admin']
+      [adminData.organisationId, trimmedUsername, hashedPassword, adminData.email || null, 'admin']
     );
 
     return result.rows[0];
@@ -92,6 +106,14 @@ const dataHelpers = {
   updateAdmin: async (id, updates) => {
     if (updates.password) {
       updates.password = bcrypt.hashSync(updates.password, 10);
+    }
+
+    // Trim username if it's being updated
+    if (updates.username) {
+      updates.username = updates.username.trim();
+      if (!updates.username) {
+        throw new Error('Username cannot be empty or only whitespace');
+      }
     }
 
     const fields = [];
@@ -143,18 +165,32 @@ const dataHelpers = {
   },
 
   getUserByUsername: async (username) => {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    // First try exact match
+    let result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+
+    // If not found, try trimmed match (to handle usernames with spaces in DB)
+    if (result.rows.length === 0) {
+      result = await pool.query('SELECT * FROM users WHERE TRIM(username) = $1', [username]);
+    }
+
     return result.rows[0];
   },
 
   createUser: async (userData) => {
+    // Trim username to prevent leading/trailing spaces
+    const trimmedUsername = userData.username?.trim();
+
+    if (!trimmedUsername) {
+      throw new Error('Username cannot be empty or only whitespace');
+    }
+
     const hashedPassword = bcrypt.hashSync(userData.password, 10);
 
     const result = await pool.query(
       `INSERT INTO users (organisation_id, username, password)
        VALUES ($1, $2, $3)
        RETURNING *`,
-      [userData.organisationId, userData.username, hashedPassword]
+      [userData.organisationId, trimmedUsername, hashedPassword]
     );
 
     return result.rows[0];
@@ -163,6 +199,14 @@ const dataHelpers = {
   updateUser: async (id, updates) => {
     if (updates.password) {
       updates.password = bcrypt.hashSync(updates.password, 10);
+    }
+
+    // Trim username if it's being updated
+    if (updates.username) {
+      updates.username = updates.username.trim();
+      if (!updates.username) {
+        throw new Error('Username cannot be empty or only whitespace');
+      }
     }
 
     const fields = [];
@@ -321,26 +365,62 @@ const dataHelpers = {
   },
 
   updateInventoryById: async (id, qty) => {
+    const qtyValue = parseFloat(qty);
+
+    if (qtyValue < 0) {
+      throw new Error('Inventory quantity cannot be negative');
+    }
+
     const result = await pool.query(
       'UPDATE inventory SET qty = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
-      [qty, id]
+      [qtyValue, id]
     );
     return result.rows[0];
   },
 
   upsertInventory: async (inventoryData) => {
+    const qtyValue = parseFloat(inventoryData.qty);
+
+    if (qtyValue < 0) {
+      throw new Error('Inventory quantity cannot be negative');
+    }
+
     const result = await pool.query(
       `INSERT INTO inventory (organisation_id, product_id, qty)
        VALUES ($1, $2, $3)
        ON CONFLICT (organisation_id, product_id)
        DO UPDATE SET qty = $3, updated_at = CURRENT_TIMESTAMP
        RETURNING *`,
-      [inventoryData.organisationId, inventoryData.productId, inventoryData.qty]
+      [inventoryData.organisationId, inventoryData.productId, qtyValue]
     );
     return result.rows[0];
   },
 
   decrementInventory: async (organisationId, productId, qty) => {
+    // First check current inventory
+    const currentInventory = await pool.query(
+      `SELECT qty FROM inventory WHERE organisation_id = $1 AND product_id = $2`,
+      [organisationId, productId]
+    );
+
+    if (currentInventory.rows.length === 0) {
+      throw new Error(`Product not found in inventory`);
+    }
+
+    const currentQty = parseFloat(currentInventory.rows[0].qty || 0);
+    const decrementQty = parseFloat(qty);
+
+    if (currentQty < decrementQty) {
+      // Get product name for better error message
+      const productResult = await pool.query(
+        `SELECT product_name FROM products WHERE id = $1`,
+        [productId]
+      );
+      const productName = productResult.rows[0]?.product_name || 'Unknown Product';
+
+      throw new Error(`Insufficient inventory for ${productName}. Available: ${currentQty}, Required: ${decrementQty}`);
+    }
+
     const result = await pool.query(
       `UPDATE inventory
        SET qty = qty - $1, updated_at = CURRENT_TIMESTAMP

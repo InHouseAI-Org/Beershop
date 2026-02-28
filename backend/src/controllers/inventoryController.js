@@ -63,6 +63,10 @@ const updateInventory = async (req, res) => {
     res.json(updatedInventory);
   } catch (error) {
     console.error(error);
+    // Check if it's a validation error
+    if (error.message && error.message.includes('cannot be negative')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };

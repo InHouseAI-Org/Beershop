@@ -309,19 +309,22 @@ const OrdersTab = () => {
                       return minDate.toISOString().split('T')[0];
                     })()}
                     max={new Date().toISOString().split('T')[0]}
+                    disabled={editingOrder !== null}
                     style={{
                       fontSize: '1.125rem',
                       padding: '1rem',
                       fontWeight: '600',
-                      color: '#000'
+                      color: '#000',
+                      backgroundColor: editingOrder !== null ? '#f5f5f5' : '#fff',
+                      cursor: editingOrder !== null ? 'not-allowed' : 'auto'
                     }}
                   />
                   <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                    You can select dates from {(() => {
+                    {editingOrder ? 'Order date cannot be changed after creation' : `You can select dates from ${(() => {
                       const minDate = new Date(lastSalesReportDate);
                       minDate.setDate(minDate.getDate() + 1);
                       return minDate.toLocaleDateString();
-                    })()} to today
+                    })()} to today`}
                   </small>
                 </div>
               </div>

@@ -4,15 +4,24 @@ const db = require('../models/data');
 
 const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    let { username, password } = req.body;
+
+    // Trim username to handle leading/trailing spaces
+    username = username?.trim();
 
     console.log('=== LOGIN ATTEMPT ===');
-    console.log('Username:', username);
+    console.log('Username (after trim):', username);
     console.log('Password provided:', !!password);
 
     if (!username || !password) {
       console.log('Missing username or password');
       return res.status(400).json({ error: 'Please provide username and password' });
+    }
+
+    // Check JWT_SECRET is configured
+    if (!process.env.JWT_SECRET) {
+      console.error('CRITICAL: JWT_SECRET is not configured!');
+      return res.status(500).json({ error: 'Server configuration error. Please contact administrator.' });
     }
 
     let user = null;
@@ -55,11 +64,20 @@ const login = async (req, res) => {
     // Verify password
     console.log('Comparing password...');
     console.log('Stored hash:', user.password);
+    console.log('Password length:', password?.length);
+
+    if (!user.password) {
+      console.error('User has no password hash in database!');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     console.log('Password match:', isMatch);
 
     if (!isMatch) {
       console.log('Password mismatch - returning 401');
+      console.log('Username from DB:', JSON.stringify(user.username));
+      console.log('Username from request:', JSON.stringify(username));
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 

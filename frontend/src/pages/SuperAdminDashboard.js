@@ -115,17 +115,25 @@ const SuperAdminDashboard = () => {
     e.preventDefault();
     setError('');
 
+    // Trim username to prevent leading/trailing spaces
+    const trimmedUsername = formData.username.trim();
+
+    if (!trimmedUsername) {
+      setError('Username cannot be empty or only whitespace');
+      return;
+    }
+
     try {
       if (editingAdmin) {
         // Update admin
-        const updateData = { ...formData };
+        const updateData = { ...formData, username: trimmedUsername };
         if (!updateData.password) {
           delete updateData.password; // Don't update password if not provided
         }
         await api.put(`/admins/${editingAdmin.id}`, updateData);
       } else {
         // Create admin
-        await api.post('/admins', formData);
+        await api.post('/admins', { ...formData, username: trimmedUsername });
       }
       await fetchAdmins();
       handleCloseModal();

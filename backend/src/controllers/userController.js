@@ -59,6 +59,10 @@ const createUser = async (req, res) => {
     res.status(201).json(userWithoutPassword);
   } catch (error) {
     console.error(error);
+    // Check if it's a validation error
+    if (error.message && error.message.includes('Username cannot be empty')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -98,6 +102,10 @@ const updateUser = async (req, res) => {
     res.json(userWithoutPassword);
   } catch (error) {
     console.error(error);
+    // Check if it's a validation error
+    if (error.message && error.message.includes('Username cannot be empty')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };

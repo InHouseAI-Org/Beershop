@@ -60,6 +60,10 @@ const createAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    // Check if it's a validation error
+    if (error.message && error.message.includes('Username cannot be empty')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -101,6 +105,10 @@ const updateAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    // Check if it's a validation error
+    if (error.message && error.message.includes('Username cannot be empty')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
