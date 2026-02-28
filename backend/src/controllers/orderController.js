@@ -39,7 +39,7 @@ const getOrder = async (req, res) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate } = req.body;
 
     if (!distributorId) {
       return res.status(400).json({ error: 'Please provide distributor ID' });
@@ -47,19 +47,22 @@ const createOrder = async (req, res) => {
 
     const organisationId = req.user.organisationId;
 
-    // Always use today's date in local timezone - ignore any date sent from frontend
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const todayDateString = `${year}-${month}-${day}`;
+    // Use the date provided from frontend, or default to today if not provided
+    let orderDateString = orderDate;
+    if (!orderDateString) {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      orderDateString = `${year}-${month}-${day}`;
+    }
 
-    console.log(`Creating order with date: ${todayDateString} (today's date)`);
+    console.log(`Creating order with date: ${orderDateString}`);
 
     const newOrder = await db.createOrder({
       organisationId,
       distributorId,
-      orderDate: todayDateString,
+      orderDate: orderDateString,
       orderData,
       tax: tax || 0,
       misc: misc || 0,
