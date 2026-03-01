@@ -73,19 +73,6 @@ const ProductsTab = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) {
-      return;
-    }
-
-    try {
-      await api.delete(`/products/${id}`);
-      await fetchProducts();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to delete product');
-    }
-  };
-
   if (loading) {
     return <div>Loading...</div>;
   }

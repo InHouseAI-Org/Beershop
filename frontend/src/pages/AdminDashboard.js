@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertTriangle, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import DashboardTab from '../components/admin/DashboardTab';
 import InventoryTab from '../components/admin/InventoryTab';
 import ProductsTab from '../components/admin/ProductsTab';

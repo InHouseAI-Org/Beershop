@@ -52,6 +52,7 @@ const MonthlySalesChart = ({ data }) => {
               <Tooltip
                 formatter={(value) => `₹${value.toLocaleString()}`}
                 contentStyle={{ fontSize: isMobile ? 11 : 14 }}
+                wrapperStyle={{ zIndex: 1000 }}
               />
               <Legend wrapperStyle={{ fontSize: isMobile ? 11 : 14 }} />
               <Line

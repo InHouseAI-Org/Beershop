@@ -70,6 +70,7 @@ const CreditOutstandingChart = ({ data, creditHolderNames }) => {
               <Tooltip
                 formatter={(value) => `₹${value.toLocaleString()}`}
                 contentStyle={{ fontSize: isMobile ? 11 : 14 }}
+                wrapperStyle={{ zIndex: 1000 }}
               />
               <Legend
                 wrapperStyle={{ fontSize: isMobile ? 10 : 12, cursor: 'pointer' }}

@@ -70,10 +70,11 @@ const ProductSalesChart = ({ data, productNames }) => {
               />
               <Tooltip
                 formatter={(value) => value.toLocaleString()}
-                contentStyle={{ fontSize: isMobile ? 11 : 14, zIndex: 1000 }}
+                contentStyle={{ fontSize: isMobile ? 11 : 14 }}
+                wrapperStyle={{ zIndex: 1000}}
               />
               <Legend
-                wrapperStyle={{ fontSize: isMobile ? 10 : 12, zIndex: 1, cursor: 'pointer' }}
+                wrapperStyle={{ fontSize: isMobile ? 10 : 12, cursor: 'pointer' }}
                 iconSize={isMobile ? 10 : 14}
                 onClick={(e) => handleLegendClick(e.dataKey)}
               />
