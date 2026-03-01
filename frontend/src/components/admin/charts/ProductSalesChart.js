@@ -32,6 +32,69 @@ const ProductSalesChart = ({ data, productNames }) => {
   const monthWidth = isMobile ? 60 : 80;
   const chartWidth = Math.max(totalMonths * monthWidth, minVisibleMonths * monthWidth);
 
+  // Calculate dynamic height based on number of products
+  const numberOfProducts = productNames.filter(name => name).length;
+  const baseHeight = isMobile ? 300 : 400;
+  // Add extra height if there are many products (legend takes space)
+  const extraHeight = numberOfProducts > 8 ? Math.min((numberOfProducts - 8) * 20, 150) : 0;
+  const chartHeight = baseHeight + extraHeight;
+
+  // Custom legend renderer for better layout with many items
+  const renderCustomLegend = (props) => {
+    const { payload } = props;
+    return (
+      <div style={{
+        maxHeight: isMobile ? '120px' : '150px',
+        overflowY: 'auto',
+        padding: '10px',
+        border: '1px solid #e0e0e0',
+        borderRadius: '4px',
+        backgroundColor: '#fafafa',
+        marginTop: '10px'
+      }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(150px, 1fr))',
+          gap: '8px',
+          fontSize: isMobile ? '10px' : '12px'
+        }}>
+          {payload.map((entry, index) => (
+            <div
+              key={`legend-${index}`}
+              onClick={() => handleLegendClick(entry.dataKey)}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '4px',
+                opacity: hiddenLines[entry.dataKey] ? 0.4 : 1,
+                transition: 'opacity 0.2s',
+                textDecoration: hiddenLines[entry.dataKey] ? 'line-through' : 'none'
+              }}
+            >
+              <span style={{
+                display: 'inline-block',
+                width: isMobile ? '10px' : '14px',
+                height: isMobile ? '10px' : '14px',
+                backgroundColor: entry.color,
+                marginRight: '6px',
+                borderRadius: '2px',
+                flexShrink: 0
+              }} />
+              <span style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {entry.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="card" style={{ marginBottom: '2rem' }}>
       <h3 style={{ marginBottom: '1rem', fontSize: isMobile ? '1.125rem' : '1.25rem' }}>Product Sales by Month</h3>
@@ -41,7 +104,7 @@ const ProductSalesChart = ({ data, productNames }) => {
         overflowY: 'visible'
       }}>
         <div style={{ width: shouldScroll ? `${chartWidth}px` : '100%', minWidth: '100%' }}>
-          <ResponsiveContainer width="100%" height={isMobile ? 250 : 350} style={{overflowY:'auto'}}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
             <LineChart
               data={data}
               margin={{
@@ -74,9 +137,7 @@ const ProductSalesChart = ({ data, productNames }) => {
                 wrapperStyle={{ zIndex: 1000}}
               />
               <Legend
-                wrapperStyle={{ fontSize: isMobile ? 10 : 12, cursor: 'pointer' }}
-                iconSize={isMobile ? 10 : 14}
-                onClick={(e) => handleLegendClick(e.dataKey)}
+                content={renderCustomLegend}
               />
               {productNames.filter(name => name).map((name, index) => (
                 <Line
