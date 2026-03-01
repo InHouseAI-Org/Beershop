@@ -122,8 +122,9 @@ const SalesReportTab = () => {
       totals.cash += parseFloat(sale.cash_collected || 0);
       totals.upi += parseFloat(sale.upi || 0);
       totals.credit += calculateCreditSum(sale);
+      totals.expense += (sale.dailyExpenses && Array.isArray(sale.dailyExpenses)) ? sale.dailyExpenses.reduce((expSum, exp) => expSum + parseFloat(exp.amount || 0), 0) : 0;
       return totals;
-    }, { cash: 0, upi: 0, credit: 0 });
+    }, { cash: 0, upi: 0, credit: 0, expense: 0 });
   };
 
   const getProductName = (productId) => {
@@ -844,6 +845,18 @@ const SalesReportTab = () => {
                 </p>
               </div>
 
+              <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)', color: 'white' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <TrendingUp size={20} />
+                  <h3 style={{ color: 'white', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
+                    Total Daily Expenses
+                  </h3>
+                </div>
+                <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                  ₹{calculateMonthTotals(salesByMonth[activeMonth].sales).expense.toFixed(2)}
+                </p>
+              </div>
+
             </div>
           )}
 
@@ -853,7 +866,6 @@ const SalesReportTab = () => {
             gap: '0.5rem',
             marginBottom: '1.5rem',
             overflowX: 'auto',
-            flexWrap: 'wrap',
             padding: 'clamp(0.75rem, 2vw, 1rem)',
             backgroundColor: 'white',
             borderRadius: '12px',
@@ -887,6 +899,10 @@ const SalesReportTab = () => {
               </button>
             ))}
           </div>
+
+          <p style={{ fontSize: '0.875rem', marginTop: '0.5rem', marginBottom: '1.5rem', color: '#666', textAlign: 'center', fontStyle: 'italic' }}>
+            ← Scroll horizontally to view previous months →
+          </p>
 
           {/* Active Month Table - Desktop */}
           {activeMonth && salesByMonth[activeMonth] && (
@@ -1896,51 +1912,9 @@ const SalesReportTab = () => {
                       })()}
                     </p>
                     <p style={{ fontSize: '0.75rem', margin: '0.5rem 0 0 0', opacity: 0.9 }}>
-                      (UPI + Extra UPI + Credit in Bank)
+                      (UPI + Extra UPI + Credit Collected via UPI)
                     </p>
                   </div>
-
-                  {/* Total Cash Received */}
-                  <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)', color: 'white', padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                      <DollarSign size={20} />
-                      <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center' }}>
-                        Total Cash Received | कुल नकद प्राप्त
-                      </p>
-                    </div>
-                    <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                      ₹{parseFloat(selectedSale.cash_collected || 0).toFixed(2)}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', margin: '0.5rem 0 0 0', opacity: 0.9 }}>
-                      (Cash + Extra Cash + Credit in Cash)
-                    </p>
-                  </div>
-
-                  {/* Gala Balance */}
-                  {selectedSale.gala_balance_today > 0 && (
-                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', padding: '1.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                        <DollarSign size={20} />
-                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Gala Balance | गाला बैलेंस</p>
-                      </div>
-                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                        ₹{parseFloat(selectedSale.gala_balance_today || 0).toFixed(2)}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Total Expenses */}
-                  {selectedSale.dailyExpenses && selectedSale.dailyExpenses.length > 0 && (
-                    <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)', color: 'white', padding: '1.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                        <TrendingUp size={20} />
-                        <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Expenses | कुल खर्च</p>
-                      </div>
-                      <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                        ₹{selectedSale.dailyExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0).toFixed(2)}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -2084,12 +2058,12 @@ const SalesReportTab = () => {
                     <DollarSign size={22} style={{ color: '#f44336' }} />
                     Daily Expenses
                   </h3>
-                  <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+                  <div style={{ borderRadius: '12px', overflow: 'auto', border: '1px solid #e0e0e0' }}>
                     <table className="table" style={{ marginBottom: 0 }}>
                       <thead style={{ backgroundColor: '#f44336' }}>
                         <tr>
-                          <th style={{ color: 'white', padding: '1rem' }}>Expense Name</th>
-                          <th style={{ color: 'white', padding: '1rem' }}>Description</th>
+                          <th style={{ color: 'white', padding: '1rem', maxWidth: '200px' }}>Expense Name</th>
+                          <th style={{ color: 'white', padding: '1rem', maxWidth: '20px' }}>Description</th>
                           <th style={{ color: 'white', padding: '1rem' }}>Amount</th>
                         </tr>
                       </thead>
@@ -2413,7 +2387,7 @@ const SalesReportTab = () => {
 
                 {/* Mobile View */}
                 <div className="mobile-only">
-                  {products.map((product, index) => {
+                  {products.map((product) => {
                     const productData = approvalForm.productData[product.id] || { openingStock: 0, closingStock: 0, sale: 0 };
                     const saleQuantity = parseFloat(productData.sale) || 0;
                     const salePrice = parseFloat(product.sale_price) || 0;

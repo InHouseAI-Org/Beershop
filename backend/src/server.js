@@ -14,6 +14,7 @@ const inventoryRoutes = require('./routes/inventory');
 const balanceRoutes = require('./routes/balances');
 const expenseRoutes = require('./routes/expenses');
 const balanceTransferRoutes = require('./routes/balanceTransfers');
+const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/balances', balanceRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/balance-transfers', balanceTransferRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

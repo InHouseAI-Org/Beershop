@@ -117,12 +117,6 @@ const ProductsTab = () => {
           >
             Edit
           </button>
-          <button
-            onClick={() => handleDelete(product.id)}
-            className="btn btn-danger"
-          >
-            Delete
-          </button>
         </div>
       )
     }

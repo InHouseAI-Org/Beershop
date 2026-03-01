@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { formatDate } from '../../utils/dateUtils';
 import MobileTable from '../common/MobileTable';
-import { Plus } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Plus } from 'lucide-react';
 
 const BalanceTransfersTab = () => {
   const [transfers, setTransfers] = useState([]);
@@ -258,27 +258,30 @@ const BalanceTransfersTab = () => {
       {/* Current Balances */}
       {balances && (
         <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'clamp(0.75rem, 2vw, 1rem)' }}>
-          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', backgroundColor: '#e8f5e9', borderRadius: '12px', border: '2px solid #4CAF50' }}>
-            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#2e7d32', marginBottom: '0.5rem', fontWeight: '600' }}>
+          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px' }}>
+            <Wallet size={32} style={{ marginRight: '1rem', color: '#fff' }} />
+            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#fff', marginBottom: '0.5rem', fontWeight: '600' }}>
               Cash Balance
             </div>
-            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#1b5e20' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#fff' }}>
               ₹{parseFloat(balances.cashBalance || 0).toFixed(2)}
             </div>
           </div>
-          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', backgroundColor: '#e3f2fd', borderRadius: '12px', border: '2px solid #2196F3' }}>
-            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#1565c0', marginBottom: '0.5rem', fontWeight: '600' }}>
+          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', borderRadius: '12px' }}>
+            <TrendingUp size={32} style={{ marginRight: '1rem', color: '#fff' }} />
+            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#fff', marginBottom: '0.5rem', fontWeight: '600' }}>
               Bank Balance
             </div>
-            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#0d47a1' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#fff' }}>
               ₹{parseFloat(balances.bankBalance || 0).toFixed(2)}
             </div>
           </div>
-          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', backgroundColor: '#f3e5f5', borderRadius: '12px', border: '2px solid #9C27B0' }}>
-            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#6a1b9a', marginBottom: '0.5rem', fontWeight: '600' }}>
+          <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', borderRadius: '12px' }}>
+            <DollarSign size={32} style={{ marginRight: '1rem', color: '#fff' }} />
+            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: '#fff', marginBottom: '0.5rem', fontWeight: '600' }}>
               Gala Balance
             </div>
-            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#4a148c' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '700', color: '#fff' }}>
               ₹{parseFloat(balances.galaBalance || 0).toFixed(2)}
             </div>
           </div>

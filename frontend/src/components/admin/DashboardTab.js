@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
+import MonthlySalesChart from './charts/MonthlySalesChart';
+import DistributorOrdersChart from './charts/DistributorOrdersChart';
+import CreditOutstandingChart from './charts/CreditOutstandingChart';
+import ProductSalesChart from './charts/ProductSalesChart';
 
 const DashboardTab = () => {
   const [stats, setStats] = useState({
@@ -10,6 +14,15 @@ const DashboardTab = () => {
     totalOrders: 0,
     recentSales: []
   });
+  const [analyticsData, setAnalyticsData] = useState({
+    monthlySales: [],
+    distributorOrders: [],
+    creditOutstanding: [],
+    productSales: [],
+    distributorNames: [],
+    productNames: [],
+    creditHolderNames: []
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -19,13 +32,14 @@ const DashboardTab = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [usersRes, productsRes, creditHoldersRes, distributorsRes, ordersRes, salesRes] = await Promise.all([
+      const [usersRes, productsRes, creditHoldersRes, distributorsRes, ordersRes, salesRes, analyticsRes] = await Promise.all([
         api.get('/users'),
         api.get('/products'),
         api.get('/credit-holders'),
         api.get('/distributors'),
         api.get('/orders'),
-        api.get('/sales')
+        api.get('/sales'),
+        api.get('/analytics/monthly')
       ]);
 
       setStats({
@@ -37,9 +51,12 @@ const DashboardTab = () => {
         recentSales: salesRes.data.slice(0, 10).reverse()
       });
 
+      setAnalyticsData(analyticsRes.data);
+
       setError('');
     } catch (err) {
       setError('Failed to fetch dashboard data');
+      console.error('Dashboard error:', err);
     } finally {
       setLoading(false);
     }
@@ -109,6 +126,32 @@ const DashboardTab = () => {
           </p>
         </div>
       </div>
+
+      {/* Analytics Charts */}
+      {analyticsData.monthlySales && analyticsData.monthlySales.length > 0 && (
+        <>
+          <MonthlySalesChart data={analyticsData.monthlySales} />
+
+          {analyticsData.distributorNames && analyticsData.distributorNames.length > 0 && (
+            <DistributorOrdersChart
+              data={analyticsData.distributorOrders}
+              distributorNames={analyticsData.distributorNames}
+            />
+          )}
+
+          <CreditOutstandingChart
+            data={analyticsData.creditOutstanding}
+            creditHolderNames={analyticsData.creditHolderNames}
+          />
+
+          {analyticsData.productNames && analyticsData.productNames.length > 0 && (
+            <ProductSalesChart
+              data={analyticsData.productSales}
+              productNames={analyticsData.productNames}
+            />
+          )}
+        </>
+      )}
 
     </>
   );
