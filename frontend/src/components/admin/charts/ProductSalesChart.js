@@ -41,7 +41,7 @@ const ProductSalesChart = ({ data, productNames }) => {
         overflowY: 'visible'
       }}>
         <div style={{ width: shouldScroll ? `${chartWidth}px` : '100%', minWidth: '100%' }}>
-          <ResponsiveContainer width="100%" height={isMobile ? 250 : 350}>
+          <ResponsiveContainer width="100%" height={isMobile ? 250 : 350} style={{overflowY:'auto'}}>
             <LineChart
               data={data}
               margin={{
