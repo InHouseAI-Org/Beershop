@@ -113,7 +113,7 @@ const deleteDistributor = async (req, res) => {
 
 const payDistributor = async (req, res) => {
   try {
-    const { distributorId, amountPaid, paidFrom } = req.body;
+    const { distributorId, amountPaid, paidFrom, paymentDate } = req.body;
 
     if (!distributorId || !amountPaid || !paidFrom) {
       return res.status(400).json({ error: 'Distributor ID, amount paid, and payment source are required' });
@@ -205,7 +205,8 @@ const payDistributor = async (req, res) => {
       newOutstanding: newOutstanding,
       paidBy: req.user.id,
       notes: null,
-      paidFrom: paidFrom
+      paidFrom: paidFrom,
+      paidAt: paymentDate
     });
 
     res.json({

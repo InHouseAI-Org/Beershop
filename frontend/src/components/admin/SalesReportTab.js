@@ -1115,7 +1115,7 @@ const SalesReportTab = () => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 2fr)', gap: '0.75rem', marginBottom: '1rem', width: '100%' }}>
                       <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(0, 0, 0, 0.05)', borderRadius: '8px' }}>
                         <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.25rem' }}>CASH</div>
                         <div style={{ fontSize: '1rem', fontWeight: '700', color: '#000' }}>
@@ -1134,18 +1134,19 @@ const SalesReportTab = () => {
                           ₹{creditSum.toFixed(2)}
                         </div>
                       </div>
-                    </div>
-
-                    {Array.isArray(sale.credit) && sale.credit.length > 0 && (
-                      <div style={{ padding: '0.75rem', background: 'rgba(255, 152, 0, 0.05)', borderRadius: '8px', marginBottom: '1rem' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666', marginBottom: '0.5rem' }}>Credit Details:</div>
+                      {Array.isArray(sale.credit) && sale.credit.length > 0 && (
+                      <div style={{ textAlign: 'center',padding: '0.75rem', background: 'rgba(255, 0, 0, 0.1)', borderRadius: '8px'}}>
+                        <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.25rem' }}>CREDIT DETAILS</div>
                         {sale.credit.map((item, idx) => (
-                          <div key={idx} style={{ fontSize: '0.875rem', color: '#ff9800', marginBottom: '0.25rem' }}>
+                          <div key={idx} style={{ fontSize: '0.875rem', color: '#ff0000', marginBottom: '0.25rem' }}>
                             {getCreditHolderName(item.credit_holder_id)} → ₹{parseFloat(item.creditgiven || 0).toFixed(2)}
                           </div>
                         ))}
                       </div>
                     )}
+                    </div>
+
+                    
 
                     <div onClick={(e) => e.stopPropagation()}>
                       {sale.status === 'pending' ? (

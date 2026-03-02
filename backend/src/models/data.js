@@ -886,8 +886,8 @@ const dataHelpers = {
     const result = await pool.query(
       `INSERT INTO distributor_payment_history (
         organisation_id, distributor_id, amount_paid,
-        previous_outstanding, new_outstanding, paid_by, notes, paid_from
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        previous_outstanding, new_outstanding, paid_by, notes, paid_from, paid_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         historyData.organisationId,
@@ -897,7 +897,8 @@ const dataHelpers = {
         historyData.newOutstanding,
         historyData.paidBy,
         historyData.notes || null,
-        historyData.paidFrom || null
+        historyData.paidFrom || null,
+        historyData.paidAt || new Date()
       ]
     );
     return result.rows[0];

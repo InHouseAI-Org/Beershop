@@ -20,7 +20,8 @@ const DistributorsTab = () => {
   const [paymentData, setPaymentData] = useState({
     distributorId: '',
     amountPaid: '',
-    paidFrom: 'cash_balance'
+    paidFrom: 'cash_balance',
+    paymentDate: new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
@@ -108,7 +109,8 @@ const DistributorsTab = () => {
     setPaymentData({
       distributorId: '',
       amountPaid: '',
-      paidFrom: 'cash_balance'
+      paidFrom: 'cash_balance',
+      paymentDate: new Date().toISOString().split('T')[0]
     });
     setShowPaymentModal(true);
     setError('');
@@ -120,7 +122,8 @@ const DistributorsTab = () => {
     setPaymentData({
       distributorId: '',
       amountPaid: '',
-      paidFrom: 'cash_balance'
+      paidFrom: 'cash_balance',
+      paymentDate: new Date().toISOString().split('T')[0]
     });
   };
 
@@ -156,7 +159,8 @@ const DistributorsTab = () => {
       await api.post('/distributors/pay', {
         distributorId: paymentData.distributorId,
         amountPaid: amountPaid,
-        paidFrom: paymentData.paidFrom
+        paidFrom: paymentData.paidFrom,
+        paymentDate: paymentData.paymentDate
       });
 
       setSuccess(`Successfully paid ₹${amountPaid.toFixed(2)} to ${selectedDistributor.name}`);
@@ -390,6 +394,20 @@ const DistributorsTab = () => {
               </div>
 
               <div className="form-group">
+                <label htmlFor="paymentDate">Payment Date | भुगतान तिथि</label>
+                <input
+                  type="date"
+                  id="paymentDate"
+                  className="form-control"
+                  value={paymentData.paymentDate}
+                  onChange={(e) => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
+                  max={new Date().toISOString().split('T')[0]}
+                  required
+                  style={{ padding: '0.75rem', fontSize: '1rem' }}
+                />
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="paidFrom">Paid From | से भुगतान</label>
                 <select
                   id="paidFrom"
@@ -505,7 +523,7 @@ const DistributorsTab = () => {
                 <table className="table">
                   <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 1 }}>
                     <tr>
-                      <th>Date & Time</th>
+                      <th>Date</th>
                       <th>Amount Paid</th>
                       <th>Paid From</th>
                       <th>Previous Balance</th>
@@ -521,7 +539,7 @@ const DistributorsTab = () => {
 
                       return (
                         <tr key={record.id}>
-                          <td>{new Date(record.paid_at).toLocaleString()}</td>
+                          <td>{new Date(record.paid_at).toLocaleDateString()}</td>
                           <td style={{ color: '#2196F3', fontWeight: '700' }}>
                             ₹{parseFloat(record.amount_paid).toFixed(2)}
                           </td>
