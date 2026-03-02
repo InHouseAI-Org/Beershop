@@ -381,7 +381,7 @@ const DistributorsTab = () => {
                   className="form-control"
                   value={paymentData.amountPaid}
                   onChange={(e) => setPaymentData({ ...paymentData, amountPaid: e.target.value })}
-                  step="1"
+                  step="0.01"
                   min="0.01"
                   required
                   placeholder="Enter amount paid"
