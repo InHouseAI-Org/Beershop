@@ -281,4 +281,89 @@ const getMonthlyAnalytics = async (req, res) => {
   }
 };
 
-module.exports = { getMonthlyAnalytics };
+const getProductMonthlyOrders = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const organisationId = req.user.organisationId;
+
+    if (!organisationId) {
+      return res.status(400).json({ error: 'Organisation ID required' });
+    }
+
+    // Get all orders for this organization
+    const orders = await db.getOrdersByOrganisationId(organisationId);
+
+    // Get the product to verify it belongs to this organization
+    const product = await db.getProductById(productId);
+    if (!product || product.organisation_id !== organisationId) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Helper function to format date to YYYY-MM
+    const formatMonth = (date) => {
+      if (!date) return null;
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
+    };
+
+    // Find the earliest order date
+    let earliestDate = null;
+    if (orders.length > 0) {
+      earliestDate = new Date(Math.min(...orders.map(o => new Date(o.order_date))));
+    }
+
+    // If no orders, return empty array
+    if (!earliestDate) {
+      return res.json({
+        productName: product.product_name,
+        monthlyOrders: []
+      });
+    }
+
+    // Generate list of months from earliest date to current month
+    const currentDate = new Date();
+    const months = [];
+    let tempDate = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+    while (tempDate <= currentDate) {
+      months.push(formatMonth(tempDate));
+      tempDate.setMonth(tempDate.getMonth() + 1);
+    }
+
+    // Calculate monthly ordered quantities for this specific product
+    const monthlyOrdersMap = {};
+    months.forEach(month => {
+      monthlyOrdersMap[month] = 0;
+    });
+
+    orders.forEach(order => {
+      const month = formatMonth(order.order_date);
+      if (month && Array.isArray(order.order_data)) {
+        order.order_data.forEach(item => {
+          // Compare as strings since product_id is a UUID
+          if (item.product_id === productId || item.product_id === parseInt(productId)) {
+            const qty = parseFloat(item.qty || 0);
+            monthlyOrdersMap[month] += qty;
+          }
+        });
+      }
+    });
+
+    const monthlyOrders = months.map(month => ({
+      month,
+      quantity: Math.round(monthlyOrdersMap[month] * 10) / 10 // Round to 1 decimal
+    }));
+
+    res.json({
+      productName: product.product_name,
+      monthlyOrders
+    });
+
+  } catch (error) {
+    console.error('Error fetching product monthly orders:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+module.exports = { getMonthlyAnalytics, getProductMonthlyOrders };

@@ -59,7 +59,14 @@ const AdminDashboard = () => {
               {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             <div>
-              <h1>Admin Dashboard</h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h1>Admin Dashboard</h1>
+                {user?.organisationName && (
+                    <h1 style={{ marginLeft: '0.5rem', color: '#ffffff', fontWeight: '800' }}>
+                      | {user.organisationName}
+                    </h1>
+                  )}
+                  </div>
               <p style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.25rem' }}>
                 Welcome, {user?.username}
               </p>

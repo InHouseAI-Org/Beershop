@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Lock, Unlock, Edit2, Check, X } from 'lucide-react';
+import { Lock, Unlock, Edit2, Check, X, TrendingUp } from 'lucide-react';
+import ProductMonthlyOrdersModal from './ProductMonthlyOrdersModal';
 
 const InventoryTab = () => {
   const [inventory, setInventory] = useState([]);
-  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editQty, setEditQty] = useState('');
   const [isLocked, setIsLocked] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -22,8 +24,23 @@ const InventoryTab = () => {
         api.get('/products')
       ]);
 
-      setInventory(inventoryRes.data);
-      setProducts(productsRes.data);
+      const inventoryData = inventoryRes.data;
+      const productsData = productsRes.data;
+
+      // Create a merged list: all products with their inventory data (if exists)
+      const mergedInventory = productsData.map(product => {
+        const inventoryItem = inventoryData.find(inv => inv.product_id === product.id);
+        return {
+          id: inventoryItem?.id || null, // inventory record ID (null if doesn't exist)
+          product_id: product.id,
+          product_name: product.product_name,
+          qty: inventoryItem?.qty || null,
+          sale_price: product.sale_price,
+          organisation_id: product.organisation_id
+        };
+      });
+
+      setInventory(mergedInventory);
       setError('');
     } catch (err) {
       setError('Failed to fetch inventory data');
@@ -31,11 +48,6 @@ const InventoryTab = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getProductName = (productId) => {
-    const product = products.find(p => p.id === productId);
-    return product ? product.product_name : 'Unknown Product';
   };
 
   const toggleTableLock = () => {
@@ -56,8 +68,8 @@ const InventoryTab = () => {
       setTimeout(() => setError(''), 3000);
       return;
     }
-    setEditingId(item.id);
-    setEditQty(item.qty);
+    setEditingId(item.product_id); // Use product_id as the editing identifier
+    setEditQty(item.qty || ''); // Default to empty string if no quantity
   };
 
   const handleCancel = () => {
@@ -65,9 +77,18 @@ const InventoryTab = () => {
     setEditQty('');
   };
 
-  const handleUpdate = async (id) => {
+  const handleUpdate = async (item) => {
     try {
-      await api.put(`/inventory/${id}`, { qty: parseInt(editQty) });
+      if (item.id) {
+        // Update existing inventory record
+        await api.put(`/inventory/${item.id}`, { qty: parseInt(editQty) });
+      } else {
+        // Create new inventory record for this product
+        await api.post('/inventory', {
+          productId: item.product_id,
+          qty: parseInt(editQty)
+        });
+      }
       setEditingId(null);
       setEditQty('');
       fetchData();
@@ -77,11 +98,22 @@ const InventoryTab = () => {
     }
   };
 
+  const handleViewOrders = (productId, productName) => {
+    setSelectedProduct({ id: productId, name: productName });
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedProduct(null);
+  };
+
   // Calculate total inventory value
   const totalInventoryValue = inventory.reduce((sum, item) => {
     const qty = parseFloat(item.qty || 0);
     const salePrice = parseFloat(item.sale_price || 0);
-    return sum + (qty * salePrice);
+    const itemValue = qty * salePrice;
+    return sum + itemValue;
   }, 0);
 
   if (loading) {
@@ -176,12 +208,13 @@ const InventoryTab = () => {
                 <th>Sale Price</th>
                 <th>Inventory Value</th>
                 <th>Actions</th>
+                <th>Analytics</th>
               </tr>
             </thead>
             <tbody>
               {inventory.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
                     No inventory data available
                   </td>
                 </tr>
@@ -192,10 +225,10 @@ const InventoryTab = () => {
                   const itemValue = qty * salePrice;
 
                   return (
-                    <tr key={item.id}>
-                      <td style={{ fontWeight: '600' }}>{getProductName(item.product_id)}</td>
+                    <tr key={item.product_id}>
+                      <td style={{ fontWeight: '600' }}>{item.product_name}</td>
                       <td>
-                        {editingId === item.id ? (
+                        {editingId === item.product_id ? (
                           <input
                             type="number"
                             className="form-control"
@@ -216,10 +249,10 @@ const InventoryTab = () => {
                         ₹{itemValue.toFixed(2)}
                       </td>
                       <td>
-                        {editingId === item.id ? (
+                        {editingId === item.product_id ? (
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button
-                              onClick={() => handleUpdate(item.id)}
+                              onClick={() => handleUpdate(item)}
                               className="btn btn-primary"
                               style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
                             >
@@ -249,6 +282,25 @@ const InventoryTab = () => {
                           </button>
                         )}
                       </td>
+                      <td>
+                        <button
+                          onClick={() => handleViewOrders(item.product_id, item.product_name)}
+                          className="btn"
+                          style={{
+                            padding: '0.5rem 1rem',
+                            fontSize: '0.875rem',
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <TrendingUp size={16} />
+                          View Orders
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
@@ -271,10 +323,10 @@ const InventoryTab = () => {
             const itemValue = qty * salePrice;
 
             return (
-              <div key={item.id} className="card" style={{ marginBottom: '1rem', padding: '1.25rem' }}>
+              <div key={item.product_id} className="card" style={{ marginBottom: '1rem', padding: '1.25rem' }}>
                 <div style={{ marginBottom: '1rem' }}>
                   <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.125rem', fontWeight: '700', color: '#000' }}>
-                    {getProductName(item.product_id)}
+                    {item.product_name}
                   </h3>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #f0f0f0' }}>
                     <span style={{ fontSize: '0.875rem', color: '#666', fontWeight: '600' }}>Sale Price</span>
@@ -282,7 +334,7 @@ const InventoryTab = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid #f0f0f0' }}>
                     <span style={{ fontSize: '0.875rem', color: '#666', fontWeight: '600' }}>Current Quantity</span>
-                    {editingId === item.id ? (
+                    {editingId === item.product_id ? (
                       <input
                         type="number"
                         className="form-control"
@@ -303,10 +355,10 @@ const InventoryTab = () => {
                   </div>
                 </div>
 
-                {editingId === item.id ? (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {editingId === item.product_id ? (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     <button
-                      onClick={() => handleUpdate(item.id)}
+                      onClick={() => handleUpdate(item)}
                       className="btn btn-primary"
                       style={{ flex: 1 }}
                     >
@@ -329,7 +381,8 @@ const InventoryTab = () => {
                     style={{
                       width: '100%',
                       opacity: isLocked ? 0.5 : 1,
-                      cursor: isLocked ? 'not-allowed' : 'pointer'
+                      cursor: isLocked ? 'not-allowed' : 'pointer',
+                      marginBottom: '0.5rem'
                     }}
                     disabled={isLocked}
                   >
@@ -337,11 +390,38 @@ const InventoryTab = () => {
                     Edit Quantity
                   </button>
                 )}
+
+                <button
+                  onClick={() => handleViewOrders(item.product_id, item.product_name)}
+                  className="btn"
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <TrendingUp size={16} />
+                  View Monthly Orders
+                </button>
               </div>
             );
           })
         )}
       </div>
+
+      {/* Modal */}
+      {modalOpen && selectedProduct && (
+        <ProductMonthlyOrdersModal
+          productId={selectedProduct.id}
+          productName={selectedProduct.name}
+          onClose={handleCloseModal}
+        />
+      )}
 
       <style>{`
         @media (min-width: 768px) {

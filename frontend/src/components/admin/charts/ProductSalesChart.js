@@ -45,7 +45,7 @@ const ProductSalesChart = ({ data, productNames }) => {
     return (
       <div style={{
         maxHeight: isMobile ? '120px' : '150px',
-        overflowY: 'auto',
+        overflowY: 'scroll',
         padding: '10px',
         border: '1px solid #e0e0e0',
         borderRadius: '4px',
@@ -56,6 +56,7 @@ const ProductSalesChart = ({ data, productNames }) => {
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(150px, 1fr))',
           gap: '8px',
+          overflow: 'scroll',
           fontSize: isMobile ? '10px' : '12px'
         }}>
           {payload.map((entry, index) => (

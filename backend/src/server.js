@@ -15,6 +15,7 @@ const balanceRoutes = require('./routes/balances');
 const expenseRoutes = require('./routes/expenses');
 const balanceTransferRoutes = require('./routes/balanceTransfers');
 const analyticsRoutes = require('./routes/analytics');
+const organisationRoutes = require('./routes/organisations');
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use('/api/balances', balanceRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/balance-transfers', balanceTransferRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/organisations', organisationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

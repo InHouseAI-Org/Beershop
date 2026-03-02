@@ -23,12 +23,31 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchOrganisationName = async (organisationId) => {
+    try {
+      const response = await api.get(`/organisations/${organisationId}`);
+      return response.data.organisation_name;
+    } catch (error) {
+      console.error('Failed to fetch organisation name:', error);
+      return null;
+    }
+  };
 
   const verifyToken = async () => {
     try {
       const response = await api.get('/auth/verify');
-      setUser(response.data.user);
+      const userData = response.data.user;
+
+      // Fetch organisation name if user has organisationId
+      if (userData.organisationId && !userData.organisationName) {
+        const orgName = await fetchOrganisationName(userData.organisationId);
+        userData.organisationName = orgName;
+      }
+
+      setUser(userData);
     } catch (error) {
       localStorage.removeItem('token');
       setUser(null);
@@ -39,22 +58,21 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      console.log('AuthContext: Sending login request to API');
       const response = await api.post('/auth/login', { username, password });
-      console.log('AuthContext: Login response received', {
-        hasToken: !!response.data.token,
-        hasUser: !!response.data.user
-      });
 
       localStorage.setItem('token', response.data.token);
-      setUser(response.data.user);
-      return { success: true, user: response.data.user };
+      const userData = response.data.user;
+
+      // Fetch organisation name if user has organisationId
+      if (userData.organisationId && !userData.organisationName) {
+        const orgName = await fetchOrganisationName(userData.organisationId);
+        userData.organisationName = orgName;
+      }
+
+      setUser(userData);
+      return { success: true, user: userData };
     } catch (error) {
-      console.error('AuthContext: Login error', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      console.error('AuthContext: Login error', error);
 
       return {
         success: false,

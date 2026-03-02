@@ -84,6 +84,11 @@ const UserDashboard = () => {
             <h1>User Dashboard | उपयोगकर्ता डैशबोर्ड</h1>
             <p style={{ color: '#ccc', fontSize: '0.875rem', marginTop: '0.25rem' }}>
               Welcome | स्वागत है, {user?.username}
+              {user?.organisationName && (
+                <span style={{ marginLeft: '0.5rem', color: '#2196F3', fontWeight: '600' }}>
+                  | {user.organisationName}
+                </span>
+              )}
             </p>
           </div>
           <button onClick={logout} className="btn btn-secondary">

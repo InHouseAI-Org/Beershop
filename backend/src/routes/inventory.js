@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAllInventory, getInventoryByProduct, updateInventory } = require('../controllers/inventoryController');
+const { getAllInventory, getInventoryByProduct, updateInventory, createInventory } = require('../controllers/inventoryController');
 const { authMiddleware, adminOnly } = require('../middleware/auth');
 
 // All routes require authentication
@@ -10,7 +10,8 @@ router.use(authMiddleware);
 router.get('/', getAllInventory);
 router.get('/product/:productId', getInventoryByProduct);
 
-// Update requires admin role
+// Create and update require admin role
+router.post('/', adminOnly, createInventory);
 router.put('/:id', adminOnly, updateInventory);
 
 module.exports = router;

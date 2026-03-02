@@ -71,4 +71,36 @@ const updateInventory = async (req, res) => {
   }
 };
 
-module.exports = { getAllInventory, getInventoryByProduct, updateInventory };
+const createInventory = async (req, res) => {
+  try {
+    const { productId, qty } = req.body;
+    const organisationId = req.user.organisationId;
+
+    if (!productId || qty === undefined || qty === null) {
+      return res.status(400).json({ error: 'Product ID and quantity are required' });
+    }
+
+    // Verify product belongs to user's organisation
+    const product = await db.getProductById(productId);
+    if (!product || product.organisation_id !== organisationId) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Use upsert to create or update inventory
+    const inventory = await db.upsertInventory({
+      organisationId,
+      productId,
+      qty: parseInt(qty)
+    });
+
+    res.status(201).json(inventory);
+  } catch (error) {
+    console.error(error);
+    if (error.message && error.message.includes('cannot be negative')) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+module.exports = { getAllInventory, getInventoryByProduct, updateInventory, createInventory };

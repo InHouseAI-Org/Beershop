@@ -81,13 +81,21 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Get organisation name if user has an organisation
+    let organisationName = null;
+    if (organisationId) {
+      const organisation = await db.getOrganisationById(organisationId);
+      organisationName = organisation?.organisation_name || null;
+    }
+
     // Create JWT token
     const token = jwt.sign(
       {
         id: user.id,
         username: user.username,
         role: role,
-        organisationId: organisationId || null
+        organisationId: organisationId || null,
+        organisationName: organisationName
       },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
@@ -99,7 +107,8 @@ const login = async (req, res) => {
         id: user.id,
         username: user.username,
         role: role,
-        organisationId: organisationId || null
+        organisationId: organisationId || null,
+        organisationName: organisationName
       }
     });
   } catch (error) {
