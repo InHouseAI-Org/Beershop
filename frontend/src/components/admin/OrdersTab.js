@@ -409,8 +409,8 @@ const OrdersTab = () => {
                             className="form-control"
                             value={item.buy_price}
                             onChange={(e) => updateOrderItem(index, 'buy_price', e.target.value)}
-                            step="1"
-                            min="0"
+                            step="0.01"
+                            min="0.01"
                             placeholder="0.00"
                             style={{ fontSize: '1rem', padding: '0.875rem' }}
                             required
@@ -446,8 +446,8 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.tax}
                     onChange={(e) => setFormData({ ...formData, tax: e.target.value })}
-                    step="1"
-                    min="0"
+                    step="0.01"
+                    min="0.01"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
@@ -463,8 +463,8 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.misc}
                     onChange={(e) => setFormData({ ...formData, misc: e.target.value })}
-                    step="1"
-                    min="0"
+                    step="0.01"
+                    min="0.01"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
@@ -480,8 +480,8 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.scheme}
                     onChange={(e) => setFormData({ ...formData, scheme: e.target.value })}
-                    step="1"
-                    min="0"
+                    step="0.01"
+                    min="0.01"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
@@ -497,8 +497,8 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.discount}
                     onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
-                    step="1"
-                    min="0"
+                    step="0.01"
+                    min="0.01"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />

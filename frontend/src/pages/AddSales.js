@@ -810,8 +810,8 @@ const AddSales = () => {
                 value={miscellaneousCash}
                 onChange={(e) => setMiscellaneousCash(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
-                step="1"
-                min="0"
+                step="0.01"
+                min="0.01"
                 placeholder="₹ 0.00"
               />
             </div>
@@ -825,8 +825,8 @@ const AddSales = () => {
                 value={miscellaneousUPI}
                 onChange={(e) => setMiscellaneousUPI(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
-                step="1"
-                min="0"
+                step="0.01"
+                min="0.01"
                 placeholder="₹ 0.00"
               />
             </div>
@@ -901,8 +901,8 @@ const AddSales = () => {
                       value={entry.amount}
                       onChange={(e) => updateCreditTaken(index, 'amount', e.target.value)}
                       style={{ fontSize: '1.125rem', padding: '0.875rem' }}
-                      step="1"
-                      min="0"
+                      step="0.01"
+                      min="0.01"
                       placeholder="₹ 0.00"
                     />
                   </div>
@@ -1012,8 +1012,8 @@ const AddSales = () => {
                       value={entry.amount}
                       onChange={(e) => updateCreditEntry(index, 'amount', e.target.value)}
                       style={{ fontSize: '1.125rem', padding: '0.875rem' }}
-                      step="1"
-                      min="0"
+                      step="0.01"
+                      min="0.01"
                       placeholder="₹ 0.00"
                     />
                   </div>
@@ -1057,8 +1057,8 @@ const AddSales = () => {
                 value={upiTotal}
                 onChange={(e) => setUpiTotal(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
-                step="1"
-                min="0"
+                step="0.01"
+                min="0.01"
                 placeholder="₹ 0.00"
               />
             </div>
@@ -1157,8 +1157,8 @@ const AddSales = () => {
                     value={expense.amount}
                     onChange={(e) => updateDailyExpense(index, 'amount', e.target.value)}
                     style={{ fontSize: '1.125rem', padding: '0.875rem' }}
-                    step="1"
-                    min="0"
+                    step="0.01"
+                    min="0.01"
                     placeholder="₹ 0.00"
                   />
                 </div>

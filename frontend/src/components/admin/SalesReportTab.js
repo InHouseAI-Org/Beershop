@@ -1380,8 +1380,8 @@ const SalesReportTab = () => {
                     value={allocationForm.cashBalance}
                     onChange={(e) => handleAllocationFieldChange('cashBalance', e.target.value)}
                     placeholder="₹ 0.00"
-                    step="1"
-                    min="0"
+                    step="0.01"
+                    min="0.01"
                     style={{ fontSize: '1.25rem', padding: '1rem' }}
                   />
                 </div>
@@ -1396,8 +1396,8 @@ const SalesReportTab = () => {
                     value={allocationForm.galaBalance}
                     onChange={(e) => handleAllocationFieldChange('galaBalance', e.target.value)}
                     placeholder="₹ 0.00"
-                    step="1"
-                    min="0"
+                    step="0.01"
+                    min="0.01"
                     style={{ fontSize: '1.25rem', padding: '1rem' }}
                   />
                 </div>
@@ -1415,8 +1415,8 @@ const SalesReportTab = () => {
                     value={allocationForm.bankBalance}
                     disabled
                     placeholder="₹ 0.00"
-                    step="1"
-                    min="0"
+                    step="0.01"
+                    min="0.01"
                     style={{
                       fontSize: '1.25rem',
                       padding: '1rem',
@@ -2522,8 +2522,8 @@ const SalesReportTab = () => {
                       className="form-control"
                       value={approvalForm.upiTotal || 0}
                       onChange={(e) => setApprovalForm({ ...approvalForm, upiTotal: e.target.value })}
-                      step="1"
-                      min="0"
+                      step="0.01"
+                      min="0.01"
                       style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                     />
                   </div>
@@ -2543,8 +2543,8 @@ const SalesReportTab = () => {
                       className="form-control"
                       value={approvalForm.miscellaneousCash || 0}
                       onChange={(e) => setApprovalForm({ ...approvalForm, miscellaneousCash: e.target.value })}
-                      step="1"
-                      min="0"
+                      step="0.01"
+                      min="0.01"
                       style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                     />
                   </div>
@@ -2558,8 +2558,8 @@ const SalesReportTab = () => {
                       className="form-control"
                       value={approvalForm.miscellaneousUPI || 0}
                       onChange={(e) => setApprovalForm({ ...approvalForm, miscellaneousUPI: e.target.value })}
-                      step="1"
-                      min="0"
+                      step="0.01"
+                      min="0.01"
                       style={{ fontSize: '1.125rem', padding: '0.75rem' }}
                     />
                   </div>
@@ -2611,8 +2611,8 @@ const SalesReportTab = () => {
                               className="form-control"
                               value={entry.amount}
                               onChange={(e) => updateCreditTakenInApproval(index, 'amount', e.target.value)}
-                              step="1"
-                              min="0"
+                              step="0.01"
+                              min="0.01"
                               placeholder="₹ 0.00"
                             />
                           </div>
@@ -2752,8 +2752,8 @@ const SalesReportTab = () => {
                           className="form-control"
                           value={expense.amount}
                           onChange={(e) => updateDailyExpenseInApproval(index, 'amount', e.target.value)}
-                          step="1"
-                          min="0"
+                          step="0.01"
+                          min="0.01"
                           placeholder="₹ 0.00"
                         />
                       </div>
@@ -2822,8 +2822,8 @@ const SalesReportTab = () => {
                               className="form-control"
                               value={entry.amount}
                               onChange={(e) => updateCreditEntryInApproval(index, 'amount', e.target.value)}
-                              step="1"
-                              min="0"
+                              step="0.01"
+                              min="0.01"
                               placeholder="₹ 0.00"
                             />
                           </div>
