@@ -2239,8 +2239,23 @@ const SalesReportTab = () => {
                   </h3>
                 </div>
                 <p style={{ fontSize: '3rem', fontWeight: '700', margin: 0 }}>
-                  ₹{(parseFloat(selectedSale.cash_collected || 0) +
-                     parseFloat(selectedSale.upi || 0)).toFixed(2)}
+                  ₹{(() => {
+                    const totalcredit = calculateCreditSum(allocationSale);
+                    const creditTakenCash = (allocationSale.creditTaken || [])
+                      .filter(c => c.collectedIn === 'cash_balance')
+                      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+                    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
+                    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+
+                    const totalAvailable = parseFloat(allocationSale.cash_collected || 0)
+                      + parseFloat(allocationSale.upi || 0)
+                      + creditTakenCash
+                      - totalcredit
+                      + miscCash
+                      - expenses;
+
+                    return `₹${totalAvailable.toFixed(2)}`;
+                  })()}
                 </p>
               </div>
             </div>
