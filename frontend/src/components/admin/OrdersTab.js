@@ -23,7 +23,8 @@ const OrdersTab = () => {
     misc: '',
     discount: '',
     scheme: '',
-    paymentOutstandingDate: ''
+    paymentOutstandingDate: '',
+    remarks: ''
   });
 
   useEffect(() => {
@@ -109,7 +110,8 @@ const OrdersTab = () => {
         misc: order.misc || '',
         discount: order.discount || '',
         scheme: order.scheme || '',
-        paymentOutstandingDate: order.payment_outstanding_date ? new Date(order.payment_outstanding_date).toISOString().split('T')[0] : ''
+        paymentOutstandingDate: order.payment_outstanding_date ? new Date(order.payment_outstanding_date).toISOString().split('T')[0] : '',
+        remarks: order.remarks || ''
       });
     } else {
       setEditingOrder(null);
@@ -122,7 +124,8 @@ const OrdersTab = () => {
         misc: '',
         discount: '',
         scheme: '',
-        paymentOutstandingDate: ''
+        paymentOutstandingDate: '',
+        remarks: ''
       });
       // Check for gaps when opening new order form
       checkOrderDateGap(todayDate);
@@ -144,7 +147,8 @@ const OrdersTab = () => {
       misc: '',
       discount: '',
       scheme: '',
-      paymentOutstandingDate: ''
+      paymentOutstandingDate: '',
+      remarks: ''
     });
   };
 
@@ -246,7 +250,8 @@ const OrdersTab = () => {
           misc: formData.misc,
           discount: formData.discount,
           scheme: formData.scheme,
-          paymentOutstandingDate: formData.paymentOutstandingDate
+          paymentOutstandingDate: formData.paymentOutstandingDate,
+          remarks: formData.remarks
         };
       } else {
         // When creating, calculate totals and send all fields
@@ -623,6 +628,21 @@ const OrdersTab = () => {
                 />
               </div>
 
+              <div className="form-group">
+                <label htmlFor="remarks" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                  Remarks
+                </label>
+                <textarea
+                  id="remarks"
+                  className="form-control"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                  placeholder="Add any additional notes about this order"
+                  rows="3"
+                  style={{ fontSize: '1.125rem', padding: '1rem' }}
+                />
+              </div>
+
               {/* Order Summary */}
               <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '2px solid #dee2e6' }}>
                 <h4 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem' }}>Order Summary</h4>
@@ -766,6 +786,23 @@ const OrdersTab = () => {
       key: 'payment_outstanding_date',
       label: 'Payment Date',
       render: (order) => order.payment_outstanding_date ? new Date(order.payment_outstanding_date).toLocaleDateString() : '-'
+    },
+    {
+      key: 'remarks',
+      label: 'Remarks',
+      sortable: false,
+      render: (order) => order.remarks ? (
+        <span style={{
+          backgroundColor: '#fff3cd',
+          color: '#856404',
+          padding: '0.25rem 0.5rem',
+          borderRadius: '4px',
+          fontSize: '0.875rem',
+          fontWeight: '600'
+        }}>
+          ✓ Has remarks
+        </span>
+      ) : '-'
     },
     {
       key: 'actions',
@@ -962,6 +999,24 @@ const OrdersTab = () => {
                 </div>
               </div>
             </div>
+
+            {/* Remarks */}
+            {selectedOrder.remarks && (
+              <div style={{
+                marginTop: '1.5rem',
+                padding: '1.5rem',
+                backgroundColor: '#fff3cd',
+                borderRadius: '8px',
+                border: '1px solid #ffc107'
+              }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', fontWeight: '600', color: '#856404' }}>
+                  Remarks
+                </h4>
+                <p style={{ margin: 0, fontSize: '1rem', color: '#856404', whiteSpace: 'pre-wrap' }}>
+                  {selectedOrder.remarks}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

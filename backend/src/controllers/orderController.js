@@ -39,7 +39,7 @@ const getOrder = async (req, res) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks } = req.body;
 
     if (!distributorId) {
       return res.status(400).json({ error: 'Please provide distributor ID' });
@@ -68,7 +68,8 @@ const createOrder = async (req, res) => {
       misc: misc || 0,
       discount: discount || 0,
       scheme: scheme || 0,
-      paymentOutstandingDate: paymentOutstandingDate || null
+      paymentOutstandingDate: paymentOutstandingDate || null,
+      remarks: remarks || ''
     });
 
     // Update inventory: inventory_new = inventory_old + order quantity
@@ -123,7 +124,7 @@ const createOrder = async (req, res) => {
 const updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks } = req.body;
 
     const order = await db.getOrderById(id);
 
@@ -191,6 +192,7 @@ const updateOrder = async (req, res) => {
     if (discount !== undefined) updates.discount = discount;
     if (scheme !== undefined) updates.scheme = scheme;
     if (paymentOutstandingDate !== undefined) updates.paymentOutstandingDate = paymentOutstandingDate || null;
+    if (remarks !== undefined) updates.remarks = remarks;
 
     const updatedOrder = await db.updateOrder(id, updates);
     res.json(updatedOrder);
