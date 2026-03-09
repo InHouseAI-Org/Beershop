@@ -187,8 +187,20 @@ const SalesReportTab = () => {
   const handleAllocationFieldChange = (field, value) => {
     if (!allocationSale) return;
 
-    // Calculate total available for allocation
-    const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
+    // Calculate total available for allocation including all adjustments
+    const totalcredit = calculateCreditSum(allocationSale);
+    const creditTakenCash = (allocationSale.creditTaken || [])
+      .filter(c => c.collectedIn === 'cash_balance')
+      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
+    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+
+    const maxAllowed = parseFloat(allocationSale.cash_collected || 0)
+      + parseFloat(allocationSale.upi || 0)
+      + creditTakenCash
+      - totalcredit
+      + miscCash
+      - expenses;
 
     let newForm = { ...allocationForm, [field]: value };
 
@@ -206,7 +218,20 @@ const SalesReportTab = () => {
   const handleSubmitAllocation = async () => {
     if (!allocationSale) return;
 
-    const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
+    // Calculate total available for allocation including all adjustments
+    const totalcredit = calculateCreditSum(allocationSale);
+    const creditTakenCash = (allocationSale.creditTaken || [])
+      .filter(c => c.collectedIn === 'cash_balance')
+      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
+    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+
+    const maxAllowed = parseFloat(allocationSale.cash_collected || 0)
+      + parseFloat(allocationSale.upi || 0)
+      + creditTakenCash
+      - totalcredit
+      + miscCash
+      - expenses;
 
     const cashBal = parseFloat(allocationForm.cashBalance || 0);
     const bankBal = parseFloat(allocationForm.bankBalance || 0);
@@ -490,11 +515,13 @@ const SalesReportTab = () => {
       return sum + (parseFloat(expense.amount) || 0);
     }, 0);
 
+    console.log('expenses:', totalExpenses);
+
     const upiTotalValue = parseFloat(approvalForm.upiTotal || 0);
 
     const upiSales = Math.max(0, upiTotalValue - creditTakenUPI - miscUPI);
-    const cashSales = Math.max(0, totalSales - upiSales - totalCreditGiven + miscCash);
-    const cashCollected = cashSales + creditTakenCash - totalExpenses;
+    const cashSales = Math.max(0, totalSales - upiSales + miscCash);
+    const cashCollected = cashSales + creditTakenCash - totalExpenses - totalCreditGiven;
 
     return {
       totalSales,
@@ -1316,7 +1343,7 @@ const SalesReportTab = () => {
                 Allocate Balance | शेष आवंटित करें
               </h3>
               <p style={{ color: 'rgba(255, 255, 255, 0.9)', margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
-                {new Date(allocationSale.date).toLocaleDateString()} - {allocationSale.username}
+                {new Date(allocationSale.date).toLocaleDateString()}
               </p>
             </div>
 
@@ -1350,7 +1377,23 @@ const SalesReportTab = () => {
                   Total Collection Available:
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0d47a1' }}>
-                  ₹{(parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0)).toFixed(2)}
+                  {(() => {
+                    const totalcredit = calculateCreditSum(allocationSale);
+                    const creditTakenCash = (allocationSale.creditTaken || [])
+                      .filter(c => c.collectedIn === 'cash_balance')
+                      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+                    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
+                    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+
+                    const totalAvailable = parseFloat(allocationSale.cash_collected || 0)
+                      + parseFloat(allocationSale.upi || 0)
+                      + creditTakenCash
+                      - totalcredit
+                      + miscCash
+                      - expenses;
+
+                    return `₹${totalAvailable.toFixed(2)}`;
+                  })()}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#1565c0', marginTop: '0.25rem' }}>
                   = Cash Collected (₹{parseFloat(allocationSale.cash_collected || 0).toFixed(2)}) + UPI (₹{parseFloat(allocationSale.upi || 0).toFixed(2)})
@@ -1435,7 +1478,20 @@ const SalesReportTab = () => {
                   const galaBal = parseFloat(allocationForm.galaBalance || 0);
                   const totalAllocated = cashBal + bankBal + galaBal;
 
-                  const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
+                  // Calculate total available for allocation including all adjustments
+                  const totalcredit = calculateCreditSum(allocationSale);
+                  const creditTakenCash = (allocationSale.creditTaken || [])
+                    .filter(c => c.collectedIn === 'cash_balance')
+                    .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+                  const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
+                  const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+
+                  const maxAllowed = parseFloat(allocationSale.cash_collected || 0)
+                    + parseFloat(allocationSale.upi || 0)
+                    + creditTakenCash
+                    - totalcredit
+                    + miscCash
+                    - expenses;
                   const remaining = maxAllowed - totalAllocated;
 
                   if (totalAllocated > 0) {
