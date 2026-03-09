@@ -286,7 +286,7 @@ const DistributorsTab = () => {
                     value={formData.amountOutstanding}
                     onChange={(e) => setFormData({ ...formData, amountOutstanding: e.target.value })}
                     step="0.01"
-                    min="0.01"
+                    min="0"
                     placeholder="₹ 0.00"
                   />
                   <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
@@ -386,7 +386,7 @@ const DistributorsTab = () => {
                   value={paymentData.amountPaid}
                   onChange={(e) => setPaymentData({ ...paymentData, amountPaid: e.target.value })}
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                   placeholder="Enter amount paid"
                   style={{ padding: '0.75rem', fontSize: '1rem' }}

@@ -23,6 +23,15 @@ const ProductSalesChart = ({ data, productNames }) => {
     }));
   };
 
+  // Calculate average value for each product and sort by average (high to low)
+  const sortedProductNames = data.length > 0
+    ? [...productNames.filter(name => name)].sort((a, b) => {
+        const avgA = data.reduce((sum, month) => sum + (parseFloat(month[a]) || 0), 0) / data.length;
+        const avgB = data.reduce((sum, month) => sum + (parseFloat(month[b]) || 0), 0) / data.length;
+        return avgB - avgA; // Sort descending (high to low)
+      })
+    : productNames.filter(name => name);
+
   // Calculate minimum visible months (12) and total months
   const totalMonths = data.length;
   const minVisibleMonths = 12;
@@ -33,7 +42,7 @@ const ProductSalesChart = ({ data, productNames }) => {
   const chartWidth = Math.max(totalMonths * monthWidth, minVisibleMonths * monthWidth);
 
   // Calculate dynamic height based on number of products
-  const numberOfProducts = productNames.filter(name => name).length;
+  const numberOfProducts = sortedProductNames.length;
   const baseHeight = isMobile ? 300 : 400;
   // Add extra height if there are many products (legend takes space)
   const extraHeight = numberOfProducts > 8 ? Math.min((numberOfProducts - 8) * 20, 150) : 0;
@@ -42,6 +51,14 @@ const ProductSalesChart = ({ data, productNames }) => {
   // Custom legend renderer for better layout with many items
   const renderCustomLegend = (props) => {
     const { payload } = props;
+
+    // Sort legend payload by the sorted product names order
+    const sortedPayload = [...payload].sort((a, b) => {
+      const indexA = sortedProductNames.indexOf(a.value);
+      const indexB = sortedProductNames.indexOf(b.value);
+      return indexA - indexB;
+    });
+
     return (
       <div style={{
         maxHeight: isMobile ? '120px' : '150px',
@@ -59,7 +76,7 @@ const ProductSalesChart = ({ data, productNames }) => {
           overflow: 'scroll',
           fontSize: isMobile ? '10px' : '12px'
         }}>
-          {payload.map((entry, index) => (
+          {sortedPayload.map((entry, index) => (
             <div
               key={`legend-${index}`}
               onClick={() => handleLegendClick(entry.dataKey)}
@@ -140,7 +157,7 @@ const ProductSalesChart = ({ data, productNames }) => {
               <Legend
                 content={renderCustomLegend}
               />
-              {productNames.filter(name => name).map((name, index) => (
+              {sortedProductNames.map((name, index) => (
                 <Line
                   key={`product-${name}-${index}`}
                   type="monotone"

@@ -14,6 +14,7 @@ const OrdersTab = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [editingOrder, setEditingOrder] = useState(null);
   const [lastSalesReportDate, setLastSalesReportDate] = useState(null);
+  const [orderDateWarning, setOrderDateWarning] = useState('');
   const [formData, setFormData] = useState({
     distributorId: '',
     orderDate: new Date().toISOString().split('T')[0],
@@ -112,9 +113,10 @@ const OrdersTab = () => {
       });
     } else {
       setEditingOrder(null);
+      const todayDate = new Date().toISOString().split('T')[0];
       setFormData({
         distributorId: '',
-        orderDate: new Date().toISOString().split('T')[0],
+        orderDate: todayDate,
         orderData: [],
         tax: '',
         misc: '',
@@ -122,14 +124,18 @@ const OrdersTab = () => {
         scheme: '',
         paymentOutstandingDate: ''
       });
+      // Check for gaps when opening new order form
+      checkOrderDateGap(todayDate);
     }
     setError('');
+    setOrderDateWarning('');
     setShowOrderForm(true);
   };
 
   const handleCloseOrderForm = () => {
     setShowOrderForm(false);
     setEditingOrder(null);
+    setOrderDateWarning('');
     setFormData({
       distributorId: '',
       orderDate: new Date().toISOString().split('T')[0],
@@ -172,44 +178,90 @@ const OrdersTab = () => {
     });
   };
 
+  const checkOrderDateGap = (selectedDate) => {
+    if (!lastSalesReportDate || !selectedDate) {
+      setOrderDateWarning('');
+      return;
+    }
+
+    const orderDate = new Date(selectedDate);
+    orderDate.setHours(0, 0, 0, 0);
+    const lastReportDate = new Date(lastSalesReportDate);
+    lastReportDate.setHours(0, 0, 0, 0);
+
+    // Calculate the number of days between last sales report and order date
+    const daysDiff = Math.floor((orderDate - lastReportDate) / (1000 * 60 * 60 * 24));
+
+    if (daysDiff > 1) {
+      // There's a gap - list the missing dates
+      const missingDates = [];
+      for (let i = 1; i < daysDiff; i++) {
+        const missingDate = new Date(lastReportDate);
+        missingDate.setDate(missingDate.getDate() + i);
+        missingDates.push(missingDate.toLocaleDateString());
+      }
+
+      setOrderDateWarning(
+        `⚠️ Warning: You won't be able to fill sales reports for ${missingDates.join(', ')} as they are between the last sales report (${lastReportDate.toLocaleDateString()}) and this order date.`
+      );
+    } else {
+      setOrderDateWarning('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // Validate all fields
-    if (!formData.distributorId) {
-      setError('Please select a distributor');
-      return;
-    }
+    // Only validate distributor and order items when creating (not editing)
+    if (!editingOrder) {
+      if (!formData.distributorId) {
+        setError('Please select a distributor');
+        return;
+      }
 
-    if (formData.orderData.length === 0) {
-      setError('Please add at least one order item');
-      return;
-    }
+      if (formData.orderData.length === 0) {
+        setError('Please add at least one order item');
+        return;
+      }
 
-    // Validate all items have required fields
-    const invalidItem = formData.orderData.find(item =>
-      !item.product_id || !item.qty || !item.buy_price
-    );
+      // Validate all items have required fields
+      const invalidItem = formData.orderData.find(item =>
+        !item.product_id || !item.qty || !item.buy_price
+      );
 
-    if (invalidItem) {
-      setError('Please fill all fields for each order item');
-      return;
+      if (invalidItem) {
+        setError('Please fill all fields for each order item');
+        return;
+      }
     }
 
     try {
-      // Calculate total for each order item
-      const orderDataWithTotals = formData.orderData.map(item => ({
-        ...item,
-        total: (parseFloat(item.qty || 0) * parseFloat(item.buy_price || 0)).toFixed(2)
-      }));
+      let submitData;
 
-      const submitData = {
-        ...formData,
-        orderData: orderDataWithTotals.length > 0 ? orderDataWithTotals : null
-      };
+      if (editingOrder) {
+        // When editing, only send editable fields (exclude orderData and distributorId)
+        submitData = {
+          tax: formData.tax,
+          misc: formData.misc,
+          discount: formData.discount,
+          scheme: formData.scheme,
+          paymentOutstandingDate: formData.paymentOutstandingDate
+        };
+      } else {
+        // When creating, calculate totals and send all fields
+        const orderDataWithTotals = formData.orderData.map(item => ({
+          ...item,
+          total: (parseFloat(item.qty || 0) * parseFloat(item.buy_price || 0)).toFixed(2)
+        }));
 
-      console.log('Submitting order data with totals:', submitData);
+        submitData = {
+          ...formData,
+          orderData: orderDataWithTotals.length > 0 ? orderDataWithTotals : null
+        };
+      }
+
+      console.log('Submitting order data:', submitData);
 
       if (editingOrder) {
         await api.put(`/orders/${editingOrder.id}`, submitData);
@@ -278,7 +330,13 @@ const OrdersTab = () => {
                     className="form-control"
                     value={formData.distributorId}
                     onChange={(e) => setFormData({ ...formData, distributorId: e.target.value })}
-                    style={{ fontSize: '1.125rem', padding: '1rem' }}
+                    style={{
+                      fontSize: '1.125rem',
+                      padding: '1rem',
+                      backgroundColor: editingOrder ? '#f5f5f5' : '#fff',
+                      cursor: editingOrder ? 'not-allowed' : 'auto'
+                    }}
+                    disabled={editingOrder !== null}
                     required
                   >
                     <option value="">Select a distributor</option>
@@ -288,6 +346,11 @@ const OrdersTab = () => {
                       </option>
                     ))}
                   </select>
+                  {editingOrder && (
+                    <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                      Distributor cannot be changed when editing an order
+                    </small>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -300,7 +363,12 @@ const OrdersTab = () => {
                     id="orderDate"
                     className="form-control"
                     value={formData.orderDate}
-                    onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, orderDate: e.target.value });
+                      if (!editingOrder) {
+                        checkOrderDateGap(e.target.value);
+                      }
+                    }}
                     min={(() => {
                       if (!lastSalesReportDate) return new Date().toISOString().split('T')[0];
                       // Add 1 day to the last sales report date
@@ -315,8 +383,8 @@ const OrdersTab = () => {
                       padding: '1rem',
                       fontWeight: '600',
                       color: '#000',
-                      backgroundColor: editingOrder !== null ? '#f5f5f5' : '#fff',
-                      cursor: editingOrder !== null ? 'not-allowed' : 'auto'
+                      backgroundColor: editingOrder ? '#f5f5f5' : '#fff',
+                      cursor: editingOrder ? 'not-allowed' : 'auto'
                     }}
                   />
                   <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
@@ -326,6 +394,20 @@ const OrdersTab = () => {
                       return minDate.toLocaleDateString();
                     })()} to today`}
                   </small>
+                  {orderDateWarning && !editingOrder && (
+                    <div style={{
+                      marginTop: '1rem',
+                      padding: '1rem',
+                      backgroundColor: '#fff3cd',
+                      border: '1px solid #ffc107',
+                      borderRadius: '8px',
+                      color: '#856404',
+                      fontSize: '0.875rem',
+                      fontWeight: '600'
+                    }}>
+                      {orderDateWarning}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -334,17 +416,19 @@ const OrdersTab = () => {
             <div style={{ marginBottom: '2rem', paddingBottom: '2rem', borderBottom: '2px solid #e0e0e0' }}>
               <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="order-items-header">
                 <h3 style={{ fontSize: '1.5rem', fontWeight: '600', margin: 0, color: '#000' }}>
-                  Order Items *
+                  Order Items * {editingOrder && <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: '#666' }}>(Cannot be edited)</span>}
                 </h3>
-                <button
-                  type="button"
-                  onClick={addOrderItem}
-                  className="btn btn-primary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                >
-                  <Plus size={20} />
-                  Add Item
-                </button>
+                {!editingOrder && (
+                  <button
+                    type="button"
+                    onClick={addOrderItem}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <Plus size={20} />
+                    Add Item
+                  </button>
+                )}
               </div>
 
               {formData.orderData.length === 0 ? (
@@ -354,18 +438,20 @@ const OrdersTab = () => {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {formData.orderData.map((item, index) => (
-                    <div key={index} style={{ backgroundColor: '#f8f9fa', padding: '1.5rem', borderRadius: '8px', position: 'relative' }}>
+                    <div key={index} style={{ backgroundColor: editingOrder ? '#f5f5f5' : '#f8f9fa', padding: '1.5rem', borderRadius: '8px', position: 'relative', opacity: editingOrder ? 0.7 : 1 }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <h4 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600' }}>Item {index + 1}</h4>
-                        <button
-                          type="button"
-                          onClick={() => removeOrderItem(index)}
-                          className="btn btn-danger"
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', marginTop: '0.5rem' }}
-                        >
-                          <Trash2 size={16} />
-                          Remove
-                        </button>
+                        {!editingOrder && (
+                          <button
+                            type="button"
+                            onClick={() => removeOrderItem(index)}
+                            className="btn btn-danger"
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', marginTop: '0.5rem' }}
+                          >
+                            <Trash2 size={16} />
+                            Remove
+                          </button>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
@@ -375,7 +461,13 @@ const OrdersTab = () => {
                             className="form-control"
                             value={item.product_id}
                             onChange={(e) => updateOrderItem(index, 'product_id', e.target.value)}
-                            style={{ fontSize: '1rem', padding: '0.875rem' }}
+                            style={{
+                              fontSize: '1rem',
+                              padding: '0.875rem',
+                              backgroundColor: editingOrder ? '#e0e0e0' : '#fff',
+                              cursor: editingOrder ? 'not-allowed' : 'auto'
+                            }}
+                            disabled={editingOrder !== null}
                             required
                           >
                             <option value="">Select Product</option>
@@ -397,7 +489,13 @@ const OrdersTab = () => {
                             step="1"
                             min="0"
                             placeholder="0"
-                            style={{ fontSize: '1rem', padding: '0.875rem' }}
+                            style={{
+                              fontSize: '1rem',
+                              padding: '0.875rem',
+                              backgroundColor: editingOrder ? '#e0e0e0' : '#fff',
+                              cursor: editingOrder ? 'not-allowed' : 'auto'
+                            }}
+                            disabled={editingOrder !== null}
                             required
                           />
                         </div>
@@ -410,9 +508,15 @@ const OrdersTab = () => {
                             value={item.buy_price}
                             onChange={(e) => updateOrderItem(index, 'buy_price', e.target.value)}
                             step="0.01"
-                            min="0.01"
+                            min="0"
                             placeholder="0.00"
-                            style={{ fontSize: '1rem', padding: '0.875rem' }}
+                            style={{
+                              fontSize: '1rem',
+                              padding: '0.875rem',
+                              backgroundColor: editingOrder ? '#e0e0e0' : '#fff',
+                              cursor: editingOrder ? 'not-allowed' : 'auto'
+                            }}
+                            disabled={editingOrder !== null}
                             required
                           />
                         </div>
@@ -447,7 +551,7 @@ const OrdersTab = () => {
                     value={formData.tax}
                     onChange={(e) => setFormData({ ...formData, tax: e.target.value })}
                     step="0.01"
-                    min="0.01"
+                    min="0"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
@@ -464,7 +568,7 @@ const OrdersTab = () => {
                     value={formData.misc}
                     onChange={(e) => setFormData({ ...formData, misc: e.target.value })}
                     step="0.01"
-                    min="0.01"
+                    min="0"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
@@ -481,7 +585,7 @@ const OrdersTab = () => {
                     value={formData.scheme}
                     onChange={(e) => setFormData({ ...formData, scheme: e.target.value })}
                     step="0.01"
-                    min="0.01"
+                    min="0"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
@@ -498,7 +602,7 @@ const OrdersTab = () => {
                     value={formData.discount}
                     onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
                     step="0.01"
-                    min="0.01"
+                    min="0"
                     placeholder="0.00"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
@@ -522,38 +626,38 @@ const OrdersTab = () => {
               {/* Order Summary */}
               <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '2px solid #dee2e6' }}>
                 <h4 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem' }}>Order Summary</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                  <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Items Total</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700' }}>
                       ₹{getTotalOrderValue(formData.orderData).toFixed(2)}
                     </p>
                   </div>
-                  <div>
+                  <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Tax</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700' }}>
                       +₹{parseFloat(formData.tax || 0).toFixed(2)}
                     </p>
                   </div>
-                  <div>
+                  <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Miscellaneous</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700' }}>
                       +₹{parseFloat(formData.misc || 0).toFixed(2)}
                     </p>
                   </div>
-                  <div>
+                  <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Scheme</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700', color: '#f57c00' }}>
                       -₹{parseFloat(formData.scheme || 0).toFixed(2)}
                     </p>
                   </div>
-                  <div>
+                  <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Discount</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700', color: '#f57c00' }}>
                       -₹{parseFloat(formData.discount || 0).toFixed(2)}
                     </p>
                   </div>
-                  <div>
+                  <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Grand Total</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.5rem', fontWeight: '700', color: '#2e7d32' }}>
                       ₹{(getTotalOrderValue(formData.orderData) + parseFloat(formData.tax || 0) + parseFloat(formData.misc || 0) - parseFloat(formData.scheme || 0) - parseFloat(formData.discount || 0)).toFixed(2)}
@@ -808,7 +912,7 @@ const OrdersTab = () => {
             }}>
               <h4 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Order Summary</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span style={{ fontSize: '1rem', color: '#666' }}>Items Subtotal:</span>
                   <span style={{ fontSize: '1.125rem', fontWeight: '600' }}>
                     ₹{getTotalOrderValue(selectedOrder.order_data).toFixed(2)}

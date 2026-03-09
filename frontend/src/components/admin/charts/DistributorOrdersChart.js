@@ -22,6 +22,15 @@ const DistributorOrdersChart = ({ data, distributorNames }) => {
     }));
   };
 
+  // Calculate average value for each distributor and sort by average (high to low)
+  const sortedDistributorNames = data.length > 0
+    ? [...distributorNames.filter(name => name)].sort((a, b) => {
+        const avgA = data.reduce((sum, month) => sum + (parseFloat(month[a]) || 0), 0) / data.length;
+        const avgB = data.reduce((sum, month) => sum + (parseFloat(month[b]) || 0), 0) / data.length;
+        return avgB - avgA; // Sort descending (high to low)
+      })
+    : distributorNames.filter(name => name);
+
   // Calculate minimum visible months (12) and total months
   const totalMonths = data.length;
   const minVisibleMonths = 12;
@@ -30,6 +39,55 @@ const DistributorOrdersChart = ({ data, distributorNames }) => {
   // Calculate chart width based on number of months
   const monthWidth = isMobile ? 60 : 80;
   const chartWidth = Math.max(totalMonths * monthWidth, minVisibleMonths * monthWidth);
+
+  // Custom legend renderer to maintain sorted order
+  const renderLegend = (props) => {
+    const { payload } = props;
+
+    // Sort legend payload by the sorted distributor names order
+    const sortedPayload = [...payload].sort((a, b) => {
+      const indexA = sortedDistributorNames.indexOf(a.value);
+      const indexB = sortedDistributorNames.indexOf(b.value);
+      return indexA - indexB;
+    });
+
+    return (
+      <ul style={{
+        listStyle: 'none',
+        padding: 0,
+        margin: '10px 0 0 0',
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: '10px',
+        fontSize: isMobile ? '10px' : '12px'
+      }}>
+        {sortedPayload.map((entry, index) => (
+          <li
+            key={`legend-${index}`}
+            onClick={() => handleLegendClick(entry.dataKey)}
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              opacity: hiddenLines[entry.dataKey] ? 0.4 : 1,
+              textDecoration: hiddenLines[entry.dataKey] ? 'line-through' : 'none'
+            }}
+          >
+            <span style={{
+              display: 'inline-block',
+              width: isMobile ? '10px' : '14px',
+              height: isMobile ? '10px' : '14px',
+              backgroundColor: entry.color,
+              marginRight: '6px',
+              borderRadius: '2px'
+            }} />
+            <span>{entry.value}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  };
 
   return (
     <div className="card" style={{ marginBottom: '2rem' }}>
@@ -72,12 +130,8 @@ const DistributorOrdersChart = ({ data, distributorNames }) => {
                 contentStyle={{ fontSize: isMobile ? 11 : 14 }}
                 wrapperStyle={{ zIndex: 1000 }}
               />
-              <Legend
-                wrapperStyle={{ fontSize: isMobile ? 10 : 12, cursor: 'pointer' }}
-                iconSize={isMobile ? 10 : 14}
-                onClick={(e) => handleLegendClick(e.dataKey)}
-              />
-              {distributorNames.filter(name => name).map((name, index) => (
+              <Legend content={renderLegend} />
+              {sortedDistributorNames.map((name, index) => (
                 <Line
                   key={`distributor-${name}-${index}`}
                   type="monotone"

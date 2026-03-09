@@ -554,7 +554,7 @@ const SuperAdminDashboard = () => {
                       onChange={(e) => setFormData({ ...formData, initialCashBalance: e.target.value })}
                       placeholder="0.00"
                       step="0.01"
-                      min="0.01"
+                      min="0"
                     />
                   </div>
 
@@ -570,7 +570,7 @@ const SuperAdminDashboard = () => {
                       onChange={(e) => setFormData({ ...formData, initialBankBalance: e.target.value })}
                       placeholder="0.00"
                       step="0.01"
-                      min="0.01"
+                      min="0"
                     />
                   </div>
 
@@ -586,7 +586,7 @@ const SuperAdminDashboard = () => {
                       onChange={(e) => setFormData({ ...formData, initialGalaBalance: e.target.value })}
                       placeholder="0.00"
                       step="0.01"
-                      min="0.01"
+                      min="0"
                     />
                   </div>
                 </>
@@ -624,7 +624,7 @@ const SuperAdminDashboard = () => {
                   onChange={(e) => setBalanceFormData({ ...balanceFormData, cashBalance: e.target.value })}
                   placeholder="0.00"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                 />
               </div>
@@ -641,7 +641,7 @@ const SuperAdminDashboard = () => {
                   onChange={(e) => setBalanceFormData({ ...balanceFormData, bankBalance: e.target.value })}
                   placeholder="0.00"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                 />
               </div>
@@ -658,7 +658,7 @@ const SuperAdminDashboard = () => {
                   onChange={(e) => setBalanceFormData({ ...balanceFormData, galaBalance: e.target.value })}
                   placeholder="0.00"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                 />
               </div>

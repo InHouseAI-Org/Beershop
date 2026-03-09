@@ -158,7 +158,7 @@ const ProductsTab = () => {
                   value={formData.salePrice}
                   onChange={(e) => setFormData({ ...formData, salePrice: e.target.value })}
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                 />
               </div>

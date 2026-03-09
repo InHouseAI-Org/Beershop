@@ -123,7 +123,7 @@ const createOrder = async (req, res) => {
 const updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate } = req.body;
 
     const order = await db.getOrderById(id);
 
@@ -136,36 +136,18 @@ const updateOrder = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Update inventory if orderData has changed
-    // Note: We don't recalculate average buy price on edits as that would distort the running average
-    if (orderData !== undefined && Array.isArray(orderData)) {
-      const oldOrderData = order.order_data || [];
-      console.log('Updating inventory after order edit...');
-      console.log('Old order data:', oldOrderData);
-      console.log('New order data:', orderData);
+    // Prevent editing of distributor and order items
+    if (distributorId !== undefined && distributorId !== order.distributor_id) {
+      return res.status(400).json({ error: 'Distributor cannot be changed when editing an order' });
+    }
 
-      // First, reverse the old order quantities (subtract from inventory)
-      for (const oldItem of oldOrderData) {
-        if (oldItem.product_id && oldItem.qty) {
-          const oldQty = parseFloat(oldItem.qty);
-          await db.incrementInventory(order.organisation_id, oldItem.product_id, -oldQty);
-          console.log(`Decreased inventory for product ${oldItem.product_id} by ${oldQty} (reversing old order)`);
-        }
-      }
-
-      // Then, add the new order quantities (add to inventory)
-      for (const newItem of orderData) {
-        if (newItem.product_id && newItem.qty) {
-          const newQty = parseFloat(newItem.qty);
-          await db.incrementInventory(order.organisation_id, newItem.product_id, newQty);
-          console.log(`Increased inventory for product ${newItem.product_id} by ${newQty} (applying new order)`);
-        }
-      }
+    if (orderData !== undefined) {
+      return res.status(400).json({ error: 'Order items cannot be changed when editing an order' });
     }
 
     // Update distributor outstanding if order total has changed
     // Total = order value + tax + misc - scheme - discount
-    if (orderData !== undefined || tax !== undefined || misc !== undefined || discount !== undefined || scheme !== undefined) {
+    if (tax !== undefined || misc !== undefined || discount !== undefined || scheme !== undefined) {
       const oldOrderData = order.order_data || [];
       const oldTax = parseFloat(order.tax || 0);
       const oldMisc = parseFloat(order.misc || 0);
@@ -183,8 +165,7 @@ const updateOrder = async (req, res) => {
 
       // Calculate new total
       let newTotal = 0;
-      const newOrderData = orderData || oldOrderData;
-      newOrderData.forEach(item => {
+      oldOrderData.forEach(item => {
         if (item.total) {
           newTotal += parseFloat(item.total);
         }
@@ -198,17 +179,13 @@ const updateOrder = async (req, res) => {
       const totalDifference = newTotal - oldTotal;
 
       if (totalDifference !== 0) {
-        const targetDistributorId = distributorId || order.distributor_id;
-        console.log(`Adjusting distributor ${targetDistributorId} outstanding by ₹${totalDifference.toFixed(2)}`);
-        await db.incrementDistributorOutstanding(targetDistributorId, totalDifference);
+        console.log(`Adjusting distributor ${order.distributor_id} outstanding by ₹${totalDifference.toFixed(2)}`);
+        await db.incrementDistributorOutstanding(order.distributor_id, totalDifference);
       }
     }
 
-    // Order date cannot be changed after creation - it remains as originally created
+    // Build updates object - only allow editing specific fields
     const updates = {};
-    if (distributorId !== undefined) updates.distributorId = distributorId;
-    // orderDate is NOT updated - it remains the original creation date
-    if (orderData !== undefined) updates.orderData = orderData;
     if (tax !== undefined) updates.tax = tax;
     if (misc !== undefined) updates.misc = misc;
     if (discount !== undefined) updates.discount = discount;

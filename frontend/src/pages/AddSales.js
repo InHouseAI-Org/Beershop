@@ -26,6 +26,7 @@ const AddSales = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [galaBalanceYesterday, setGalaBalanceYesterday] = useState(0);
   const [lastSalesReportDate, setLastSalesReportDate] = useState(null);
+  const [latestOrderDate, setLatestOrderDate] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -33,12 +34,13 @@ const AddSales = () => {
 
   const fetchData = async () => {
     try {
-      const [productsRes, creditHoldersRes, inventoryRes, balancesRes, salesRes] = await Promise.all([
+      const [productsRes, creditHoldersRes, inventoryRes, balancesRes, salesRes, ordersRes] = await Promise.all([
         api.get('/products'),
         api.get('/credit-holders'),
         api.get('/inventory'),
         api.get('/balances/organisation'),
-        api.get('/sales')
+        api.get('/sales'),
+        api.get('/orders')
       ]);
 
       setProducts(productsRes.data);
@@ -53,6 +55,17 @@ const AddSales = () => {
         const lastDate = new Date(lastSale.date);
         lastDate.setHours(0, 0, 0, 0);
         setLastSalesReportDate(lastDate);
+      }
+
+      // Find the latest order date
+      const allOrders = ordersRes.data;
+      if (allOrders.length > 0) {
+        // Sort by order date descending and get the latest
+        const sortedOrders = allOrders.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+        const latestOrder = sortedOrders[0];
+        const latestDate = new Date(latestOrder.order_date);
+        latestDate.setHours(0, 0, 0, 0);
+        setLatestOrderDate(latestDate);
       }
 
       // Get current gala balance from organisation (this is the actual balance in gala)
@@ -455,13 +468,34 @@ const AddSales = () => {
               value={saleDate}
               onChange={(e) => handleDateChange(e.target.value)}
               min={(() => {
-                if (!lastSalesReportDate) {
-                  // If no last report, allow today minus 30 days
+                // Determine the minimum date based on both last sales report and latest order
+                let salesReportMin = null;
+                let orderMin = null;
+
+                // For sales reports, we need day AFTER the last report
+                if (lastSalesReportDate) {
+                  salesReportMin = new Date(lastSalesReportDate);
+                  salesReportMin.setDate(salesReportMin.getDate() + 1);
+                }
+
+                // For orders, we can create sales report for the SAME day as the order
+                if (latestOrderDate) {
+                  orderMin = new Date(latestOrderDate);
+                }
+
+                // Use the later of the two constraints
+                let minDate;
+                if (salesReportMin && orderMin) {
+                  minDate = salesReportMin > orderMin ? salesReportMin : orderMin;
+                } else if (salesReportMin) {
+                  minDate = salesReportMin;
+                } else if (orderMin) {
+                  minDate = orderMin;
+                } else {
+                  // If no last report or order, allow today minus 30 days
                   return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 }
-                // Allow from day after last report
-                const minDate = new Date(lastSalesReportDate);
-                minDate.setDate(minDate.getDate() + 1);
+
                 return minDate.toISOString().split('T')[0];
               })()}
               max={new Date().toISOString().split('T')[0]}
@@ -492,25 +526,57 @@ const AddSales = () => {
 
           <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
             <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>
-              {lastSalesReportDate ? (
-                <>
-                  You can select dates from {(() => {
-                    const minDate = new Date(lastSalesReportDate);
-                    minDate.setDate(minDate.getDate() + 1);
-                    return minDate.toLocaleDateString();
-                  })()} to {new Date().toLocaleDateString()}.<br/>
-                  आप {(() => {
-                    const minDate = new Date(lastSalesReportDate);
-                    minDate.setDate(minDate.getDate() + 1);
-                    return minDate.toLocaleDateString();
-                  })()} से {new Date().toLocaleDateString()} तक की तारीखें चुन सकते हैं।
-                </>
-              ) : (
-                <>
-                  You can select dates from the last 30 days up to today.<br/>
-                  आप पिछले 30 दिनों से आज तक की तारीखें चुन सकते हैं।
-                </>
-              )}
+              {(() => {
+                let salesReportMin = null;
+                let orderMin = null;
+
+                // For sales reports, we need day AFTER the last report
+                if (lastSalesReportDate) {
+                  salesReportMin = new Date(lastSalesReportDate);
+                  salesReportMin.setDate(salesReportMin.getDate() + 1);
+                }
+
+                // For orders, we can create sales report for the SAME day as the order
+                if (latestOrderDate) {
+                  orderMin = new Date(latestOrderDate);
+                }
+
+                // Use the later of the two constraints
+                let minDate;
+                let reason = '';
+
+                if (salesReportMin && orderMin) {
+                  if (salesReportMin > orderMin) {
+                    minDate = salesReportMin;
+                    reason = `day after last sales report: ${lastSalesReportDate.toLocaleDateString()}`;
+                  } else {
+                    minDate = orderMin;
+                    reason = `latest order date: ${latestOrderDate.toLocaleDateString()}`;
+                  }
+                } else if (salesReportMin) {
+                  minDate = salesReportMin;
+                  reason = `day after last sales report: ${lastSalesReportDate.toLocaleDateString()}`;
+                } else if (orderMin) {
+                  minDate = orderMin;
+                  reason = `latest order date: ${latestOrderDate.toLocaleDateString()}`;
+                }
+
+                if (minDate) {
+                  return (
+                    <>
+                      You can select dates from {minDate.toLocaleDateString()} to {new Date().toLocaleDateString()} ({reason}).<br/>
+                      आप {minDate.toLocaleDateString()} से {new Date().toLocaleDateString()} तक की तारीखें चुन सकते हैं ({reason})।
+                    </>
+                  );
+                } else {
+                  return (
+                    <>
+                      You can select dates from the last 30 days up to today.<br/>
+                      आप पिछले 30 दिनों से आज तक की तारीखें चुन सकते हैं।
+                    </>
+                  );
+                }
+              })()}
             </p>
           </div>
         </div>
@@ -811,7 +877,7 @@ const AddSales = () => {
                 onChange={(e) => setMiscellaneousCash(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
                 step="0.01"
-                min="0.01"
+                min="0"
                 placeholder="₹ 0.00"
               />
             </div>
@@ -826,7 +892,7 @@ const AddSales = () => {
                 onChange={(e) => setMiscellaneousUPI(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
                 step="0.01"
-                min="0.01"
+                min="0"
                 placeholder="₹ 0.00"
               />
             </div>
@@ -902,7 +968,7 @@ const AddSales = () => {
                       onChange={(e) => updateCreditTaken(index, 'amount', e.target.value)}
                       style={{ fontSize: '1.125rem', padding: '0.875rem' }}
                       step="0.01"
-                      min="0.01"
+                      min="0"
                       placeholder="₹ 0.00"
                     />
                   </div>
@@ -1013,7 +1079,7 @@ const AddSales = () => {
                       onChange={(e) => updateCreditEntry(index, 'amount', e.target.value)}
                       style={{ fontSize: '1.125rem', padding: '0.875rem' }}
                       step="0.01"
-                      min="0.01"
+                      min="0"
                       placeholder="₹ 0.00"
                     />
                   </div>
@@ -1058,7 +1124,7 @@ const AddSales = () => {
                 onChange={(e) => setUpiTotal(e.target.value)}
                 style={{ fontSize: '1.25rem', padding: '1.25rem' }}
                 step="0.01"
-                min="0.01"
+                min="0"
                 placeholder="₹ 0.00"
               />
             </div>
@@ -1158,7 +1224,7 @@ const AddSales = () => {
                     onChange={(e) => updateDailyExpense(index, 'amount', e.target.value)}
                     style={{ fontSize: '1.125rem', padding: '0.875rem' }}
                     step="0.01"
-                    min="0.01"
+                    min="0"
                     placeholder="₹ 0.00"
                   />
                 </div>
