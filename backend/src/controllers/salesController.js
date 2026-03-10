@@ -675,7 +675,100 @@ const approveSale = async (req, res) => {
       }
     }
 
-    res.json({ message: 'Sale approved successfully', sale: updatedSale });
+    // Recalculate cash_collected based on final approved values
+    console.log('Recalculating cash_collected after approval...');
+
+    // Get the final values after all updates
+    const finalSaleData = await db.getSaleById(id);
+    const finalExpenses = await db.getDailyExpensesBySaleId(id);
+
+    // Calculate total sales from sale items - need to get product prices
+    let totalSales = 0;
+    if (Array.isArray(finalSaleData.sale) && finalSaleData.sale.length > 0) {
+      for (const item of finalSaleData.sale) {
+        if (item.product_id && item.sale) {
+          const product = await db.getProductById(item.product_id);
+          if (product && product.sale_price) {
+            totalSales += parseFloat(item.sale) * parseFloat(product.sale_price);
+          }
+        }
+      }
+    }
+
+    // Calculate total credit given
+    let totalCreditGiven = 0;
+    if (Array.isArray(finalSaleData.credit) && finalSaleData.credit.length > 0) {
+      finalSaleData.credit.forEach(item => {
+        if (item.creditgiven) {
+          totalCreditGiven += parseFloat(item.creditgiven);
+        }
+      });
+    }
+
+    // Calculate credit collected in cash
+    let creditCollectedCash = 0;
+    const finalCreditTakenData = finalSaleData.credit_taken || [];
+    if (Array.isArray(finalCreditTakenData) && finalCreditTakenData.length > 0) {
+      finalCreditTakenData.forEach(item => {
+        if (item.collectedIn === 'cash_balance' && item.amount) {
+          creditCollectedCash += parseFloat(item.amount);
+        }
+      });
+    }
+
+    // Calculate total expenses
+    let totalExpenses = 0;
+    if (Array.isArray(finalExpenses) && finalExpenses.length > 0) {
+      finalExpenses.forEach(exp => {
+        if (exp.amount) {
+          totalExpenses += parseFloat(exp.amount);
+        }
+      });
+    }
+
+    // Get misc cash and UPI values
+    const miscCash = parseFloat(finalSaleData.miscellaneous_cash || 0);
+    const miscUPI = parseFloat(finalSaleData.miscellaneous_upi || 0);
+    const upiValue = parseFloat(finalSaleData.upi || 0);
+
+    // Calculate credit collected in UPI
+    let creditCollectedUPI = 0;
+    if (Array.isArray(finalCreditTakenData) && finalCreditTakenData.length > 0) {
+      finalCreditTakenData.forEach(item => {
+        if (item.collectedIn === 'bank_balance' && item.amount) {
+          creditCollectedUPI += parseFloat(item.amount);
+        }
+      });
+    }
+
+    // Calculate UPI sales and cash sales
+    // upiValue includes: UPI from sales + credit collected via UPI + misc UPI
+    // So we need to subtract credit and misc to get just the sales portion
+    const upiSales = Math.max(0, upiValue - creditCollectedUPI - miscUPI);
+    const cashSales = Math.max(0, totalSales - upiSales + miscCash);
+
+    // Calculate final cash_collected
+    const recalculatedCashCollected = Math.max(0, cashSales + creditCollectedCash - totalCreditGiven - totalExpenses);
+
+    console.log('Cash collected recalculation:', {
+      totalSales,
+      upiValue,
+      upiSales,
+      cashSales,
+      creditCollectedCash,
+      creditCollectedUPI,
+      totalCreditGiven,
+      totalExpenses,
+      miscCash,
+      miscUPI,
+      recalculatedCashCollected
+    });
+
+    // Update cash_collected with recalculated value
+    await db.updateSale(id, { cashCollected: recalculatedCashCollected });
+
+    const finalUpdatedSale = await db.getSaleById(id);
+    res.json({ message: 'Sale approved successfully', sale: finalUpdatedSale });
   } catch (error) {
     console.error('Error approving sale:', error);
     // Check if it's an inventory validation error

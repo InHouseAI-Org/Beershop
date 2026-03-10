@@ -187,20 +187,9 @@ const SalesReportTab = () => {
   const handleAllocationFieldChange = (field, value) => {
     if (!allocationSale) return;
 
-    // Calculate total available for allocation including all adjustments
-    const totalcredit = calculateCreditSum(allocationSale);
-    const creditTakenCash = (allocationSale.creditTaken || [])
-      .filter(c => c.collectedIn === 'cash_balance')
-      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
-    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
-    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
-
-    const maxAllowed = parseFloat(allocationSale.cash_collected || 0)
-      + parseFloat(allocationSale.upi || 0)
-      + creditTakenCash
-      - totalcredit
-      + miscCash
-      - expenses;
+    // Calculate total available for allocation
+    // cash_collected already includes: cash sales + credit collected (cash) - credit given - expenses + misc cash
+    const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
 
     let newForm = { ...allocationForm, [field]: value };
 
@@ -218,20 +207,9 @@ const SalesReportTab = () => {
   const handleSubmitAllocation = async () => {
     if (!allocationSale) return;
 
-    // Calculate total available for allocation including all adjustments
-    const totalcredit = calculateCreditSum(allocationSale);
-    const creditTakenCash = (allocationSale.creditTaken || [])
-      .filter(c => c.collectedIn === 'cash_balance')
-      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
-    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
-    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
-
-    const maxAllowed = parseFloat(allocationSale.cash_collected || 0)
-      + parseFloat(allocationSale.upi || 0)
-      + creditTakenCash
-      - totalcredit
-      + miscCash
-      - expenses;
+    // Calculate total available for allocation
+    // cash_collected already includes: cash sales + credit collected (cash) - credit given - expenses + misc cash
+    const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
 
     const cashBal = parseFloat(allocationForm.cashBalance || 0);
     const bankBal = parseFloat(allocationForm.bankBalance || 0);
@@ -1377,23 +1355,7 @@ const SalesReportTab = () => {
                   Total Collection Available:
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0d47a1' }}>
-                  {(() => {
-                    const totalcredit = calculateCreditSum(allocationSale);
-                    const creditTakenCash = (allocationSale.creditTaken || [])
-                      .filter(c => c.collectedIn === 'cash_balance')
-                      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
-                    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
-                    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
-
-                    const totalAvailable = parseFloat(allocationSale.cash_collected || 0)
-                      + parseFloat(allocationSale.upi || 0)
-                      + creditTakenCash
-                      - totalcredit
-                      + miscCash
-                      - expenses;
-
-                    return `₹${totalAvailable.toFixed(2)}`;
-                  })()}
+                  ₹{(parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0)).toFixed(2)}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#1565c0', marginTop: '0.25rem' }}>
                   = Cash Collected (₹{parseFloat(allocationSale.cash_collected || 0).toFixed(2)}) + UPI (₹{parseFloat(allocationSale.upi || 0).toFixed(2)})
@@ -1407,7 +1369,7 @@ const SalesReportTab = () => {
                     const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
                     const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
 
-                    return `+ Credit Collected ₹${creditTakenCash.toFixed(2)} - Credit Given ₹${totalcredit.toFixed(2)} + Misc ₹${miscCash.toFixed(2)} - Expenses ₹${expenses.toFixed(2)}`;
+                    return `Cash Collected already includes: Credit Collected ₹${creditTakenCash.toFixed(2)} - Credit Given ₹${totalcredit.toFixed(2)} + Misc ₹${miscCash.toFixed(2)} - Expenses ₹${expenses.toFixed(2)}`;
                   })()}
                 </div>
               </div>
@@ -1478,20 +1440,9 @@ const SalesReportTab = () => {
                   const galaBal = parseFloat(allocationForm.galaBalance || 0);
                   const totalAllocated = cashBal + bankBal + galaBal;
 
-                  // Calculate total available for allocation including all adjustments
-                  const totalcredit = calculateCreditSum(allocationSale);
-                  const creditTakenCash = (allocationSale.creditTaken || [])
-                    .filter(c => c.collectedIn === 'cash_balance')
-                    .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
-                  const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
-                  const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
-
-                  const maxAllowed = parseFloat(allocationSale.cash_collected || 0)
-                    + parseFloat(allocationSale.upi || 0)
-                    + creditTakenCash
-                    - totalcredit
-                    + miscCash
-                    - expenses;
+                  // Calculate total available for allocation
+                  // cash_collected already includes: cash sales + credit collected (cash) - credit given - expenses + misc cash
+                  const maxAllowed = parseFloat(allocationSale.cash_collected || 0) + parseFloat(allocationSale.upi || 0);
                   const remaining = maxAllowed - totalAllocated;
 
                   if (totalAllocated > 0) {
@@ -1619,6 +1570,7 @@ const SalesReportTab = () => {
               borderTopRightRadius: '16px',
               position: 'relative'
             }}>
+              {/* Close button */}
               <button
                 onClick={closeModal}
                 style={{
@@ -1927,14 +1879,11 @@ const SalesReportTab = () => {
                     </div>
                     <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
                       ₹{(() => {
-                        const totalSales = selectedSale.opening_stock?.reduce((total, openingItem) => {
-                          const saleItem = selectedSale.sale?.find(s => s.product_id === openingItem.product_id);
-                          const saleQuantity = saleItem ? parseFloat(saleItem.sale || 0) : 0;
-                          const salePrice = getProductSalePrice(openingItem.product_id);
-                          return total + (saleQuantity * salePrice);
-                        }, 0) || 0;
-                        const cashSales = parseFloat(selectedSale.cash_collected || 0);
-                        return (totalSales - cashSales).toFixed(2);
+                        const creditCollectedUPI = (selectedSale.creditTaken || [])
+                          .filter(c => c.collectedIn === 'bank_balance')
+                          .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+                        const upiSales = parseFloat(selectedSale.upi || 0) - parseFloat(selectedSale.miscellaneous_upi || 0) - creditCollectedUPI;
+                        return Math.max(0, upiSales).toFixed(2);
                       })()}
                     </p>
                   </div>
@@ -1946,7 +1895,17 @@ const SalesReportTab = () => {
                       <p style={{ color: 'white', fontSize: '0.875rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cash Sales | नकद बिक्री</p>
                     </div>
                     <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                      ₹{parseFloat(selectedSale.cash_collected || 0).toFixed(2) - parseFloat(selectedSale.creditTakenCash || 0).toFixed(2) + parseFloat(selectedSale.totalExpenses || 0).toFixed(2)}
+                      ₹{(() => {
+                        const creditCollectedCash = (selectedSale.creditTaken || [])
+                          .filter(c => c.collectedIn === 'cash_balance')
+                          .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+                        const totalExpenses = (selectedSale.dailyExpenses || [])
+                          .reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
+                        const totalCreditGiven = (selectedSale.credit || [])
+                          .reduce((sum, c) => sum + (parseFloat(c.creditgiven) || 0), 0);
+                        const cashSales = parseFloat(selectedSale.cash_collected || 0) - creditCollectedCash + totalCreditGiven + totalExpenses - parseFloat(selectedSale.miscellaneous_cash || 0);
+                        return Math.max(0, cashSales).toFixed(2);
+                      })()}
                     </p>
                   </div>
 
@@ -1959,14 +1918,7 @@ const SalesReportTab = () => {
                       </p>
                     </div>
                     <p style={{ fontSize: '2rem', fontWeight: '700', color: 'white', margin: 0 }}>
-                      ₹{(() => {
-                        const upiSales = parseFloat(selectedSale.upi || 0);
-                        const miscUpi = parseFloat(selectedSale.miscellaneous_upi || 0);
-                        const creditInBank = (selectedSale.creditTaken || [])
-                          .filter(item => item.collectedIn === 'bank_balance')
-                          .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-                        return (upiSales + miscUpi + creditInBank).toFixed(2);
-                      })()}
+                      ₹{parseFloat(selectedSale.upi || 0).toFixed(2)}
                     </p>
                     <p style={{ fontSize: '0.75rem', margin: '0.5rem 0 0 0', opacity: 0.9 }}>
                       (UPI + Extra UPI + Credit Collected via UPI)
@@ -2239,23 +2191,7 @@ const SalesReportTab = () => {
                   </h3>
                 </div>
                 <p style={{ fontSize: '3rem', fontWeight: '700', margin: 0 }}>
-                  ₹{(() => {
-                    const totalcredit = calculateCreditSum(allocationSale);
-                    const creditTakenCash = (allocationSale.creditTaken || [])
-                      .filter(c => c.collectedIn === 'cash_balance')
-                      .reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
-                    const miscCash = parseFloat(allocationSale.miscellaneous_cash || 0);
-                    const expenses = (allocationSale.dailyExpenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
-
-                    const totalAvailable = parseFloat(allocationSale.cash_collected || 0)
-                      + parseFloat(allocationSale.upi || 0)
-                      + creditTakenCash
-                      - totalcredit
-                      + miscCash
-                      - expenses;
-
-                    return `₹${totalAvailable.toFixed(2)}`;
-                  })()}
+                  ₹{(parseFloat(selectedSale.cash_collected || 0) + parseFloat(selectedSale.upi || 0)).toFixed(2)}
                 </p>
               </div>
             </div>

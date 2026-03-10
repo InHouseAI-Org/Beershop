@@ -34,13 +34,12 @@ const AddSales = () => {
 
   const fetchData = async () => {
     try {
-      const [productsRes, creditHoldersRes, inventoryRes, balancesRes, salesRes, ordersRes] = await Promise.all([
+      const [productsRes, creditHoldersRes, inventoryRes, balancesRes, salesRes] = await Promise.all([
         api.get('/products'),
         api.get('/credit-holders'),
         api.get('/inventory'),
         api.get('/balances/organisation'),
-        api.get('/sales'),
-        api.get('/orders')
+        api.get('/sales')
       ]);
 
       setProducts(productsRes.data);
@@ -57,15 +56,21 @@ const AddSales = () => {
         setLastSalesReportDate(lastDate);
       }
 
-      // Find the latest order date
-      const allOrders = ordersRes.data;
-      if (allOrders.length > 0) {
-        // Sort by order date descending and get the latest
-        const sortedOrders = allOrders.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
-        const latestOrder = sortedOrders[0];
-        const latestDate = new Date(latestOrder.order_date);
-        latestDate.setHours(0, 0, 0, 0);
-        setLatestOrderDate(latestDate);
+      // Try to find the latest order date (optional - may fail for non-admin users)
+      try {
+        const ordersRes = await api.get('/orders');
+        const allOrders = ordersRes.data;
+        if (allOrders.length > 0) {
+          // Sort by order date descending and get the latest
+          const sortedOrders = allOrders.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+          const latestOrder = sortedOrders[0];
+          const latestDate = new Date(latestOrder.order_date);
+          latestDate.setHours(0, 0, 0, 0);
+          setLatestOrderDate(latestDate);
+        }
+      } catch (ordersError) {
+        // Orders endpoint may require admin access - continue without order date validation
+        console.log('Could not fetch orders (may require admin access)');
       }
 
       // Get current gala balance from organisation (this is the actual balance in gala)
