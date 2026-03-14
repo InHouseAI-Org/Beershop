@@ -39,7 +39,7 @@ const getOrder = async (req, res) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks, billNumber } = req.body;
 
     if (!distributorId) {
       return res.status(400).json({ error: 'Please provide distributor ID' });
@@ -63,6 +63,7 @@ const createOrder = async (req, res) => {
       organisationId,
       distributorId,
       orderDate: orderDateString,
+      billNumber: billNumber || null,
       orderData,
       tax: tax || 0,
       misc: misc || 0,
@@ -92,27 +93,8 @@ const createOrder = async (req, res) => {
       }
     }
 
-    // Calculate total order amount and add to distributor outstanding
-    // Total = order value + tax + misc - scheme - discount
-    let totalAmount = 0;
-
-    // Sum up all product costs from orderData
-    if (Array.isArray(orderData) && orderData.length > 0) {
-      orderData.forEach(item => {
-        if (item.total) {
-          totalAmount += parseFloat(item.total);
-        }
-      });
-    }
-
-    // Add tax and misc, subtract scheme and discount
-    totalAmount += parseFloat(tax || 0);
-    totalAmount += parseFloat(misc || 0);
-    totalAmount -= parseFloat(scheme || 0);
-    totalAmount -= parseFloat(discount || 0);
-
-    console.log(`Adding ₹${totalAmount} to distributor ${distributorId} outstanding...`);
-    await db.incrementDistributorOutstanding(distributorId, totalAmount);
+    // Note: Distributor outstanding is automatically updated by database trigger
+    // The trigger recalculates outstanding based on all orders and payments
 
     res.status(201).json(newOrder);
   } catch (error) {
@@ -124,7 +106,7 @@ const createOrder = async (req, res) => {
 const updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks, billNumber } = req.body;
 
     const order = await db.getOrderById(id);
 
@@ -146,44 +128,8 @@ const updateOrder = async (req, res) => {
       return res.status(400).json({ error: 'Order items cannot be changed when editing an order' });
     }
 
-    // Update distributor outstanding if order total has changed
-    // Total = order value + tax + misc - scheme - discount
-    if (tax !== undefined || misc !== undefined || discount !== undefined || scheme !== undefined) {
-      const oldOrderData = order.order_data || [];
-      const oldTax = parseFloat(order.tax || 0);
-      const oldMisc = parseFloat(order.misc || 0);
-      const oldDiscount = parseFloat(order.discount || 0);
-      const oldScheme = parseFloat(order.scheme || 0);
-
-      // Calculate old total
-      let oldTotal = 0;
-      oldOrderData.forEach(item => {
-        if (item.total) {
-          oldTotal += parseFloat(item.total);
-        }
-      });
-      oldTotal += oldTax + oldMisc - oldScheme - oldDiscount;
-
-      // Calculate new total
-      let newTotal = 0;
-      oldOrderData.forEach(item => {
-        if (item.total) {
-          newTotal += parseFloat(item.total);
-        }
-      });
-      newTotal += parseFloat(tax !== undefined ? (tax || 0) : oldTax);
-      newTotal += parseFloat(misc !== undefined ? (misc || 0) : oldMisc);
-      newTotal -= parseFloat(discount !== undefined ? (discount || 0) : oldDiscount);
-      newTotal -= parseFloat(scheme !== undefined ? (scheme || 0) : oldScheme);
-
-      // Calculate the difference
-      const totalDifference = newTotal - oldTotal;
-
-      if (totalDifference !== 0) {
-        console.log(`Adjusting distributor ${order.distributor_id} outstanding by ₹${totalDifference.toFixed(2)}`);
-        await db.incrementDistributorOutstanding(order.distributor_id, totalDifference);
-      }
-    }
+    // Note: Distributor outstanding is automatically updated by database trigger
+    // The trigger recalculates outstanding based on all orders and payments
 
     // Build updates object - only allow editing specific fields
     const updates = {};
@@ -193,6 +139,7 @@ const updateOrder = async (req, res) => {
     if (scheme !== undefined) updates.scheme = scheme;
     if (paymentOutstandingDate !== undefined) updates.paymentOutstandingDate = paymentOutstandingDate || null;
     if (remarks !== undefined) updates.remarks = remarks;
+    if (billNumber !== undefined) updates.billNumber = billNumber || null;
 
     const updatedOrder = await db.updateOrder(id, updates);
     res.json(updatedOrder);

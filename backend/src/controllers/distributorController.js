@@ -47,6 +47,18 @@ const createDistributor = async (req, res) => {
 
     const organisationId = req.user.organisationId;
 
+    // Check for duplicate distributor name in same organization
+    const existingDistributors = await db.getDistributorsByOrganisationId(organisationId);
+    const duplicate = existingDistributors.find(
+      d => d.name.toLowerCase().trim() === name.toLowerCase().trim()
+    );
+
+    if (duplicate) {
+      return res.status(409).json({
+        error: 'A distributor with this name already exists in your organization | इस नाम का वितरक पहले से मौजूद है'
+      });
+    }
+
     const newDistributor = await db.createDistributor({
       organisationId,
       name,
@@ -56,6 +68,12 @@ const createDistributor = async (req, res) => {
     res.status(201).json(newDistributor);
   } catch (error) {
     console.error(error);
+    // Check for database unique constraint violation
+    if (error.code === '23505' && error.constraint === 'unique_distributor_name_per_org') {
+      return res.status(409).json({
+        error: 'A distributor with this name already exists in your organization | इस नाम का वितरक पहले से मौजूद है'
+      });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -76,6 +94,20 @@ const updateDistributor = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Check for duplicate name if name is being updated
+    if (name !== undefined && name.toLowerCase().trim() !== distributor.name.toLowerCase().trim()) {
+      const existingDistributors = await db.getDistributorsByOrganisationId(req.user.organisationId);
+      const duplicate = existingDistributors.find(
+        d => d.id !== id && d.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+
+      if (duplicate) {
+        return res.status(409).json({
+          error: 'A distributor with this name already exists in your organization | इस नाम का वितरक पहले से मौजूद है'
+        });
+      }
+    }
+
     // Only allow updating name - amountOutstanding is automatically managed
     const updates = {};
     if (name !== undefined) updates.name = name;
@@ -84,6 +116,12 @@ const updateDistributor = async (req, res) => {
     res.json(updatedDistributor);
   } catch (error) {
     console.error(error);
+    // Check for database unique constraint violation
+    if (error.code === '23505' && error.constraint === 'unique_distributor_name_per_org') {
+      return res.status(409).json({
+        error: 'A distributor with this name already exists in your organization | इस नाम का वितरक पहले से मौजूद है'
+      });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -177,13 +215,25 @@ const payDistributor = async (req, res) => {
       });
     }
 
-    // Calculate new outstanding amount
-    const newOutstanding = currentOutstanding - amount;
+    // IMPORTANT: Use NEW distributor_payments table, not old payment_history
+    // The database trigger will automatically update distributor.amount_outstanding
+    const pool = require('../config/database');
+    const insertQuery = `
+      INSERT INTO distributor_payments (
+        organisation_id, distributor_id, payment_type, amount, payment_from, created_by, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `;
 
-    // Update distributor with new outstanding amount
-    const updatedDistributor = await db.updateDistributor(distributorId, {
-      amountOutstanding: newOutstanding
-    });
+    await pool.query(insertQuery, [
+      req.user.organisationId,
+      distributorId,
+      'advance', // Treat as advance since no bill number specified in old API
+      amount,
+      paidFrom,
+      req.user.id,
+      'Migrated from old payment system'
+    ]);
 
     // Deduct payment amount from the selected balance
     const balanceUpdate = {};
@@ -196,18 +246,10 @@ const payDistributor = async (req, res) => {
     }
     await db.incrementOrganisationBalances(req.user.organisationId, balanceUpdate);
 
-    // Save transaction history with paidFrom information
-    await db.createDistributorPaymentHistory({
-      organisationId: req.user.organisationId,
-      distributorId: distributorId,
-      amountPaid: amount,
-      previousOutstanding: currentOutstanding,
-      newOutstanding: newOutstanding,
-      paidBy: req.user.id,
-      notes: null,
-      paidFrom: paidFrom,
-      paidAt: paymentDate
-    });
+    // Trigger will auto-update distributor.amount_outstanding
+    // Fetch updated distributor to get new outstanding
+    const updatedDistributor = await db.getDistributorById(distributorId);
+    const newOutstanding = parseFloat(updatedDistributor.amount_outstanding || 0);
 
     res.json({
       message: 'Payment recorded successfully',

@@ -18,6 +18,7 @@ const OrdersTab = () => {
   const [formData, setFormData] = useState({
     distributorId: '',
     orderDate: new Date().toISOString().split('T')[0],
+    billNumber: '',
     orderData: [],
     tax: '',
     misc: '',
@@ -105,6 +106,7 @@ const OrdersTab = () => {
       setFormData({
         distributorId: order.distributor_id,
         orderDate: order.order_date ? new Date(order.order_date).toISOString().split('T')[0] : '',
+        billNumber: order.bill_number || '',
         orderData: order.order_data || [],
         tax: order.tax || '',
         misc: order.misc || '',
@@ -119,6 +121,7 @@ const OrdersTab = () => {
       setFormData({
         distributorId: '',
         orderDate: todayDate,
+        billNumber: '',
         orderData: [],
         tax: '',
         misc: '',
@@ -142,6 +145,7 @@ const OrdersTab = () => {
     setFormData({
       distributorId: '',
       orderDate: new Date().toISOString().split('T')[0],
+      billNumber: '',
       orderData: [],
       tax: '',
       misc: '',
@@ -413,6 +417,24 @@ const OrdersTab = () => {
                       {orderDateWarning}
                     </div>
                   )}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="billNumber" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                    Bill Number
+                  </label>
+                  <input
+                    type="text"
+                    id="billNumber"
+                    className="form-control"
+                    value={formData.billNumber}
+                    onChange={(e) => setFormData({ ...formData, billNumber: e.target.value })}
+                    placeholder="Enter bill number from distributor"
+                    style={{ fontSize: '1.125rem', padding: '1rem' }}
+                  />
+                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                    Optional: Bill/invoice number from distributor
+                  </small>
                 </div>
               </div>
             </div>
@@ -733,6 +755,11 @@ const OrdersTab = () => {
       render: (order) => getDistributorName(order.distributor_id)
     },
     {
+      key: 'bill_number',
+      label: 'Bill Number',
+      render: (order) => order.bill_number || '-'
+    },
+    {
       key: 'items',
       label: 'Items',
       sortable: false,
@@ -880,7 +907,7 @@ const OrdersTab = () => {
               marginBottom: '1.5rem',
               border: '1px solid #dee2e6'
             }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                 <div>
                   <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Order Date</p>
                   <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.125rem', fontWeight: '600' }}>
@@ -891,6 +918,12 @@ const OrdersTab = () => {
                   <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Distributor</p>
                   <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.125rem', fontWeight: '600' }}>
                     {getDistributorName(selectedOrder.distributor_id)}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Bill Number</p>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.125rem', fontWeight: '600' }}>
+                    {selectedOrder.bill_number || '-'}
                   </p>
                 </div>
                 <div>

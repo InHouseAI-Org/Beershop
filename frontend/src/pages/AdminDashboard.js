@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Menu, X } from 'lucide-react';
 import DashboardTab from '../components/admin/DashboardTab';
@@ -12,30 +13,30 @@ import SalesReportTab from '../components/admin/SalesReportTab';
 import BalanceTab from '../components/admin/BalanceTab';
 import ExpenseTab from '../components/admin/ExpenseTab';
 import BalanceTransfersTab from '../components/admin/BalanceTransfersTab';
+import SchemesTab from '../components/admin/SchemesTab';
+import RecurringExpensesTab from '../components/admin/RecurringExpensesTab';
+import BalanceSheetTab from '../components/admin/BalanceSheetTab';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'salesReport', label: 'Sales Report' },
-    { id: 'balances', label: 'Balances' },
-    { id: 'balanceTransfers', label: 'Balance Transfers' },
-    { id: 'expenses', label: 'Expenses' },
-    { id: 'products', label: 'Products' },
-    { id: 'creditHolders', label: 'Credit Holders' },
-    { id: 'orders', label: 'Orders' },
-    { id: 'distributors', label: 'Distributors' },
-    { id: 'inventory', label: 'Inventory' },
-    { id: 'users', label: 'Users' }
+    { id: 'dashboard', label: 'Dashboard', path: '' },
+    { id: 'salesReport', label: 'Sales Report', path: 'sales-report' },
+    { id: 'balanceSheet', label: 'Balance Sheet', path: 'balance-sheet' },
+    { id: 'balances', label: 'Balances', path: 'balances' },
+    { id: 'balanceTransfers', label: 'Balance Transfers', path: 'balance-transfers' },
+    { id: 'expenses', label: 'Expenses', path: 'expenses' },
+    { id: 'recurringExpenses', label: 'Recurring Expenses', path: 'recurring-expenses' },
+    { id: 'products', label: 'Products', path: 'products' },
+    { id: 'creditHolders', label: 'Credit Holders', path: 'credit-holders' },
+    { id: 'orders', label: 'Orders', path: 'orders' },
+    { id: 'distributors', label: 'Distributors', path: 'distributors' },
+    { id: 'schemes', label: 'Schemes', path: 'schemes' },
+    { id: 'inventory', label: 'Inventory', path: 'inventory' },
+    { id: 'users', label: 'Users', path: 'users' }
   ];
-
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-    setSidebarOpen(false); // Close sidebar on mobile after selecting a tab
-  };
 
   return (
     <>
@@ -113,55 +114,67 @@ const AdminDashboard = () => {
           }}
         >
           {tabs.map(tab => (
-            <button
+            <NavLink
               key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              style={{
+              to={`/admin/${tab.path}`}
+              end={tab.path === ''}
+              onClick={() => setSidebarOpen(false)}
+              style={({ isActive }) => ({
                 width: '100%',
                 padding: '1rem 1.5rem',
-                background: activeTab === tab.id ? '#000' : 'transparent',
+                background: isActive ? '#000' : 'transparent',
                 border: 'none',
-                borderLeft: activeTab === tab.id ? '4px solid #000' : '4px solid transparent',
-                color: activeTab === tab.id ? '#fff' : '#666',
-                fontWeight: activeTab === tab.id ? '700' : '500',
+                borderLeft: isActive ? '4px solid #000' : '4px solid transparent',
+                color: isActive ? '#fff' : '#666',
+                fontWeight: isActive ? '700' : '500',
                 cursor: 'pointer',
                 fontSize: '0.95rem',
                 textAlign: 'left',
                 transition: 'all 0.2s ease',
                 display: 'block',
-                marginBottom: '0.25rem'
-              }}
+                marginBottom: '0.25rem',
+                textDecoration: 'none'
+              })}
               onMouseEnter={(e) => {
-                if (activeTab !== tab.id) {
-                  e.target.style.backgroundColor = '#f5f5f5';
-                  e.target.style.borderLeftColor = '#666';
+                const isActive = e.currentTarget.classList.contains('active');
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  e.currentTarget.style.borderLeftColor = '#666';
                 }
               }}
               onMouseLeave={(e) => {
-                if (activeTab !== tab.id) {
-                  e.target.style.backgroundColor = 'transparent';
-                  e.target.style.borderLeftColor = 'transparent';
+                const isActive = e.currentTarget.classList.contains('active');
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.borderLeftColor = 'transparent';
                 }
               }}
             >
               {tab.label}
-            </button>
+            </NavLink>
           ))}
         </div>
 
         {/* Main Content Area */}
         <div style={{ flex: 1, padding: '2rem', backgroundColor: '#f8f9fa', overflowY: 'auto' }}>
-          {activeTab === 'dashboard' && <DashboardTab />}
-          {activeTab === 'salesReport' && <SalesReportTab />}
-          {activeTab === 'balances' && <BalanceTab />}
-          {activeTab === 'balanceTransfers' && <BalanceTransfersTab />}
-          {activeTab === 'expenses' && <ExpenseTab />}
-          {activeTab === 'inventory' && <InventoryTab />}
-          {activeTab === 'products' && <ProductsTab />}
-          {activeTab === 'creditHolders' && <CreditHoldersTab />}
-          {activeTab === 'distributors' && <DistributorsTab />}
-          {activeTab === 'orders' && <OrdersTab />}
-          {activeTab === 'users' && <UsersTab />}
+          <Routes>
+            <Route index element={<DashboardTab />} />
+            <Route path="sales-report" element={<SalesReportTab />} />
+            <Route path="balance-sheet" element={<BalanceSheetTab />} />
+            <Route path="balances" element={<BalanceTab />} />
+            <Route path="balance-transfers" element={<BalanceTransfersTab />} />
+            <Route path="expenses" element={<ExpenseTab />} />
+            <Route path="recurring-expenses" element={<RecurringExpensesTab />} />
+            <Route path="inventory" element={<InventoryTab />} />
+            <Route path="products" element={<ProductsTab />} />
+            <Route path="credit-holders" element={<CreditHoldersTab />} />
+            <Route path="distributors" element={<DistributorsTab />} />
+            <Route path="schemes" element={<SchemesTab />} />
+            <Route path="orders" element={<OrdersTab />} />
+            <Route path="users" element={<UsersTab />} />
+            {/* Redirect unknown paths to dashboard */}
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Routes>
         </div>
       </div>
     </>

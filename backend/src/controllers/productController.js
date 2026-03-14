@@ -47,6 +47,18 @@ const createProduct = async (req, res) => {
 
     const organisationId = req.user.organisationId;
 
+    // Check for duplicate product name in same organization
+    const existingProducts = await db.getProductsByOrganisationId(organisationId);
+    const duplicate = existingProducts.find(
+      p => p.product_name.toLowerCase().trim() === productName.toLowerCase().trim()
+    );
+
+    if (duplicate) {
+      return res.status(409).json({
+        error: 'A product with this name already exists in your organization | इस नाम का उत्पाद पहले से मौजूद है'
+      });
+    }
+
     const newProduct = await db.createProduct({
       organisationId,
       productName,
@@ -64,6 +76,12 @@ const createProduct = async (req, res) => {
     res.status(201).json(newProduct);
   } catch (error) {
     console.error(error);
+    // Check for database unique constraint violation
+    if (error.code === '23505' && error.constraint === 'unique_product_name_per_org') {
+      return res.status(409).json({
+        error: 'A product with this name already exists in your organization | इस नाम का उत्पाद पहले से मौजूद है'
+      });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -84,6 +102,20 @@ const updateProduct = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Check for duplicate product name if name is being updated
+    if (productName !== undefined && productName.toLowerCase().trim() !== product.product_name.toLowerCase().trim()) {
+      const existingProducts = await db.getProductsByOrganisationId(req.user.organisationId);
+      const duplicate = existingProducts.find(
+        p => p.id !== id && p.product_name.toLowerCase().trim() === productName.toLowerCase().trim()
+      );
+
+      if (duplicate) {
+        return res.status(409).json({
+          error: 'A product with this name already exists in your organization | इस नाम का उत्पाद पहले से मौजूद है'
+        });
+      }
+    }
+
     const updates = {};
     if (productName !== undefined) updates.productName = productName;
     if (salePrice !== undefined) updates.salePrice = salePrice;
@@ -92,6 +124,12 @@ const updateProduct = async (req, res) => {
     res.json(updatedProduct);
   } catch (error) {
     console.error(error);
+    // Check for database unique constraint violation
+    if (error.code === '23505' && error.constraint === 'unique_product_name_per_org') {
+      return res.status(409).json({
+        error: 'A product with this name already exists in your organization | इस नाम का उत्पाद पहले से मौजूद है'
+      });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };

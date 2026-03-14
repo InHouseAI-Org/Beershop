@@ -35,17 +35,23 @@ const createUser = async (req, res) => {
       return res.status(400).json({ error: 'Please provide username and password' });
     }
 
-    // Check if username already exists
-    const existingUser = await db.getUserByUsername(username);
-    if (existingUser) {
-      return res.status(400).json({ error: 'Username already exists' });
-    }
-
     // Admins create users for their own organization
     const organisationId = req.user.organisationId;
 
     if (!organisationId) {
       return res.status(400).json({ error: 'Organisation ID is required' });
+    }
+
+    // Check if username already exists in the same organization
+    const existingUsers = await db.getUsersByOrganisationId(organisationId);
+    const duplicate = existingUsers.find(
+      u => u.username.toLowerCase().trim() === username.toLowerCase().trim()
+    );
+
+    if (duplicate) {
+      return res.status(409).json({
+        error: 'A user with this username already exists in your organization | इस यूज़रनेम का उपयोगकर्ता पहले से मौजूद है'
+      });
     }
 
     const newUser = await db.createUser({
@@ -59,6 +65,12 @@ const createUser = async (req, res) => {
     res.status(201).json(userWithoutPassword);
   } catch (error) {
     console.error(error);
+    // Check for database unique constraint violation
+    if (error.code === '23505' && error.constraint === 'unique_username_per_org') {
+      return res.status(409).json({
+        error: 'A user with this username already exists in your organization | इस यूज़रनेम का उपयोगकर्ता पहले से मौजूद है'
+      });
+    }
     // Check if it's a validation error
     if (error.message && error.message.includes('Username cannot be empty')) {
       return res.status(400).json({ error: error.message });
@@ -83,11 +95,17 @@ const updateUser = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Check if username already exists (if updating username)
-    if (username) {
-      const existingUser = await db.getUserByUsername(username);
-      if (existingUser && existingUser.id !== id) {
-        return res.status(400).json({ error: 'Username already exists' });
+    // Check for duplicate username in same organization if username is being updated
+    if (username !== undefined && username.toLowerCase().trim() !== user.username.toLowerCase().trim()) {
+      const existingUsers = await db.getUsersByOrganisationId(user.organisation_id);
+      const duplicate = existingUsers.find(
+        u => u.id !== id && u.username.toLowerCase().trim() === username.toLowerCase().trim()
+      );
+
+      if (duplicate) {
+        return res.status(409).json({
+          error: 'A user with this username already exists in your organization | इस यूज़रनेम का उपयोगकर्ता पहले से मौजूद है'
+        });
       }
     }
 
@@ -102,6 +120,12 @@ const updateUser = async (req, res) => {
     res.json(userWithoutPassword);
   } catch (error) {
     console.error(error);
+    // Check for database unique constraint violation
+    if (error.code === '23505' && error.constraint === 'unique_username_per_org') {
+      return res.status(409).json({
+        error: 'A user with this username already exists in your organization | इस यूज़रनेम का उपयोगकर्ता पहले से मौजूद है'
+      });
+    }
     // Check if it's a validation error
     if (error.message && error.message.includes('Username cannot be empty')) {
       return res.status(400).json({ error: error.message });

@@ -11,7 +11,11 @@ const DistributorsTab = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showDistributorHistory, setShowDistributorHistory] = useState(false);
   const [selectedDistributor, setSelectedDistributor] = useState(null);
+  const [activeTab, setActiveTab] = useState('outstanding');
   const [distributorHistory, setDistributorHistory] = useState([]);
+  const [distributorLedger, setDistributorLedger] = useState([]);
+  const [distributorOrders, setDistributorOrders] = useState([]);
+  const [unpaidBills, setUnpaidBills] = useState([]);
   const [editingDistributor, setEditingDistributor] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -19,9 +23,12 @@ const DistributorsTab = () => {
   });
   const [paymentData, setPaymentData] = useState({
     distributorId: '',
-    amountPaid: '',
-    paidFrom: 'cash_balance',
-    paymentDate: new Date().toISOString().split('T')[0]
+    paymentType: 'order_payment',
+    amount: '',
+    paymentFrom: 'bank_balance',
+    billNumber: '',
+    orderId: '',
+    notes: ''
   });
 
   useEffect(() => {
@@ -42,24 +49,60 @@ const DistributorsTab = () => {
 
   const fetchDistributorHistory = async (distributorId) => {
     try {
-      const response = await api.get(`/distributors/${distributorId}/history`);
-      setDistributorHistory(response.data);
+      // Fetch both payment history and ledger from NEW payment system
+      const [historyRes, ledgerRes] = await Promise.all([
+        api.get(`/distributor-payments/${distributorId}/payments`), // NEW endpoint
+        api.get(`/distributor-payments/${distributorId}/ledger`)
+      ]);
+      setDistributorHistory(historyRes.data);
+      setDistributorLedger(ledgerRes.data);
     } catch (err) {
       console.error('Failed to fetch distributor history:', err);
       setError('Failed to fetch payment history');
     }
   };
 
+  const fetchUnpaidBills = async (distributorId) => {
+    try {
+      const response = await api.get(`/distributor-payments/${distributorId}/unpaid-bills`);
+      setUnpaidBills(response.data);
+    } catch (err) {
+      console.error('Failed to fetch unpaid bills:', err);
+      setError('Failed to fetch unpaid bills');
+    }
+  };
+
+  const fetchDistributorOrders = async (distributorId) => {
+    try {
+      const response = await api.get('/orders');
+      // Filter orders for this distributor
+      const filteredOrders = response.data.filter(order => order.distributor_id === distributorId);
+      setDistributorOrders(filteredOrders);
+    } catch (err) {
+      console.error('Failed to fetch distributor orders:', err);
+      setError('Failed to fetch orders');
+    }
+  };
+
   const handleShowDistributorHistory = async (distributor) => {
     setSelectedDistributor(distributor);
-    await fetchDistributorHistory(distributor.id);
+    setActiveTab('outstanding');
+    await Promise.all([
+      fetchDistributorHistory(distributor.id),
+      fetchUnpaidBills(distributor.id),
+      fetchDistributorOrders(distributor.id)
+    ]);
     setShowDistributorHistory(true);
   };
 
   const handleCloseDistributorHistory = () => {
     setShowDistributorHistory(false);
     setSelectedDistributor(null);
+    setActiveTab('outstanding');
     setDistributorHistory([]);
+    setDistributorLedger([]);
+    setDistributorOrders([]);
+    setUnpaidBills([]);
   };
 
   const handleOpenModal = (distributor = null) => {
@@ -108,10 +151,14 @@ const DistributorsTab = () => {
   const handleOpenPaymentModal = () => {
     setPaymentData({
       distributorId: '',
-      amountPaid: '',
-      paidFrom: 'cash_balance',
-      paymentDate: new Date().toISOString().split('T')[0]
+      paymentType: 'order_payment',
+      amount: '',
+      paymentFrom: 'bank_balance',
+      billNumber: '',
+      orderId: '',
+      notes: ''
     });
+    setUnpaidBills([]);
     setShowPaymentModal(true);
     setError('');
     setSuccess('');
@@ -121,10 +168,14 @@ const DistributorsTab = () => {
     setShowPaymentModal(false);
     setPaymentData({
       distributorId: '',
-      amountPaid: '',
-      paidFrom: 'cash_balance',
-      paymentDate: new Date().toISOString().split('T')[0]
+      paymentType: 'order_payment',
+      amount: '',
+      paymentFrom: 'bank_balance',
+      billNumber: '',
+      orderId: '',
+      notes: ''
     });
+    setUnpaidBills([]);
   };
 
   const handlePayDistributor = async (e) => {
@@ -132,14 +183,20 @@ const DistributorsTab = () => {
     setError('');
     setSuccess('');
 
-    if (!paymentData.distributorId || !paymentData.amountPaid) {
+    if (!paymentData.distributorId || !paymentData.amount) {
       setError('Please select a distributor and enter amount');
       return;
     }
 
-    const amountPaid = parseFloat(paymentData.amountPaid);
-    if (amountPaid <= 0) {
-      setError('Amount paid must be greater than 0');
+    const amount = parseFloat(paymentData.amount);
+    if (amount <= 0) {
+      setError('Amount must be greater than 0');
+      return;
+    }
+
+    // Validate bill number is selected for order_payment
+    if (paymentData.paymentType === 'order_payment' && !paymentData.orderId) {
+      setError('Please select a bill number for order payment');
       return;
     }
 
@@ -149,21 +206,25 @@ const DistributorsTab = () => {
       return;
     }
 
-    const currentOutstanding = parseFloat(selectedDistributor.amount_outstanding || 0);
-    if (amountPaid > currentOutstanding) {
-      setError(`Amount paid (₹${amountPaid.toFixed(2)}) cannot exceed outstanding (₹${currentOutstanding.toFixed(2)})`);
-      return;
-    }
-
     try {
-      await api.post('/distributors/pay', {
+      const requestData = {
         distributorId: paymentData.distributorId,
-        amountPaid: amountPaid,
-        paidFrom: paymentData.paidFrom,
-        paymentDate: paymentData.paymentDate
-      });
+        paymentType: paymentData.paymentType,
+        amount: amount,
+        paymentFrom: paymentData.paymentFrom,
+        notes: paymentData.notes || null
+      };
 
-      setSuccess(`Successfully paid ₹${amountPaid.toFixed(2)} to ${selectedDistributor.name}`);
+      // Add bill-specific fields for order_payment
+      if (paymentData.paymentType === 'order_payment') {
+        requestData.orderId = paymentData.orderId;
+        requestData.billNumber = paymentData.billNumber;
+      }
+
+      await api.post('/distributor-payments/pay', requestData);
+
+      const paymentTypeLabel = paymentData.paymentType === 'advance' ? 'advance payment' : 'payment';
+      setSuccess(`Successfully recorded ${paymentTypeLabel} of ₹${amount.toFixed(2)} for ${selectedDistributor.name}`);
       await fetchDistributors();
       handleClosePaymentModal();
 
@@ -347,18 +408,24 @@ const DistributorsTab = () => {
                   id="distributor"
                   className="form-control"
                   value={paymentData.distributorId}
-                  onChange={(e) => setPaymentData({ ...paymentData, distributorId: e.target.value })}
+                  onChange={async (e) => {
+                    const selectedId = e.target.value;
+                    setPaymentData({ ...paymentData, distributorId: selectedId, billNumber: '', orderId: '' });
+                    if (selectedId) {
+                      await fetchUnpaidBills(selectedId);
+                    } else {
+                      setUnpaidBills([]);
+                    }
+                  }}
                   required
                   style={{ padding: '0.75rem', fontSize: '1rem' }}
                 >
                   <option value="">-- Select Distributor --</option>
-                  {distributors
-                    .filter(d => parseFloat(d.amount_outstanding || 0) > 0)
-                    .map(d => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} - Outstanding: ₹{parseFloat(d.amount_outstanding || 0).toFixed(2)}
-                      </option>
-                    ))}
+                  {distributors.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} - Outstanding: ₹{parseFloat(d.amount_outstanding || 0).toFixed(2)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -378,47 +445,89 @@ const DistributorsTab = () => {
               )}
 
               <div className="form-group">
-                <label htmlFor="amountPaid">Amount Paid</label>
-                <input
-                  type="number"
-                  id="amountPaid"
-                  className="form-control"
-                  value={paymentData.amountPaid}
-                  onChange={(e) => setPaymentData({ ...paymentData, amountPaid: e.target.value })}
-                  step="0.01"
-                  min="0"
-                  required
-                  placeholder="Enter amount paid"
-                  style={{ padding: '0.75rem', fontSize: '1rem' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="paymentDate">Payment Date | भुगतान तिथि</label>
-                <input
-                  type="date"
-                  id="paymentDate"
-                  className="form-control"
-                  value={paymentData.paymentDate}
-                  onChange={(e) => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
-                  max={new Date().toISOString().split('T')[0]}
-                  required
-                  style={{ padding: '0.75rem', fontSize: '1rem' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="paidFrom">Paid From | से भुगतान</label>
+                <label htmlFor="paymentType">Payment Type</label>
                 <select
-                  id="paidFrom"
+                  id="paymentType"
                   className="form-control"
-                  value={paymentData.paidFrom}
-                  onChange={(e) => setPaymentData({ ...paymentData, paidFrom: e.target.value })}
+                  value={paymentData.paymentType}
+                  onChange={(e) => setPaymentData({ ...paymentData, paymentType: e.target.value, billNumber: '', orderId: '' })}
                   required
                   style={{ padding: '0.75rem', fontSize: '1rem' }}
                 >
-                  <option value="cash_balance">Cash Balance | नकद शेष</option>
+                  <option value="order_payment">Order Payment (Pay Bill)</option>
+                  <option value="advance">Advance Payment</option>
+                </select>
+                <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                  {paymentData.paymentType === 'advance'
+                    ? 'Advance payment reduces outstanding and allows negative balance'
+                    : 'Pay against a specific bill/order'}
+                </small>
+              </div>
+
+              {paymentData.paymentType === 'order_payment' && paymentData.distributorId && (
+                <div className="form-group">
+                  <label htmlFor="billNumber">Select Bill Number</label>
+                  <select
+                    id="billNumber"
+                    className="form-control"
+                    value={paymentData.orderId}
+                    onChange={(e) => {
+                      const selectedBill = unpaidBills.find(b => b.id === e.target.value);
+                      setPaymentData({
+                        ...paymentData,
+                        orderId: e.target.value,
+                        billNumber: selectedBill?.bill_number || ''
+                      });
+                    }}
+                    required={paymentData.paymentType === 'order_payment'}
+                    style={{ padding: '0.75rem', fontSize: '1rem' }}
+                  >
+                    <option value="">-- Select Bill --</option>
+                    {unpaidBills.map(bill => (
+                      <option key={bill.id} value={bill.id}>
+                        {bill.bill_number || `Order ${new Date(bill.order_date).toLocaleDateString()}`} -
+                        Total: ₹{parseFloat(bill.total_amount).toFixed(2)} |
+                        Paid: ₹{parseFloat(bill.paid_amount).toFixed(2)} |
+                        Remaining: ₹{parseFloat(bill.remaining_amount).toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                  {unpaidBills.length === 0 && (
+                    <small style={{ color: '#856404', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                      No bills found for this distributor
+                    </small>
+                  )}
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="amount">Amount</label>
+                <input
+                  type="number"
+                  id="amount"
+                  className="form-control"
+                  value={paymentData.amount}
+                  onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+                  step="0.01"
+                  min="0"
+                  required
+                  placeholder="Enter amount"
+                  style={{ padding: '0.75rem', fontSize: '1rem' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="paymentFrom">Payment From | से भुगतान</label>
+                <select
+                  id="paymentFrom"
+                  className="form-control"
+                  value={paymentData.paymentFrom}
+                  onChange={(e) => setPaymentData({ ...paymentData, paymentFrom: e.target.value })}
+                  required
+                  style={{ padding: '0.75rem', fontSize: '1rem' }}
+                >
                   <option value="bank_balance">Bank Balance | बैंक शेष</option>
+                  <option value="cash_balance">Cash Balance | नकद शेष</option>
                   <option value="gala_balance">Gala Balance | गला शेष</option>
                 </select>
                 <div style={{
@@ -433,7 +542,20 @@ const DistributorsTab = () => {
                 </div>
               </div>
 
-              {paymentData.distributorId && paymentData.amountPaid && (
+              <div className="form-group">
+                <label htmlFor="notes">Notes (Optional)</label>
+                <textarea
+                  id="notes"
+                  className="form-control"
+                  value={paymentData.notes}
+                  onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+                  placeholder="Add any notes about this payment"
+                  rows="2"
+                  style={{ padding: '0.75rem', fontSize: '1rem' }}
+                />
+              </div>
+
+              {paymentData.distributorId && paymentData.amount && (
                 <div style={{
                   padding: '1rem',
                   backgroundColor: '#e3f2fd',
@@ -443,8 +565,13 @@ const DistributorsTab = () => {
                 }}>
                   <p style={{ margin: 0, fontSize: '0.875rem', color: '#1565c0' }}>New Outstanding After Payment</p>
                   <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.5rem', fontWeight: '700', color: '#0d47a1' }}>
-                    ₹{(parseFloat(distributors.find(d => d.id === paymentData.distributorId)?.amount_outstanding || 0) - parseFloat(paymentData.amountPaid || 0)).toFixed(2)}
+                    ₹{(parseFloat(distributors.find(d => d.id === paymentData.distributorId)?.amount_outstanding || 0) - parseFloat(paymentData.amount || 0)).toFixed(2)}
                   </p>
+                  {paymentData.paymentType === 'advance' && (parseFloat(distributors.find(d => d.id === paymentData.distributorId)?.amount_outstanding || 0) - parseFloat(paymentData.amount || 0)) < 0 && (
+                    <small style={{ color: '#0d47a1', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                      ✓ Negative balance represents advance/credit with distributor
+                    </small>
+                  )}
                 </div>
               )}
 
@@ -473,9 +600,9 @@ const DistributorsTab = () => {
 
       {showDistributorHistory && selectedDistributor && (
         <div className="modal-overlay" onClick={handleCloseDistributorHistory}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1200px', width: '95%', maxHeight: '90vh', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0 }}>Payment History - {selectedDistributor.name}</h2>
+              <h2 style={{ margin: 0 }}>Distributor Details - {selectedDistributor.name}</h2>
               <button
                 onClick={handleCloseDistributorHistory}
                 className="btn btn-secondary"
@@ -510,10 +637,181 @@ const DistributorsTab = () => {
               </div>
             </div>
 
-            <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
-              Payment History ({distributorHistory.length} records)
-            </h3>
+            {/* Tab Navigation */}
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              borderBottom: '2px solid #dee2e6',
+              marginBottom: '1.5rem',
+              overflowX: 'auto',
+              flexShrink: 0
+            }}>
+              <button
+                onClick={() => setActiveTab('outstanding')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  borderBottom: activeTab === 'outstanding' ? '3px solid #2196F3' : '3px solid transparent',
+                  background: activeTab === 'outstanding' ? '#e3f2fd' : 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'outstanding' ? '700' : '600',
+                  color: activeTab === 'outstanding' ? '#0d47a1' : '#666',
+                  fontSize: '1rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Outstanding Bills ({unpaidBills.filter(b => !b.is_fully_paid).length})
+              </button>
+              <button
+                onClick={() => setActiveTab('payments')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  borderBottom: activeTab === 'payments' ? '3px solid #2196F3' : '3px solid transparent',
+                  background: activeTab === 'payments' ? '#e3f2fd' : 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'payments' ? '700' : '600',
+                  color: activeTab === 'payments' ? '#0d47a1' : '#666',
+                  fontSize: '1rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Payment History ({distributorHistory.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('orders')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  borderBottom: activeTab === 'orders' ? '3px solid #2196F3' : '3px solid transparent',
+                  background: activeTab === 'orders' ? '#e3f2fd' : 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'orders' ? '700' : '600',
+                  color: activeTab === 'orders' ? '#0d47a1' : '#666',
+                  fontSize: '1rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                All Orders ({distributorOrders.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('ledger')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  borderBottom: activeTab === 'ledger' ? '3px solid #2196F3' : '3px solid transparent',
+                  background: activeTab === 'ledger' ? '#e3f2fd' : 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'ledger' ? '700' : '600',
+                  color: activeTab === 'ledger' ? '#0d47a1' : '#666',
+                  fontSize: '1rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Complete Ledger ({distributorLedger.length})
+              </button>
+            </div>
 
+            {/* Tab Content - Scrollable */}
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+
+            {/* Outstanding Bills Tab */}
+            {activeTab === 'outstanding' && (
+            <div>
+            {unpaidBills.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '2rem',
+                color: '#666',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                border: '1px solid #dee2e6'
+              }}>
+                <p style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600', color: '#666' }}>
+                  No bills found for this distributor
+                </p>
+              </div>
+            ) : unpaidBills.filter(b => !b.is_fully_paid).length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '2rem',
+                color: '#666',
+                backgroundColor: '#d4edda',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                border: '1px solid #c3e6cb'
+              }}>
+                <p style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600', color: '#155724' }}>
+                  ✓ All bills are fully paid!
+                </p>
+              </div>
+            ) : (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Bill Number</th>
+                      <th>Order Date</th>
+                      <th>Total Amount</th>
+                      <th>Paid</th>
+                      <th>Remaining</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unpaidBills
+                      .filter(b => !b.is_fully_paid)
+                      .map(bill => (
+                        <tr key={bill.id}>
+                          <td style={{ fontWeight: '600' }}>
+                            {bill.bill_number || '-'}
+                          </td>
+                          <td>{new Date(bill.order_date).toLocaleDateString()}</td>
+                          <td>₹{parseFloat(bill.total_amount).toFixed(2)}</td>
+                          <td style={{ color: '#2196F3', fontWeight: '600' }}>
+                            ₹{parseFloat(bill.paid_amount).toFixed(2)}
+                          </td>
+                          <td style={{ color: '#dc3545', fontWeight: '700', fontSize: '1.125rem' }}>
+                            ₹{parseFloat(bill.remaining_amount).toFixed(2)}
+                          </td>
+                          <td>
+                            <span style={{
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '12px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              backgroundColor: parseFloat(bill.paid_amount) > 0 ? '#fff3cd' : '#f8d7da',
+                              color: parseFloat(bill.paid_amount) > 0 ? '#856404' : '#721c24'
+                            }}>
+                              {parseFloat(bill.paid_amount) > 0 ? 'Partial' : 'Unpaid'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                  <tfoot style={{ borderTop: '2px solid #dee2e6', backgroundColor: '#f8f9fa' }}>
+                    <tr>
+                      <td colSpan="4" style={{ fontWeight: '700', textAlign: 'right', paddingTop: '1rem' }}>
+                        Total Outstanding:
+                      </td>
+                      <td colSpan="2" style={{ fontWeight: '700', fontSize: '1.25rem', color: '#dc3545', paddingTop: '1rem' }}>
+                        ₹{unpaidBills
+                          .filter(b => !b.is_fully_paid)
+                          .reduce((sum, bill) => sum + parseFloat(bill.remaining_amount), 0)
+                          .toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+            </div>
+            )}
+
+            {/* Payment History Tab */}
+            {activeTab === 'payments' && (
+            <div>
             {distributorHistory.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
                 No payment history found for this distributor
@@ -524,42 +822,61 @@ const DistributorsTab = () => {
                   <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 1 }}>
                     <tr>
                       <th>Date</th>
-                      <th>Amount Paid</th>
+                      <th>Type</th>
+                      <th>Bill Number</th>
+                      <th>Amount</th>
                       <th>Paid From</th>
-                      <th>Previous Balance</th>
-                      <th>New Balance</th>
+                      <th>Notes</th>
                       <th>Paid By</th>
                     </tr>
                   </thead>
                   <tbody>
                     {distributorHistory.map(record => {
-                      const paidFromDisplay = record.paid_from === 'cash_balance' ? 'Cash' :
-                        record.paid_from === 'bank_balance' ? 'Bank' :
-                        record.paid_from === 'gala_balance' ? 'Gala' : '-';
+                      const paidFromDisplay = record.payment_from === 'cash_balance' ? 'Cash' :
+                        record.payment_from === 'bank_balance' ? 'Bank' :
+                        record.payment_from === 'gala_balance' ? 'Gala' : '-';
+
+                      const paymentTypeDisplay = record.payment_type === 'advance' ? 'Advance' : 'Order Payment';
 
                       return (
                         <tr key={record.id}>
-                          <td>{new Date(record.paid_at).toLocaleDateString()}</td>
-                          <td style={{ color: '#2196F3', fontWeight: '700' }}>
-                            ₹{parseFloat(record.amount_paid).toFixed(2)}
+                          <td>{new Date(record.payment_date).toLocaleDateString()}</td>
+                          <td>
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '12px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              backgroundColor: record.payment_type === 'advance' ? '#e3f2fd' : '#fff3cd',
+                              color: record.payment_type === 'advance' ? '#0d47a1' : '#856404'
+                            }}>
+                              {paymentTypeDisplay}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: '600' }}>
+                            {record.bill_number || (record.order_date ? new Date(record.order_date).toLocaleDateString() : '-')}
+                          </td>
+                          <td style={{ color: '#2196F3', fontWeight: '700', fontSize: '1.125rem' }}>
+                            ₹{parseFloat(record.amount).toFixed(2)}
                           </td>
                           <td>
                             <span style={{
                               padding: '0.25rem 0.5rem',
                               borderRadius: '4px',
                               fontSize: '0.875rem',
-                              backgroundColor: record.paid_from === 'cash_balance' ? '#fff3cd' :
-                                record.paid_from === 'bank_balance' ? '#d1ecf1' :
-                                record.paid_from === 'gala_balance' ? '#d4edda' : '#f8f9fa',
+                              backgroundColor: record.payment_from === 'cash_balance' ? '#fff3cd' :
+                                record.payment_from === 'bank_balance' ? '#d1ecf1' :
+                                record.payment_from === 'gala_balance' ? '#d4edda' : '#f8f9fa',
                               color: '#000',
                               fontWeight: '600'
                             }}>
                               {paidFromDisplay}
                             </span>
                           </td>
-                          <td>₹{parseFloat(record.previous_outstanding).toFixed(2)}</td>
-                          <td>₹{parseFloat(record.new_outstanding).toFixed(2)}</td>
-                          <td>{record.paid_by_name}</td>
+                          <td style={{ fontSize: '0.875rem', color: '#666' }}>
+                            {record.notes || '-'}
+                          </td>
+                          <td>{record.created_by_name || '-'}</td>
                         </tr>
                       );
                     })}
@@ -578,10 +895,178 @@ const DistributorsTab = () => {
               }}>
                 <p style={{ margin: 0, fontSize: '0.875rem', color: '#1565c0' }}>Total Amount Paid</p>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.5rem', fontWeight: '700', color: '#0d47a1' }}>
-                  ₹{distributorHistory.reduce((sum, record) => sum + parseFloat(record.amount_paid), 0).toFixed(2)}
+                  ₹{distributorHistory.reduce((sum, record) => sum + parseFloat(record.amount || 0), 0).toFixed(2)}
                 </p>
               </div>
             )}
+            </div>
+            )}
+
+            {/* All Orders Tab */}
+            {activeTab === 'orders' && (
+            <div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
+              All Orders ({distributorOrders.length})
+            </h3>
+
+            {distributorOrders.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f8f9fa', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                No orders found for this distributor
+              </div>
+            ) : (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Order Date</th>
+                      <th>Bill Number</th>
+                      <th>Items</th>
+                      <th>Total Amount</th>
+                      <th>Payment Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {distributorOrders.map(order => {
+                      const itemsTotal = order.order_data && Array.isArray(order.order_data)
+                        ? order.order_data.reduce((sum, item) => sum + parseFloat(item.total || 0), 0)
+                        : 0;
+                      const grandTotal = itemsTotal + parseFloat(order.tax || 0) + parseFloat(order.misc || 0) - parseFloat(order.scheme || 0) - parseFloat(order.discount || 0);
+
+                      return (
+                        <tr key={order.id}>
+                          <td>{new Date(order.order_date).toLocaleDateString()}</td>
+                          <td style={{ fontWeight: '600' }}>
+                            {order.bill_number || '-'}
+                          </td>
+                          <td>
+                            {order.order_data && Array.isArray(order.order_data) ? order.order_data.length : 0} items
+                          </td>
+                          <td style={{ fontWeight: '700', fontSize: '1.125rem', color: '#2e7d32' }}>
+                            ₹{grandTotal.toFixed(2)}
+                          </td>
+                          <td>
+                            {order.payment_outstanding_date
+                              ? new Date(order.payment_outstanding_date).toLocaleDateString()
+                              : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot style={{ borderTop: '2px solid #dee2e6', backgroundColor: '#f8f9fa' }}>
+                    <tr>
+                      <td colSpan="3" style={{ fontWeight: '700', textAlign: 'right', paddingTop: '1rem' }}>
+                        Total Orders Value:
+                      </td>
+                      <td colSpan="2" style={{ fontWeight: '700', fontSize: '1.25rem', color: '#2e7d32', paddingTop: '1rem' }}>
+                        ₹{distributorOrders.reduce((sum, order) => {
+                          const itemsTotal = order.order_data && Array.isArray(order.order_data)
+                            ? order.order_data.reduce((s, item) => s + parseFloat(item.total || 0), 0)
+                            : 0;
+                          return sum + itemsTotal + parseFloat(order.tax || 0) + parseFloat(order.misc || 0) - parseFloat(order.scheme || 0) - parseFloat(order.discount || 0);
+                        }, 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+            </div>
+            )}
+
+            {/* Complete Ledger Tab */}
+            {activeTab === 'ledger' && (
+            <div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
+              Complete Ledger ({distributorLedger.length} transactions)
+            </h3>
+
+            {distributorLedger.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f8f9fa', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                No transactions found for this distributor
+              </div>
+            ) : (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Bill Number</th>
+                      <th>Debit (Orders)</th>
+                      <th>Credit (Payments)</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {distributorLedger.map((transaction, index) => {
+                      const isOrder = transaction.transaction_type === 'order';
+                      const typeDisplay = isOrder ? 'Order' :
+                        transaction.transaction_type === 'advance' ? 'Advance Payment' : 'Order Payment';
+
+                      return (
+                        <tr key={index} style={{ backgroundColor: isOrder ? '#fff3e0' : '#e8f5e9' }}>
+                          <td>{new Date(transaction.transaction_date).toLocaleDateString()}</td>
+                          <td>
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '12px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              backgroundColor: isOrder ? '#ff9800' : '#4caf50',
+                              color: '#fff'
+                            }}>
+                              {typeDisplay}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: '600' }}>
+                            {transaction.bill_number || '-'}
+                          </td>
+                          <td style={{ color: '#d32f2f', fontWeight: '700', fontSize: '1.125rem' }}>
+                            {parseFloat(transaction.debit_amount) > 0 ? `₹${parseFloat(transaction.debit_amount).toFixed(2)}` : '-'}
+                          </td>
+                          <td style={{ color: '#2e7d32', fontWeight: '700', fontSize: '1.125rem' }}>
+                            {parseFloat(transaction.credit_amount) > 0 ? `₹${parseFloat(transaction.credit_amount).toFixed(2)}` : '-'}
+                          </td>
+                          <td style={{ fontSize: '0.875rem', color: '#666' }}>
+                            {transaction.notes || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot style={{ borderTop: '2px solid #dee2e6', backgroundColor: '#f8f9fa' }}>
+                    <tr>
+                      <td colSpan="3" style={{ fontWeight: '700', textAlign: 'right', paddingTop: '1rem' }}>
+                        Totals:
+                      </td>
+                      <td style={{ fontWeight: '700', fontSize: '1.25rem', color: '#d32f2f', paddingTop: '1rem' }}>
+                        ₹{distributorLedger.reduce((sum, t) => sum + parseFloat(t.debit_amount || 0), 0).toFixed(2)}
+                      </td>
+                      <td style={{ fontWeight: '700', fontSize: '1.25rem', color: '#2e7d32', paddingTop: '1rem' }}>
+                        ₹{distributorLedger.reduce((sum, t) => sum + parseFloat(t.credit_amount || 0), 0).toFixed(2)}
+                      </td>
+                      <td></td>
+                    </tr>
+                    <tr style={{ backgroundColor: '#e3f2fd' }}>
+                      <td colSpan="3" style={{ fontWeight: '700', textAlign: 'right', paddingTop: '1rem' }}>
+                        Net Outstanding:
+                      </td>
+                      <td colSpan="3" style={{ fontWeight: '700', fontSize: '1.5rem', color: '#0d47a1', paddingTop: '1rem' }}>
+                        ₹{(
+                          distributorLedger.reduce((sum, t) => sum + parseFloat(t.debit_amount || 0), 0) -
+                          distributorLedger.reduce((sum, t) => sum + parseFloat(t.credit_amount || 0), 0)
+                        ).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+            </div>
+            )}
+
+            </div>
           </div>
         </div>
       )}

@@ -47,6 +47,18 @@ const createCreditHolder = async (req, res) => {
 
     const organisationId = req.user.organisationId;
 
+    // Check for duplicate credit holder name in same organization
+    const existingHolders = await db.getCreditHoldersByOrganisationId(organisationId);
+    const duplicate = existingHolders.find(
+      h => h.name.toLowerCase().trim() === name.toLowerCase().trim()
+    );
+
+    if (duplicate) {
+      return res.status(409).json({
+        error: 'A credit holder with this name already exists in your organization | इस नाम का क्रेडिट धारक पहले से मौजूद है'
+      });
+    }
+
     const newCreditHolder = await db.createCreditHolder({
       organisationId,
       name,
@@ -58,6 +70,12 @@ const createCreditHolder = async (req, res) => {
     res.status(201).json(newCreditHolder);
   } catch (error) {
     console.error(error);
+    // Check for database unique constraint violation
+    if (error.code === '23505' && error.constraint === 'unique_credit_holder_name_per_org') {
+      return res.status(409).json({
+        error: 'A credit holder with this name already exists in your organization | इस नाम का क्रेडिट धारक पहले से मौजूद है'
+      });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -78,6 +96,20 @@ const updateCreditHolder = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Check for duplicate name if name is being updated
+    if (name !== undefined && name.toLowerCase().trim() !== creditHolder.name.toLowerCase().trim()) {
+      const existingHolders = await db.getCreditHoldersByOrganisationId(req.user.organisationId);
+      const duplicate = existingHolders.find(
+        h => h.id !== id && h.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+
+      if (duplicate) {
+        return res.status(409).json({
+          error: 'A credit holder with this name already exists in your organization | इस नाम का क्रेडिट धारक पहले से मौजूद है'
+        });
+      }
+    }
+
     // Only allow updating name, address, phone - amountPayable is automatically managed
     const updates = {};
     if (name !== undefined) updates.name = name;
@@ -88,6 +120,12 @@ const updateCreditHolder = async (req, res) => {
     res.json(updatedCreditHolder);
   } catch (error) {
     console.error(error);
+    // Check for database unique constraint violation
+    if (error.code === '23505' && error.constraint === 'unique_credit_holder_name_per_org') {
+      return res.status(409).json({
+        error: 'A credit holder with this name already exists in your organization | इस नाम का क्रेडिट धारक पहले से मौजूद है'
+      });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };

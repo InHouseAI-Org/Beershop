@@ -14,6 +14,13 @@ const DashboardTab = () => {
     totalOrders: 0,
     recentSales: []
   });
+  const [schemeStats, setSchemeStats] = useState({
+    total_schemes: 0,
+    active_schemes: 0,
+    achieved_schemes: 0,
+    total_value_to_avail: 0,
+    total_value_achieved: 0
+  });
   const [analyticsData, setAnalyticsData] = useState({
     monthlySales: [],
     distributorOrders: [],
@@ -32,14 +39,15 @@ const DashboardTab = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [usersRes, productsRes, creditHoldersRes, distributorsRes, ordersRes, salesRes, analyticsRes] = await Promise.all([
+      const [usersRes, productsRes, creditHoldersRes, distributorsRes, ordersRes, salesRes, analyticsRes, schemesStatsRes] = await Promise.all([
         api.get('/users'),
         api.get('/products'),
         api.get('/credit-holders'),
         api.get('/distributors'),
         api.get('/orders'),
         api.get('/sales'),
-        api.get('/analytics/monthly')
+        api.get('/analytics/monthly'),
+        api.get('/schemes/stats')
       ]);
 
       setStats({
@@ -52,6 +60,7 @@ const DashboardTab = () => {
       });
 
       setAnalyticsData(analyticsRes.data);
+      setSchemeStats(schemesStatsRes.data);
 
       setError('');
     } catch (err) {
@@ -123,6 +132,18 @@ const DashboardTab = () => {
           </h3>
           <p style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: '700', color: '#000', margin: 0 }}>
             {stats.totalDistributors}
+          </p>
+        </div>
+
+        <div className="card" style={{ textAlign: 'center'}}>
+          <h3 style={{ color: '#666', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem'}}>
+            Schemes To Be Availed
+          </h3>
+          <p style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '700', color: '#000', margin: 0 }}>
+            ₹{parseFloat(schemeStats.total_value_to_avail || 0).toFixed(2)}
+          </p>
+          <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.8 }}>
+            {schemeStats.active_schemes || 0} Active Schemes
           </p>
         </div>
       </div>

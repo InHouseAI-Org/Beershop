@@ -8,14 +8,19 @@ const userRoutes = require('./routes/users');
 const productRoutes = require('./routes/products');
 const creditHolderRoutes = require('./routes/creditHolders');
 const distributorRoutes = require('./routes/distributors');
+const distributorPaymentsRoutes = require('./routes/distributorPayments');
 const orderRoutes = require('./routes/orders');
 const salesRoutes = require('./routes/sales');
+const salesDraftsRoutes = require('./routes/salesDrafts');
 const inventoryRoutes = require('./routes/inventory');
 const balanceRoutes = require('./routes/balances');
 const expenseRoutes = require('./routes/expenses');
 const balanceTransferRoutes = require('./routes/balanceTransfers');
 const analyticsRoutes = require('./routes/analytics');
 const organisationRoutes = require('./routes/organisations');
+const schemesRoutes = require('./routes/schemes');
+const recurringExpensesRoutes = require('./routes/recurringExpenses');
+const balanceSheetRoutes = require('./routes/balanceSheet');
 
 const app = express();
 
@@ -54,14 +59,19 @@ app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/credit-holders', creditHolderRoutes);
 app.use('/api/distributors', distributorRoutes);
+app.use('/api/distributor-payments', distributorPaymentsRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/sales-drafts', salesDraftsRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/balances', balanceRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/balance-transfers', balanceTransferRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/organisations', organisationRoutes);
+app.use('/api/schemes', schemesRoutes);
+app.use('/api/recurring-expenses', recurringExpensesRoutes);
+app.use('/api/balance-sheet', balanceSheetRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

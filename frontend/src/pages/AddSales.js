@@ -28,6 +28,10 @@ const AddSales = () => {
   const [lastSalesReportDate, setLastSalesReportDate] = useState(null);
   const [latestOrderDate, setLatestOrderDate] = useState(null);
 
+  // Draft state
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -92,6 +96,95 @@ const AddSales = () => {
         };
       });
       setProductData(initialData);
+
+      // Try to load saved draft
+      try {
+        const draftRes = await api.get('/sales-drafts');
+        if (draftRes.data && draftRes.data.draft) {
+          const draftData = draftRes.data.draft.draft_data;
+
+          // Load draft data into form, merging with current products and fresh inventory
+          if (draftData.productData) {
+            const refreshedProductData = {};
+
+            // Start with ALL current products (including any newly added ones)
+            productsRes.data.forEach(product => {
+              const inventoryItem = inventoryRes.data.find(inv => inv.product_id === product.id);
+              const currentOpeningQty = inventoryItem ? (inventoryItem.qty || 0) : 0;
+
+              // Check if this product existed in the draft
+              const draftProductData = draftData.productData[product.id];
+
+              if (draftProductData) {
+                // Product existed in draft - restore user's entered data but with fresh opening stock
+                // Preserve the sale value and recalculate closing stock based on new opening stock
+                const draftSale = parseFloat(draftProductData.sale) || 0;
+                const recalculatedClosing = currentOpeningQty - draftSale;
+
+                refreshedProductData[product.id] = {
+                  openingStock: currentOpeningQty,  // Always use fresh inventory
+                  closingStock: recalculatedClosing >= 0 ? recalculatedClosing : currentOpeningQty,
+                  sale: recalculatedClosing >= 0 ? draftSale : 0  // Reset sale if it becomes invalid
+                };
+              } else {
+                // New product added since draft was saved - initialize with defaults
+                refreshedProductData[product.id] = {
+                  openingStock: currentOpeningQty,
+                  closingStock: currentOpeningQty,
+                  sale: 0
+                };
+              }
+            });
+
+            setProductData(refreshedProductData);
+          }
+
+          // Filter credit entries to remove any deleted credit holders
+          if (draftData.creditEntries) {
+            const validCreditEntries = draftData.creditEntries.filter(entry => {
+              const holderExists = creditHoldersRes.data.find(ch => ch.id === entry.creditHolderId);
+              if (!holderExists && entry.creditHolderId) {
+                console.log(`⚠️ Credit holder ${entry.creditHolderId} no longer exists, removing from draft`);
+              }
+              return holderExists || !entry.creditHolderId; // Keep empty entries
+            });
+            setCreditEntries(validCreditEntries);
+          }
+
+          // Filter credit taken to remove any deleted credit holders
+          if (draftData.creditTaken) {
+            const validCreditTaken = draftData.creditTaken.filter(entry => {
+              const holderExists = creditHoldersRes.data.find(ch => ch.id === entry.creditHolderId);
+              if (!holderExists && entry.creditHolderId) {
+                console.log(`⚠️ Credit holder ${entry.creditHolderId} no longer exists, removing from draft`);
+              }
+              return holderExists || !entry.creditHolderId; // Keep empty entries
+            });
+            setCreditTaken(validCreditTaken);
+          }
+
+          // Load other draft fields (these are all fresh or user-entered data)
+          if (draftData.saleDate) setSaleDate(draftData.saleDate);
+          if (draftData.upiTotal !== undefined) setUpiTotal(draftData.upiTotal);
+          if (draftData.miscellaneousCash !== undefined) setMiscellaneousCash(draftData.miscellaneousCash);
+          if (draftData.miscellaneousUPI !== undefined) setMiscellaneousUPI(draftData.miscellaneousUPI);
+          if (draftData.dailyExpenses) setDailyExpenses(draftData.dailyExpenses);
+          if (draftData.remarks) setRemarks(draftData.remarks);
+
+          setIsDraftLoaded(true);
+          console.log('✅ Draft loaded successfully with fresh data:');
+          console.log('  - Current products (including new ones)');
+          console.log('  - Fresh inventory (opening stock)');
+          console.log('  - Recalculated closing stock based on saved sales');
+          console.log('  - Fresh credit holder balances');
+          console.log('  - Fresh gala balance');
+          console.log('  - Filtered out deleted credit holders');
+          console.log('  - Totals will auto-recalculate');
+        }
+      } catch (draftErr) {
+        // No draft found or error loading - continue without draft
+        console.log('No saved draft found or error loading draft');
+      }
 
       setLoading(false);
     } catch (err) {
@@ -428,12 +521,79 @@ const AddSales = () => {
 
       await api.post('/sales', payload);
 
+      // Delete draft after successful submission
+      try {
+        await api.delete('/sales-drafts');
+      } catch (draftErr) {
+        // Ignore error if draft doesn't exist
+        console.log('No draft to delete or error deleting draft');
+      }
+
       // Show success message and redirect
       alert('✅ Sales report submitted successfully!\n\nबिक्री रिपोर्ट सफलतापूर्वक सबमिट की गई!');
       navigate('/dashboard');
     } catch (err) {
       const errorMessage = err.response?.data?.error || 'Failed to submit sale';
       alert(`❌ ${errorMessage}\n\nबिक्री सबमिट करने में विफल`);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    try {
+      setSavingDraft(true);
+
+      const draftData = {
+        saleDate,
+        productData,
+        upiTotal,
+        miscellaneousCash,
+        miscellaneousUPI,
+        creditEntries,
+        creditTaken,
+        dailyExpenses,
+        remarks
+      };
+
+      await api.post('/sales-drafts', draftData);
+
+      setIsDraftLoaded(true);
+      alert('✅ Draft saved successfully! You can resume this form later.\n\nड्राफ्ट सफलतापूर्वक सहेजा गया! आप इस फॉर्म को बाद में फिर से शुरू कर सकते हैं।');
+    } catch (err) {
+      console.error('Error saving draft:', err);
+      alert('❌ Failed to save draft. Please try again.\n\nड्राफ्ट सहेजने में विफल। कृपया पुनः प्रयास करें।');
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleClearDraft = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to clear the saved draft? This will reset the form.\n\nक्या आप सुनिश्चित हैं कि आप सहेजा गया ड्राफ्ट हटाना चाहते हैं? यह फॉर्म को रीसेट कर देगा।'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete('/sales-drafts');
+
+      // Reset form to initial state
+      setIsDraftLoaded(false);
+      setSaleDate(new Date().toISOString().split('T')[0]);
+      setUpiTotal('');
+      setMiscellaneousCash('');
+      setMiscellaneousUPI('');
+      setCreditEntries([]);
+      setCreditTaken([]);
+      setDailyExpenses([]);
+      setRemarks('');
+
+      // Reload fresh data
+      fetchData();
+
+      alert('✅ Draft cleared successfully!\n\nड्राफ्ट सफलतापूर्वक हटा दिया गया!');
+    } catch (err) {
+      console.error('Error clearing draft:', err);
+      alert('❌ Failed to clear draft. Please try again.\n\nड्राफ्ट हटाने में विफल। कृपया पुनः प्रयास करें।');
     }
   };
 
@@ -459,6 +619,38 @@ const AddSales = () => {
 
       <div className="container">
         {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
+
+        {/* Draft Indicator */}
+        {isDraftLoaded && (
+          <div
+            style={{
+              backgroundColor: '#fff3cd',
+              border: '2px solid #ffc107',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <div>
+              <strong style={{ color: '#856404' }}>📝 Draft Loaded | ड्राफ्ट लोड किया गया</strong>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#856404' }}>
+                Draft restored with fresh data. Opening stock updated, closing stock recalculated, totals refreshed.
+                <br />
+                ड्राफ्ट ताज़ा डेटा के साथ लोड किया गया। शुरुआती स्टॉक, समापन स्टॉक और कुल राशि अपडेट की गई।
+              </p>
+            </div>
+            <button
+              onClick={handleClearDraft}
+              className="btn btn-warning"
+              style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+            >
+              Clear Draft | ड्राफ्ट हटाएं
+            </button>
+          </div>
+        )}
 
         {/* Date Selection */}
         <div className="card" style={{ marginBottom: '2rem' }}>
@@ -1308,23 +1500,41 @@ const AddSales = () => {
           </div>
         </div>
 
-        {/* Submit Button */}
+        {/* Submit and Save Draft Buttons */}
         <div className="card">
-          <button
-            onClick={handlePreview}
-            className="btn btn-success"
-            disabled={dateError}
-            style={{
-              width: '100%',
-              fontSize: '1.5rem',
-              padding: '1.5rem',
-              fontWeight: '700',
-              opacity: dateError ? 0.5 : 1,
-              cursor: dateError ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Preview & Submit | पूर्वावलोकन और सबमिट करें
+          <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+            <button
+              onClick={handleSaveDraft}
+              className="btn btn-secondary"
+              disabled={savingDraft}
+              style={{
+                width: '100%',
+                fontSize: '1.125rem',
+                padding: '1rem',
+                fontWeight: '600'
+              }}
+            >
+              {savingDraft ? 'Saving... | सहेजा जा रहा है...' : 'Save Draft | ड्राफ्ट सहेजें'}
+            </button>
+            <button
+              onClick={handlePreview}
+              className="btn btn-success"
+              disabled={dateError}
+              style={{
+                width: '100%',
+                fontSize: '1.5rem',
+                padding: '1.5rem',
+                fontWeight: '700',
+                opacity: dateError ? 0.5 : 1,
+                cursor: dateError ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Preview & Submit | पूर्वावलोकन और सबमिट करें
+            </button>
+            <button onClick={() => navigate('/dashboard')} className="btn btn-secondary">
+            Cancel | रद्द करें
           </button>
+          </div>
         </div>
       </div>
 

@@ -19,19 +19,19 @@ const RoleRedirect = () => {
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
 
   // Redirect based on role
   if (user.role === 'superadmin') {
-    return <Navigate to="/superadmin" />;
+    return <Navigate to="/superadmin" replace />;
   }
 
   if (user.role === 'admin') {
-    return <Navigate to="/admin" />;
+    return <Navigate to="/admin" replace />;
   }
 
-  return <Navigate to="/dashboard" />;
+  return <Navigate to="/dashboard" replace />;
 };
 
 export default RoleRedirect;
