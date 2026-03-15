@@ -299,7 +299,7 @@ const DistributorsTab = () => {
           <button
             onClick={handleOpenPaymentModal}
             className="btn btn-primary"
-            style={{ background: '#2196F3', borderColor: '#2196F3' }}
+            style={{ background: '#2196F3', borderColor: '#000' }}
           >
             Pay Distributor
           </button>
@@ -584,7 +584,8 @@ const DistributorsTab = () => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    padding: '0.75rem 1.5rem'
+                    padding: '0.75rem 1.5rem',
+                    borderColor: '#000'
                   }}
                 >
                   Pay Distributor
@@ -747,7 +748,7 @@ const DistributorsTab = () => {
                 </p>
               </div>
             ) : (
-              <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
                 <table className="table">
                   <thead>
                     <tr>
@@ -914,7 +915,7 @@ const DistributorsTab = () => {
                 No orders found for this distributor
               </div>
             ) : (
-              <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
                 <table className="table">
                   <thead>
                     <tr>
@@ -986,7 +987,7 @@ const DistributorsTab = () => {
                 No transactions found for this distributor
               </div>
             ) : (
-              <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
                 <table className="table">
                   <thead>
                     <tr>
