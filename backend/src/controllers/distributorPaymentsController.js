@@ -56,7 +56,7 @@ const getUnpaidBills = async (req, res) => {
       return res.status(404).json({ error: 'Distributor not found' });
     }
 
-    // Get all orders with bill numbers
+    // Get all orders with bill numbers (exclude orders without bill numbers)
     const ordersQuery = `
       SELECT
         o.id,
@@ -71,7 +71,7 @@ const getUnpaidBills = async (req, res) => {
           0
         ) as paid_amount
       FROM orders o
-      WHERE o.distributor_id = $1 AND o.organisation_id = $2
+      WHERE o.distributor_id = $1 AND o.organisation_id = $2 AND o.bill_number IS NOT NULL
       ORDER BY o.order_date DESC
     `;
 

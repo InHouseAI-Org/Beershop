@@ -753,7 +753,7 @@ const dataHelpers = {
         orderData.organisationId,
         orderData.distributorId,
         orderData.orderDate || new Date(),
-        orderData.billNumber || null,
+        orderData.billNumber, // Bill number is now required
         orderData.orderData ? JSON.stringify(orderData.orderData) : null,
         orderData.tax || 0,
         orderData.misc || 0,
@@ -1225,6 +1225,52 @@ const dataHelpers = {
   deleteDailyExpense: async (id) => {
     const result = await pool.query(
       `DELETE FROM daily_expenses WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return result.rows[0];
+  },
+
+  // ==================== MISCELLANEOUS INCOME ====================
+  getAllMiscellaneousIncome: async (organisationId) => {
+    const result = await pool.query(
+      `SELECT mi.*,
+              COALESCE(a.username, mi.created_by_username) as created_by_name
+       FROM miscellaneous_income mi
+       LEFT JOIN admins a ON mi.created_by = a.id
+       WHERE mi.organisation_id = $1
+       ORDER BY mi.transaction_date DESC, mi.created_at DESC`,
+      [organisationId]
+    );
+    return result.rows;
+  },
+
+  getMiscellaneousIncomeById: async (id) => {
+    const result = await pool.query('SELECT * FROM miscellaneous_income WHERE id = $1', [id]);
+    return result.rows[0];
+  },
+
+  createMiscellaneousIncome: async (incomeData) => {
+    const result = await pool.query(
+      `INSERT INTO miscellaneous_income (organisation_id, name, description, amount, account, transaction_date, created_by, created_by_username)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        incomeData.organisationId,
+        incomeData.name,
+        incomeData.description || null,
+        incomeData.amount,
+        incomeData.account,
+        incomeData.transactionDate || new Date(),
+        incomeData.createdBy,
+        incomeData.createdByUsername || null
+      ]
+    );
+    return result.rows[0];
+  },
+
+  deleteMiscellaneousIncome: async (id) => {
+    const result = await pool.query(
+      `DELETE FROM miscellaneous_income WHERE id = $1 RETURNING *`,
       [id]
     );
     return result.rows[0];

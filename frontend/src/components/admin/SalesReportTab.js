@@ -616,6 +616,44 @@ const SalesReportTab = () => {
     }
   };
 
+  const handleRejectSale = async () => {
+    if (!approvalSale) return;
+
+    const confirmed = window.confirm(
+      `⚠️ WARNING: Are you sure you want to REJECT and DELETE this sale?\n\n` +
+      `This will:\n` +
+      `${approvalSale.status === 'approved' ? '• Reverse ALL inventory changes\n' : ''}` +
+      `${approvalSale.status === 'approved' ? '• Reverse ALL credit adjustments\n' : ''}` +
+      `• Delete the sale report permanently\n` +
+      `• Delete all associated daily expenses\n\n` +
+      `This action CANNOT be undone!\n\n` +
+      `चेतावनी: क्या आप सुनिश्चित हैं?\n` +
+      `यह एक्शन रद्द नहीं किया जा सकता!`
+    );
+
+    if (!confirmed) return;
+
+    // Double confirmation for safety
+    const doubleConfirmed = window.confirm(
+      `FINAL CONFIRMATION:\n\n` +
+      `Type OK to confirm deletion of this sale report.\n\n` +
+      `Delete sale from ${new Date(approvalSale.date).toLocaleDateString()}?`
+    );
+
+    if (!doubleConfirmed) return;
+
+    try {
+      await api.delete(`/sales/${approvalSale.id}`);
+
+      alert('✅ Sale rejected and deleted successfully!\n\nAll changes have been reversed.\n\nबिक्री रिपोर्ट सफलतापूर्वक हटा दी गई!');
+      handleCloseApprovalModal();
+      await fetchSalesData();
+    } catch (err) {
+      console.error('Error rejecting sale:', err);
+      setApprovalError(err.response?.data?.error || 'Failed to reject sale');
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -2926,18 +2964,25 @@ const SalesReportTab = () => {
               </div>
 
               {/* Buttons */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <button
                   className="btn btn-primary"
                   onClick={handleApproveSale}
-                  style={{ flex: 1, padding: '1rem', fontSize: '1rem', fontWeight: '600', background: '#4CAF50' }}
+                  style={{ flex: 1, minWidth: '200px', padding: '1rem', fontSize: '1rem', fontWeight: '600', background: '#4CAF50' }}
                 >
                   Approve Sale
                 </button>
                 <button
+                  className="btn btn-danger"
+                  onClick={handleRejectSale}
+                  style={{ flex: 1, minWidth: '200px', padding: '1rem', fontSize: '1rem', fontWeight: '600', background: '#dc3545' }}
+                >
+                  Reject & Delete
+                </button>
+                <button
                   className="btn btn-secondary"
                   onClick={handleCloseApprovalModal}
-                  style={{ flex: 1, padding: '1rem', fontSize: '1rem' }}
+                  style={{ flex: 1, minWidth: '200px', padding: '1rem', fontSize: '1rem' }}
                 >
                   Cancel
                 </button>

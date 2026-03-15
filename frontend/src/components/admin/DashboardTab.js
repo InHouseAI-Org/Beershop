@@ -134,18 +134,6 @@ const DashboardTab = () => {
             {stats.totalDistributors}
           </p>
         </div>
-
-        <div className="card" style={{ textAlign: 'center'}}>
-          <h3 style={{ color: '#666', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem'}}>
-            Schemes To Be Availed
-          </h3>
-          <p style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '700', color: '#000', margin: 0 }}>
-            ₹{parseFloat(schemeStats.total_value_to_avail || 0).toFixed(2)}
-          </p>
-          <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.8 }}>
-            {schemeStats.active_schemes || 0} Active Schemes
-          </p>
-        </div>
       </div>
 
       {/* Analytics Charts */}

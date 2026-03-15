@@ -53,7 +53,7 @@ const BalanceSheetTab = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flexWrap: 'wrap', gap: '2rem' }}>
         {/* ASSETS */}
         <div style={{
           backgroundColor: '#fff',
@@ -230,7 +230,7 @@ const BalanceSheetTab = () => {
               backgroundColor: '#f8f9fa',
               borderRadius: '6px'
             }}>
-              <span style={{ fontWeight: '500', color: '#495057' }}>Recurring Expenses (Financial Year)</span>
+              <span style={{ fontWeight: '500', color: '#495057' }}>Recurring Expenses (Remaining FY)</span>
               <span style={{ fontWeight: '700', fontSize: '1.125rem', color: '#212529' }}>
                 {formatCurrency(balanceSheet.liabilities.yearlyRecurring)}
               </span>
@@ -274,17 +274,6 @@ const BalanceSheetTab = () => {
         }}>
           {formatCurrency(balanceSheet.netWorth)}
         </div>
-      </div>
-
-      {/* Refresh Button */}
-      <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-        <button
-          onClick={fetchBalanceSheet}
-          className="btn btn-primary"
-          style={{ padding: '0.75rem 2rem' }}
-        >
-          Refresh Balance Sheet
-        </button>
       </div>
     </div>
   );

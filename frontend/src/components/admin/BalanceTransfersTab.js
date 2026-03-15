@@ -6,17 +6,26 @@ import { Wallet, TrendingUp, DollarSign, Plus } from 'lucide-react';
 
 const BalanceTransfersTab = () => {
   const [transfers, setTransfers] = useState([]);
+  const [miscIncome, setMiscIncome] = useState([]);
   const [balances, setBalances] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     amount: '',
     fromAccount: '',
     toAccount: '',
+    transactionDate: new Date().toISOString().split('T')[0]
+  });
+  const [incomeFormData, setIncomeFormData] = useState({
+    name: '',
+    description: '',
+    amount: '',
+    account: '',
     transactionDate: new Date().toISOString().split('T')[0]
   });
 
@@ -26,11 +35,13 @@ const BalanceTransfersTab = () => {
 
   const fetchData = async () => {
     try {
-      const [transfersRes, balancesRes] = await Promise.all([
+      const [transfersRes, incomeRes, balancesRes] = await Promise.all([
         api.get('/balance-transfers'),
+        api.get('/miscellaneous-income'),
         api.get('/balances/organisation')
       ]);
       setTransfers(transfersRes.data);
+      setMiscIncome(incomeRes.data);
       setBalances(balancesRes.data);
       setError('');
     } catch (err) {
@@ -74,6 +85,38 @@ const BalanceTransfersTab = () => {
     });
   };
 
+  const handleOpenIncomeModal = async () => {
+    setIncomeFormData({
+      name: '',
+      description: '',
+      amount: '',
+      account: '',
+      transactionDate: new Date().toISOString().split('T')[0]
+    });
+    setShowIncomeModal(true);
+    setError('');
+    setSuccess('');
+
+    // Refresh balances
+    try {
+      const balancesRes = await api.get('/balances/organisation');
+      setBalances(balancesRes.data);
+    } catch (err) {
+      console.error('Failed to refresh balances:', err);
+    }
+  };
+
+  const handleCloseIncomeModal = () => {
+    setShowIncomeModal(false);
+    setIncomeFormData({
+      name: '',
+      description: '',
+      amount: '',
+      account: '',
+      transactionDate: new Date().toISOString().split('T')[0]
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -90,6 +133,22 @@ const BalanceTransfersTab = () => {
     }
   };
 
+  const handleIncomeSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.post('/miscellaneous-income', incomeFormData);
+      setSuccess('Miscellaneous income added successfully!');
+      await fetchData();
+      handleCloseIncomeModal();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to add income');
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this transfer? This will reverse the balance changes.')) {
       return;
@@ -102,6 +161,21 @@ const BalanceTransfersTab = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete transfer');
+    }
+  };
+
+  const handleDeleteIncome = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this income record? This will deduct the amount from the balance.')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/miscellaneous-income/${id}`);
+      setSuccess('Income record deleted successfully!');
+      await fetchData();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete income record');
     }
   };
 
@@ -146,6 +220,12 @@ const BalanceTransfersTab = () => {
     }
   };
 
+  const calculateNewBalanceIncome = (account) => {
+    const currentBalance = getBalance(account);
+    const amount = parseFloat(incomeFormData.amount || 0);
+    return currentBalance + amount;
+  };
+
   const hasInsufficientBalance = () => {
     if (!formData.fromAccount || !formData.amount) return false;
     const currentBalance = getBalance(formData.fromAccount);
@@ -157,7 +237,7 @@ const BalanceTransfersTab = () => {
     return <div>Loading...</div>;
   }
 
-  const columns = [
+  const transferColumns = [
     {
       key: 'transaction_date',
       label: 'Date',
@@ -236,6 +316,68 @@ const BalanceTransfersTab = () => {
     }
   ];
 
+  const incomeColumns = [
+    {
+      key: 'transaction_date',
+      label: 'Date',
+      render: (income) => formatDate(income.transaction_date)
+    },
+    {
+      key: 'name',
+      label: 'Name',
+      render: (income) => <span style={{ fontWeight: '600' }}>{income.name}</span>
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      render: (income) => income.description || '-'
+    },
+    {
+      key: 'account',
+      label: 'Account',
+      render: (income) => (
+        <span style={{
+          padding: '0.25rem 0.75rem',
+          borderRadius: '4px',
+          fontSize: '0.875rem',
+          backgroundColor: `${getAccountColor(income.account)}20`,
+          color: getAccountColor(income.account),
+          fontWeight: '600',
+          border: `1px solid ${getAccountColor(income.account)}`
+        }}>
+          {getAccountLabel(income.account)}
+        </span>
+      )
+    },
+    {
+      key: 'amount',
+      label: 'Amount',
+      render: (income) => (
+        <span style={{ fontWeight: '700', color: '#28a745', fontSize: '1.125rem' }}>
+          +₹{parseFloat(income.amount).toFixed(2)}
+        </span>
+      )
+    },
+    {
+      key: 'created_by_name',
+      label: 'Created By',
+      render: (income) => income.created_by_name || '-'
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (income) => (
+        <button
+          onClick={() => handleDeleteIncome(income.id)}
+          className="btn btn-danger"
+        >
+          Delete
+        </button>
+      )
+    }
+  ];
+
   return (
     <>
       {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
@@ -244,16 +386,6 @@ const BalanceTransfersTab = () => {
           {success}
         </div>
       )}
-
-      <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>
-          Balance Transfers
-        </h2>
-        <button onClick={handleOpenModal} className="btn btn-success">
-          <Plus size={16} style={{ marginRight: '0.5rem' }} />
-          Add Transfer
-        </button>
-      </div>
 
       {/* Current Balances */}
       {balances && (
@@ -288,15 +420,49 @@ const BalanceTransfersTab = () => {
         </div>
       )}
 
-      {/* Transfers Table */}
-      <MobileTable
-        columns={columns}
-        data={transfers}
-        enableSearch={true}
-        enableSort={true}
-        defaultSortKey="transaction_date"
-        defaultSortOrder="desc"
-      />
+      {/* Balance Transfers Section */}
+      <div style={{ marginBottom: '3rem' }}>
+        <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>
+            Balance Transfers
+          </h2>
+          <button onClick={handleOpenModal} className="btn btn-success">
+            <Plus size={16} style={{ marginRight: '0.5rem' }} />
+            Add Transfer
+          </button>
+        </div>
+
+        <MobileTable
+          columns={transferColumns}
+          data={transfers}
+          enableSearch={true}
+          enableSort={true}
+          defaultSortKey="transaction_date"
+          defaultSortOrder="desc"
+        />
+      </div>
+
+      {/* Miscellaneous Income Section */}
+      <div>
+        <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>
+            Miscellaneous Income
+          </h2>
+          <button onClick={handleOpenIncomeModal} className="btn btn-success">
+            <Plus size={16} style={{ marginRight: '0.5rem' }} />
+            Add Income
+          </button>
+        </div>
+
+        <MobileTable
+          columns={incomeColumns}
+          data={miscIncome}
+          enableSearch={true}
+          enableSort={true}
+          defaultSortKey="transaction_date"
+          defaultSortOrder="desc"
+        />
+      </div>
 
       {/* Add Transfer Modal */}
       {showModal && (
@@ -504,6 +670,137 @@ const BalanceTransfersTab = () => {
                   Create Transfer
                 </button>
                 <button type="button" onClick={handleCloseModal} className="btn btn-secondary">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Miscellaneous Income Modal */}
+      {showIncomeModal && (
+        <div className="modal-overlay" onClick={handleCloseIncomeModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Add Miscellaneous Income</h2>
+            {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
+            <form onSubmit={handleIncomeSubmit}>
+              <div className="form-group">
+                <label htmlFor="incomeName">Income Name *</label>
+                <input
+                  type="text"
+                  id="incomeName"
+                  className="form-control"
+                  value={incomeFormData.name}
+                  onChange={(e) => setIncomeFormData({ ...incomeFormData, name: e.target.value })}
+                  required
+                  placeholder="e.g., Bank Interest, Dividend, etc."
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="incomeDescription">Description (Optional)</label>
+                <textarea
+                  id="incomeDescription"
+                  className="form-control"
+                  value={incomeFormData.description}
+                  onChange={(e) => setIncomeFormData({ ...incomeFormData, description: e.target.value })}
+                  rows="3"
+                  placeholder="Additional details about this income"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="incomeAccount">Add To Account *</label>
+                <select
+                  id="incomeAccount"
+                  className="form-control"
+                  value={incomeFormData.account}
+                  onChange={(e) => setIncomeFormData({ ...incomeFormData, account: e.target.value })}
+                  required
+                >
+                  <option value="">Select account</option>
+                  <option value="cash_balance">Cash Balance</option>
+                  <option value="bank_balance">Bank Balance</option>
+                  <option value="gala_balance">Gala Balance</option>
+                </select>
+                {incomeFormData.account && (
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.75rem',
+                    backgroundColor: `${getAccountColor(incomeFormData.account)}15`,
+                    borderRadius: '6px',
+                    border: `1px solid ${getAccountColor(incomeFormData.account)}`
+                  }}>
+                    <div style={{ fontSize: '0.875rem', color: '#666', marginBottom: '0.25rem' }}>
+                      Current Balance
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '700', color: getAccountColor(incomeFormData.account) }}>
+                      ₹{getBalance(incomeFormData.account).toFixed(2)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="incomeAmount">Amount *</label>
+                <input
+                  type="number"
+                  id="incomeAmount"
+                  className="form-control"
+                  value={incomeFormData.amount}
+                  onChange={(e) => setIncomeFormData({ ...incomeFormData, amount: e.target.value })}
+                  step="0.01"
+                  min="0"
+                  required
+                  placeholder="₹ 0.00"
+                />
+              </div>
+
+              {/* Balance Preview After Income */}
+              {incomeFormData.account && incomeFormData.amount && (
+                <div style={{
+                  padding: '1rem',
+                  backgroundColor: '#d4edda',
+                  borderRadius: '8px',
+                  border: '2px solid #28a745',
+                  marginBottom: '1rem'
+                }}>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: '#155724' }}>
+                    Balance After Income
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#155724', marginBottom: '0.25rem' }}>
+                      {getAccountLabel(incomeFormData.account)}
+                    </div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#28a745' }}>
+                      ₹{calculateNewBalanceIncome(incomeFormData.account).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="incomeTransactionDate">Transaction Date *</label>
+                <input
+                  type="date"
+                  id="incomeTransactionDate"
+                  className="form-control"
+                  value={incomeFormData.transactionDate}
+                  onChange={(e) => setIncomeFormData({ ...incomeFormData, transactionDate: e.target.value })}
+                  max={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+
+              <div className="modal-buttons">
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  Add Income
+                </button>
+                <button type="button" onClick={handleCloseIncomeModal} className="btn btn-secondary">
                   Cancel
                 </button>
               </div>

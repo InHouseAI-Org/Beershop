@@ -780,10 +780,129 @@ const approveSale = async (req, res) => {
 };
 
 const deleteSale = async (req, res) => {
-  // Sales deletion is disabled - sales cannot be deleted, only updated
-  return res.status(403).json({
-    error: 'Sales reports cannot be deleted. Please contact support if you need to make corrections.'
-  });
+  try {
+    const { id } = req.params;
+    const organisationId = req.user.organisationId;
+
+    // Only admins can delete sales
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can delete sales reports' });
+    }
+
+    const sale = await db.getSaleById(id);
+
+    if (!sale) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+
+    // Check if sale belongs to user's organisation
+    if (sale.organisation_id !== organisationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    console.log('=== DELETE/REJECT SALE ===');
+    console.log('Sale ID:', id);
+    console.log('Sale Status:', sale.status);
+
+    // If sale is approved, we need to reverse all changes
+    if (sale.status === 'approved') {
+      console.log('Sale is approved - reversing all changes...');
+
+      // 1. Reverse inventory changes (add back the sold quantities)
+      console.log('Reversing inventory changes...');
+      if (Array.isArray(sale.sale) && sale.sale.length > 0) {
+        for (const saleItem of sale.sale) {
+          if (saleItem.product_id && saleItem.sale) {
+            const saleQty = parseFloat(saleItem.sale);
+            await db.incrementInventory(organisationId, saleItem.product_id, saleQty);
+            console.log(`Added back ${saleQty} to inventory for product ${saleItem.product_id}`);
+          }
+        }
+      }
+
+      // 2. Reverse credit given (deduct from credit holders' outstanding)
+      console.log('Reversing credit given...');
+      if (Array.isArray(sale.credit) && sale.credit.length > 0) {
+        for (const creditItem of sale.credit) {
+          if (creditItem.credit_holder_id && creditItem.creditgiven) {
+            const creditAmount = parseFloat(creditItem.creditgiven);
+
+            // Get current outstanding before decrementing
+            const creditHolder = await db.getCreditHolderById(creditItem.credit_holder_id);
+            const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
+
+            // Decrement outstanding (reverse the credit given)
+            await db.decrementCreditHolderOutstanding(creditItem.credit_holder_id, creditAmount);
+            const newOutstanding = Math.max(0, previousOutstanding - creditAmount);
+            console.log(`Reversed credit given: deducted ${creditAmount} from credit holder ${creditItem.credit_holder_id}`);
+
+            // Record transaction history
+            await db.createCreditCollectionHistory({
+              organisationId,
+              creditHolderId: creditItem.credit_holder_id,
+              amountCollected: creditAmount,
+              previousOutstanding: previousOutstanding,
+              newOutstanding: newOutstanding,
+              collectedBy: req.user.id,
+              notes: 'Credit given reversed - Sale rejected/deleted',
+              transactionType: 'collected', // Reversing "given" is like "collected"
+              saleId: null, // Sale will be deleted
+              collectionType: 'regular'
+            });
+          }
+        }
+      }
+
+      // 3. Reverse credit collected (add back to credit holders' outstanding)
+      console.log('Reversing credit collected...');
+      const creditTaken = sale.credit_taken || [];
+      if (Array.isArray(creditTaken) && creditTaken.length > 0) {
+        for (const creditTakenItem of creditTaken) {
+          if (creditTakenItem.creditHolderId && creditTakenItem.amount) {
+            const collectionAmount = parseFloat(creditTakenItem.amount);
+
+            // Get current outstanding before incrementing
+            const creditHolder = await db.getCreditHolderById(creditTakenItem.creditHolderId);
+            const previousOutstanding = parseFloat(creditHolder.amount_payable || 0);
+
+            // Increment outstanding (reverse the collection)
+            await db.incrementCreditHolderOutstanding(creditTakenItem.creditHolderId, collectionAmount);
+            const newOutstanding = previousOutstanding + collectionAmount;
+            console.log(`Reversed credit collected: added ${collectionAmount} back to credit holder ${creditTakenItem.creditHolderId}`);
+
+            // Record transaction history
+            await db.createCreditCollectionHistory({
+              organisationId,
+              creditHolderId: creditTakenItem.creditHolderId,
+              amountCollected: collectionAmount,
+              previousOutstanding: previousOutstanding,
+              newOutstanding: newOutstanding,
+              collectedBy: req.user.id,
+              notes: 'Credit collection reversed - Sale rejected/deleted',
+              transactionType: 'given', // Reversing "collected" is like "given"
+              saleId: null, // Sale will be deleted
+              collectionType: 'regular'
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Delete the sale (this will cascade delete balances and daily_expenses)
+    console.log('Deleting sale record...');
+    await db.deleteSale(id);
+
+    console.log('Sale deleted successfully');
+    res.json({
+      message: 'Sale report rejected and deleted successfully. All changes have been reversed.',
+      reversedInventory: sale.status === 'approved',
+      reversedCredit: sale.status === 'approved'
+    });
+
+  } catch (error) {
+    console.error('Error deleting sale:', error);
+    res.status(500).json({ error: 'Server error while deleting sale' });
+  }
 };
 
 module.exports = { getAllSales, getSale, createSale, updateSale, deleteSale, approveSale };

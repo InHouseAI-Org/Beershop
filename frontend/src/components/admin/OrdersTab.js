@@ -421,7 +421,7 @@ const OrdersTab = () => {
 
                 <div className="form-group">
                   <label htmlFor="billNumber" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
-                    Bill Number
+                    Bill Number *
                   </label>
                   <input
                     type="text"
@@ -431,10 +431,8 @@ const OrdersTab = () => {
                     onChange={(e) => setFormData({ ...formData, billNumber: e.target.value })}
                     placeholder="Enter bill number from distributor"
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
+                    required
                   />
-                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                    Optional: Bill/invoice number from distributor
-                  </small>
                 </div>
               </div>
             </div>

@@ -45,6 +45,10 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ error: 'Please provide distributor ID' });
     }
 
+    if (!billNumber || billNumber.trim() === '') {
+      return res.status(400).json({ error: 'Bill number is required' });
+    }
+
     const organisationId = req.user.organisationId;
 
     // Use the date provided from frontend, or default to today if not provided
@@ -63,7 +67,7 @@ const createOrder = async (req, res) => {
       organisationId,
       distributorId,
       orderDate: orderDateString,
-      billNumber: billNumber || null,
+      billNumber: billNumber.trim(),
       orderData,
       tax: tax || 0,
       misc: misc || 0,
@@ -139,7 +143,12 @@ const updateOrder = async (req, res) => {
     if (scheme !== undefined) updates.scheme = scheme;
     if (paymentOutstandingDate !== undefined) updates.paymentOutstandingDate = paymentOutstandingDate || null;
     if (remarks !== undefined) updates.remarks = remarks;
-    if (billNumber !== undefined) updates.billNumber = billNumber || null;
+    if (billNumber !== undefined) {
+      if (!billNumber || billNumber.trim() === '') {
+        return res.status(400).json({ error: 'Bill number is required' });
+      }
+      updates.billNumber = billNumber.trim();
+    }
 
     const updatedOrder = await db.updateOrder(id, updates);
     res.json(updatedOrder);

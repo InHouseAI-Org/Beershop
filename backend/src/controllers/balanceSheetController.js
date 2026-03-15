@@ -31,13 +31,12 @@ const getBalanceSheet = async (req, res) => {
     const inventoryResult = await client.query(inventoryQuery, [organisationId]);
     const inventoryValue = parseFloat(inventoryResult.rows[0].inventory_value || 0);
 
-    // Get scheme to be availed (sum of achieved active schemes)
+    // Get scheme to be availed (sum of all active schemes)
     const schemesQuery = `
       SELECT COALESCE(SUM(scheme_value), 0) as schemes_to_be_availed
       FROM schemes
       WHERE organisation_id = $1
         AND status = 'active'
-        AND achieved = true
     `;
     const schemesResult = await client.query(schemesQuery, [organisationId]);
     const schemesToBeAvailed = parseFloat(schemesResult.rows[0].schemes_to_be_availed || 0);
@@ -80,19 +79,23 @@ const getBalanceSheet = async (req, res) => {
     ]);
     const monthlyRecurring = parseFloat(monthlyRecurringResult.rows[0].monthly_recurring || 0);
 
-    // Get recurring expenses for financial year (April - March)
-    const fyStart = new Date(
-      currentDate.getMonth() >= 3 ? currentDate.getFullYear() : currentDate.getFullYear() - 1,
-      3, // April (0-indexed)
-      1
-    );
+    // Get recurring expenses for REMAINING financial year (TODAY to March 31st)
+    // Financial year in India: April 1st to March 31st
+    const today = new Date();
+
+    // Calculate the end of current financial year (March 31st)
     const fyEnd = new Date(
-      currentDate.getMonth() >= 3 ? currentDate.getFullYear() + 1 : currentDate.getFullYear(),
+      today.getMonth() >= 3 ? today.getFullYear() + 1 : today.getFullYear(),
       2, // March (0-indexed)
       31
     );
 
-    // Calculate yearly recurring expenses based on frequency and type
+    // Calculate remaining days in financial year
+    const remainingDays = Math.ceil((fyEnd - today) / (1000 * 60 * 60 * 24));
+    const remainingWeeks = remainingDays / 7;
+    const remainingMonths = remainingDays / 30.44; // Average days per month
+
+    // Calculate recurring expenses for REMAINING financial year
     const yearlyRecurringQuery = `
       SELECT
         re.expense_amount,
@@ -107,21 +110,25 @@ const getBalanceSheet = async (req, res) => {
     let yearlyRecurring = 0;
     yearlyRecurringResult.rows.forEach(expense => {
       const amount = parseFloat(expense.expense_amount);
-      let occurrencesPerYear = 0;
+      const frequency = parseInt(expense.recurrence_frequency);
+      let occurrencesInRemainingPeriod = 0;
 
       switch (expense.recurrence_type) {
         case 'weekly':
-          occurrencesPerYear = 52 / parseInt(expense.recurrence_frequency);
+          // How many times will this expense occur in remaining weeks?
+          occurrencesInRemainingPeriod = Math.ceil(remainingWeeks / frequency);
           break;
         case 'monthly':
-          occurrencesPerYear = 12 / parseInt(expense.recurrence_frequency);
+          // How many times will this expense occur in remaining months?
+          occurrencesInRemainingPeriod = Math.ceil(remainingMonths / frequency);
           break;
         case 'yearly':
-          occurrencesPerYear = 1 / parseInt(expense.recurrence_frequency);
+          // Will this yearly expense occur in the remaining period?
+          occurrencesInRemainingPeriod = remainingMonths >= (frequency * 12) ? 1 : 0;
           break;
       }
 
-      yearlyRecurring += amount * occurrencesPerYear;
+      yearlyRecurring += amount * occurrencesInRemainingPeriod;
     });
 
     // Calculate totals
