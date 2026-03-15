@@ -14,13 +14,6 @@ const DashboardTab = () => {
     totalOrders: 0,
     recentSales: []
   });
-  const [schemeStats, setSchemeStats] = useState({
-    total_schemes: 0,
-    active_schemes: 0,
-    achieved_schemes: 0,
-    total_value_to_avail: 0,
-    total_value_achieved: 0
-  });
   const [analyticsData, setAnalyticsData] = useState({
     monthlySales: [],
     distributorOrders: [],
@@ -39,15 +32,14 @@ const DashboardTab = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [usersRes, productsRes, creditHoldersRes, distributorsRes, ordersRes, salesRes, analyticsRes, schemesStatsRes] = await Promise.all([
+      const [usersRes, productsRes, creditHoldersRes, distributorsRes, ordersRes, salesRes, analyticsRes] = await Promise.all([
         api.get('/users'),
         api.get('/products'),
         api.get('/credit-holders'),
         api.get('/distributors'),
         api.get('/orders'),
         api.get('/sales'),
-        api.get('/analytics/monthly'),
-        api.get('/schemes/stats')
+        api.get('/analytics/monthly')
       ]);
 
       setStats({
@@ -60,7 +52,6 @@ const DashboardTab = () => {
       });
 
       setAnalyticsData(analyticsRes.data);
-      setSchemeStats(schemesStatsRes.data);
 
       setError('');
     } catch (err) {
