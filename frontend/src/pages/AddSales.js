@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import api from '../utils/api';
+import CustomDropdown from '../components/common/CustomDropdown';
 
 const AddSales = () => {
   const navigate = useNavigate();
@@ -1122,25 +1123,24 @@ const AddSales = () => {
               <div key={index} style={{ marginBottom: '1.5rem', padding: '1.5rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div className="form-group">
-                    <label>Credit Holder | उधार धारक</label>
-                    <select
-                      className="form-control"
+                    <CustomDropdown
+                      label="Credit Holder | उधार धारक"
                       value={entry.creditHolderId}
-                      onChange={(e) => updateCreditTaken(index, 'creditHolderId', e.target.value)}
-                      style={{ fontSize: '1.125rem', padding: '0.875rem' }}
-                    >
-                      <option value="">Select | चुनें</option>
-                      {creditHolders.map(ch => {
-                        const isAlreadySelected = creditTaken.some((ct, ctIndex) =>
-                          ctIndex !== index && String(ct.creditHolderId) === String(ch.id)
-                        );
-                        return (
-                          <option key={ch.id} value={ch.id} disabled={isAlreadySelected}>
-                            {ch.name}{isAlreadySelected ? ' (Already selected)' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
+                      onChange={(value) => updateCreditTaken(index, 'creditHolderId', value)}
+                      options={[
+                        { value: '', label: 'Select | चुनें' },
+                        ...creditHolders.map(ch => {
+                          const isAlreadySelected = creditTaken.some((ct, ctIndex) =>
+                            ctIndex !== index && String(ct.creditHolderId) === String(ch.id)
+                          );
+                          return {
+                            value: ch.id,
+                            label: `${ch.name}${isAlreadySelected ? ' (Already selected)' : ''}`
+                          };
+                        })
+                      ]}
+                      placeholder="Select | चुनें"
+                    />
                   </div>
 
                   {entry.creditHolderId && (
@@ -1171,16 +1171,15 @@ const AddSales = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Collected In | में एकत्रित</label>
-                    <select
-                      className="form-control"
+                    <CustomDropdown
+                      label="Collected In | में एकत्रित"
                       value={entry.collectedIn}
-                      onChange={(e) => updateCreditTaken(index, 'collectedIn', e.target.value)}
-                      style={{ fontSize: '1.125rem', padding: '0.875rem' }}
-                    >
-                      <option value="cash_balance">Cash | नकद</option>
-                      <option value="bank_balance">UPI</option>
-                    </select>
+                      onChange={(value) => updateCreditTaken(index, 'collectedIn', value)}
+                      options={[
+                        { value: 'cash_balance', label: 'Cash | नकद' },
+                        { value: 'bank_balance', label: 'UPI' }
+                      ]}
+                    />
                   </div>
 
                   <button
@@ -1233,25 +1232,24 @@ const AddSales = () => {
               <div key={index} style={{ marginBottom: '1.5rem', padding: '1.5rem', border: '2px solid #e0e0e0', borderRadius: '8px', background: '#f9f9f9' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div className="form-group">
-                    <label>Credit Holder | उधार धारक</label>
-                    <select
-                      className="form-control"
+                    <CustomDropdown
+                      label="Credit Holder | उधार धारक"
                       value={entry.creditHolderId}
-                      onChange={(e) => updateCreditEntry(index, 'creditHolderId', e.target.value)}
-                      style={{ fontSize: '1.125rem', padding: '0.875rem' }}
-                    >
-                      <option value="">Select | चुनें</option>
-                      {creditHolders.map(ch => {
-                        const isAlreadySelected = creditEntries.some((ce, ceIndex) =>
-                          ceIndex !== index && String(ce.creditHolderId) === String(ch.id)
-                        );
-                        return (
-                          <option key={ch.id} value={ch.id} disabled={isAlreadySelected}>
-                            {ch.name}{isAlreadySelected ? ' (Already selected)' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
+                      onChange={(value) => updateCreditEntry(index, 'creditHolderId', value)}
+                      options={[
+                        { value: '', label: 'Select | चुनें' },
+                        ...creditHolders.map(ch => {
+                          const isAlreadySelected = creditEntries.some((ce, ceIndex) =>
+                            ceIndex !== index && String(ce.creditHolderId) === String(ch.id)
+                          );
+                          return {
+                            value: ch.id,
+                            label: `${ch.name}${isAlreadySelected ? ' (Already selected)' : ''}`
+                          };
+                        })
+                      ]}
+                      placeholder="Select | चुनें"
+                    />
                   </div>
 
                   {entry.creditHolderId && (
