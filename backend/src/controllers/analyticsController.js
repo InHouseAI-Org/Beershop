@@ -290,8 +290,9 @@ const getProductMonthlyOrders = async (req, res) => {
       return res.status(400).json({ error: 'Organisation ID required' });
     }
 
-    // Get all orders for this organization
+    // Get all orders and distributors for this organization
     const orders = await db.getOrdersByOrganisationId(organisationId);
+    const distributors = await db.getDistributorsByOrganisationId(organisationId);
 
     // Get the product to verify it belongs to this organization
     const product = await db.getProductById(productId);
@@ -318,7 +319,8 @@ const getProductMonthlyOrders = async (req, res) => {
     if (!earliestDate) {
       return res.json({
         productName: product.product_name,
-        monthlyOrders: []
+        monthlyOrders: [],
+        distributors: []
       });
     }
 
@@ -331,33 +333,64 @@ const getProductMonthlyOrders = async (req, res) => {
       tempDate.setMonth(tempDate.getMonth() + 1);
     }
 
-    // Calculate monthly ordered quantities for this specific product
+    // Calculate monthly ordered quantities per distributor for this specific product
     const monthlyOrdersMap = {};
     months.forEach(month => {
-      monthlyOrdersMap[month] = 0;
+      monthlyOrdersMap[month] = {
+        month,
+        total: 0
+      };
+      // Initialize each distributor with 0 quantity
+      distributors.forEach(dist => {
+        monthlyOrdersMap[month][`dist_${dist.id}`] = 0;
+      });
     });
+
+    // Track which distributors actually have orders for this product
+    const activeDistributorIds = new Set();
 
     orders.forEach(order => {
       const month = formatMonth(order.order_date);
-      if (month && Array.isArray(order.order_data)) {
+      if (month && monthlyOrdersMap[month] && Array.isArray(order.order_data)) {
         order.order_data.forEach(item => {
           // Compare as strings since product_id is a UUID
           if (item.product_id === productId || item.product_id === parseInt(productId)) {
             const qty = parseFloat(item.qty || 0);
-            monthlyOrdersMap[month] += qty;
+            if (qty > 0) {
+              monthlyOrdersMap[month].total += qty;
+              if (order.distributor_id) {
+                monthlyOrdersMap[month][`dist_${order.distributor_id}`] += qty;
+                activeDistributorIds.add(order.distributor_id);
+              }
+            }
           }
         });
       }
     });
 
-    const monthlyOrders = months.map(month => ({
-      month,
-      quantity: Math.round(monthlyOrdersMap[month] * 10) / 10 // Round to 1 decimal
-    }));
+    // Only include distributors that have ordered this product
+    const activeDistributors = distributors
+      .filter(dist => activeDistributorIds.has(dist.id))
+      .map(dist => ({
+        id: dist.id,
+        name: dist.name,
+        dataKey: `dist_${dist.id}`
+      }));
+
+    // Round all quantities to 1 decimal
+    const monthlyOrders = months.map(month => {
+      const data = { ...monthlyOrdersMap[month] };
+      data.total = Math.round(data.total * 10) / 10;
+      activeDistributors.forEach(dist => {
+        data[dist.dataKey] = Math.round(data[dist.dataKey] * 10) / 10;
+      });
+      return data;
+    });
 
     res.json({
       productName: product.product_name,
-      monthlyOrders
+      monthlyOrders,
+      distributors: activeDistributors
     });
 
   } catch (error) {

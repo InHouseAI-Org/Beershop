@@ -2,12 +2,14 @@ const pool = require('../config/database');
 const db = require('../models/data');
 
 /**
- * Get distributor ledger (orders + payments)
+ * Get distributor ledger (orders + payments) with date range support
+ * Query params: start_date, end_date (optional, defaults to all time)
  */
 const getDistributorLedger = async (req, res) => {
   const client = await pool.connect();
   try {
     const { id } = req.params; // distributor ID
+    const { start_date, end_date } = req.query;
     const organisationId = req.user.organisationId;
 
     if (!organisationId) {
@@ -20,15 +22,82 @@ const getDistributorLedger = async (req, res) => {
       return res.status(404).json({ error: 'Distributor not found' });
     }
 
-    const query = `
+    // Calculate opening balance for the date range
+    // Opening balance = distributor.opening_balance + sum(all transactions before start_date)
+    let openingBalance = parseFloat(distributor.opening_balance || 0);
+
+    if (start_date) {
+      // Get all transactions before start_date
+      const beforeStartQuery = `
+        SELECT
+          COALESCE(SUM(
+            CASE
+              WHEN transaction_type IN ('order', 'order_payment') THEN debit_amount - credit_amount
+              ELSE 0
+            END
+          ), 0) as net_change
+        FROM distributor_ledger
+        WHERE distributor_id = $1
+          AND organisation_id = $2
+          AND transaction_date < $3
+      `;
+
+      const beforeStartResult = await client.query(beforeStartQuery, [id, organisationId, start_date]);
+      const netChange = parseFloat(beforeStartResult.rows[0].net_change || 0);
+      openingBalance += netChange;
+    }
+
+    // Build ledger query with optional date filters
+    let ledgerQuery = `
       SELECT * FROM distributor_ledger
       WHERE distributor_id = $1 AND organisation_id = $2
-      ORDER BY transaction_date DESC, created_at DESC
     `;
+    const queryParams = [id, organisationId];
+    let paramIndex = 3;
 
-    const result = await client.query(query, [id, organisationId]);
+    if (start_date) {
+      ledgerQuery += ` AND transaction_date >= $${paramIndex}`;
+      queryParams.push(start_date);
+      paramIndex++;
+    }
 
-    res.json(result.rows);
+    if (end_date) {
+      ledgerQuery += ` AND transaction_date <= $${paramIndex}`;
+      queryParams.push(end_date);
+      paramIndex++;
+    }
+
+    ledgerQuery += ` ORDER BY transaction_date ASC, created_at ASC`;
+
+    const result = await client.query(ledgerQuery, queryParams);
+
+    // Calculate running balance
+    let runningBalance = openingBalance;
+    console.log(`[Ledger] Starting with opening balance: ${openingBalance}`);
+
+    const transactionsWithBalance = result.rows.map((transaction, index) => {
+      const debit = parseFloat(transaction.debit_amount || transaction.debit || 0);
+      const credit = parseFloat(transaction.credit_amount || transaction.credit || 0);
+      runningBalance += (debit - credit);
+
+      if (index < 3) {
+        console.log(`[Ledger] Transaction ${index + 1}: debit=${debit}, credit=${credit}, running=${runningBalance}`);
+      }
+
+      return {
+        ...transaction,
+        running_balance: runningBalance
+      };
+    });
+
+    console.log(`[Ledger] Final closing balance: ${runningBalance}`);
+    console.log(`[Ledger] Returning ${transactionsWithBalance.length} transactions`);
+
+    res.json({
+      openingBalance,
+      closingBalance: runningBalance,
+      transactions: transactionsWithBalance
+    });
   } catch (error) {
     console.error('Error fetching distributor ledger:', error);
     res.status(500).json({ error: 'Server error' });

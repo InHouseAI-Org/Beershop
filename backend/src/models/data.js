@@ -548,10 +548,15 @@ const dataHelpers = {
 
   createDistributor: async (distributorData) => {
     const result = await pool.query(
-      `INSERT INTO distributors (organisation_id, name, amount_outstanding)
-       VALUES ($1, $2, $3)
+      `INSERT INTO distributors (organisation_id, name, amount_outstanding, opening_balance)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [distributorData.organisationId, distributorData.name, distributorData.amountOutstanding || 0]
+      [
+        distributorData.organisationId,
+        distributorData.name,
+        distributorData.amountOutstanding || 0,
+        distributorData.openingBalance || 0
+      ]
     );
     return result.rows[0];
   },
@@ -677,7 +682,11 @@ const dataHelpers = {
       cashCollected: 'cash_collected',
       upi: 'upi',
       remarks: 'remarks',
-      status: 'status'
+      status: 'status',
+      miscellaneousCash: 'miscellaneous_cash',
+      miscellaneousUPI: 'miscellaneous_upi',
+      miscellaneousType: 'miscellaneous_type',
+      galaBalanceToday: 'gala_balance_today'
     };
 
     Object.keys(updates).forEach(key => {

@@ -13,13 +13,17 @@ const DistributorsTab = () => {
   const [selectedDistributor, setSelectedDistributor] = useState(null);
   const [activeTab, setActiveTab] = useState('outstanding');
   const [distributorHistory, setDistributorHistory] = useState([]);
-  const [distributorLedger, setDistributorLedger] = useState([]);
+  const [distributorLedger, setDistributorLedger] = useState(null); // Will store {openingBalance, closingBalance, transactions}
   const [distributorOrders, setDistributorOrders] = useState([]);
   const [unpaidBills, setUnpaidBills] = useState([]);
   const [editingDistributor, setEditingDistributor] = useState(null);
+  const [ledgerDateRange, setLedgerDateRange] = useState({
+    startDate: '',
+    endDate: ''
+  });
   const [formData, setFormData] = useState({
     name: '',
-    amountOutstanding: ''
+    openingBalance: ''
   });
   const [paymentData, setPaymentData] = useState({
     distributorId: '',
@@ -47,12 +51,18 @@ const DistributorsTab = () => {
     }
   };
 
-  const fetchDistributorHistory = async (distributorId) => {
+  const fetchDistributorHistory = async (distributorId, startDate = '', endDate = '') => {
     try {
+      // Build query params for date range
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append('start_date', startDate);
+      if (endDate) queryParams.append('end_date', endDate);
+      const queryString = queryParams.toString();
+
       // Fetch both payment history and ledger from NEW payment system
       const [historyRes, ledgerRes] = await Promise.all([
         api.get(`/distributor-payments/${distributorId}/payments`), // NEW endpoint
-        api.get(`/distributor-payments/${distributorId}/ledger`)
+        api.get(`/distributor-payments/${distributorId}/ledger${queryString ? '?' + queryString : ''}`)
       ]);
       setDistributorHistory(historyRes.data);
       setDistributorLedger(ledgerRes.data);
@@ -100,9 +110,10 @@ const DistributorsTab = () => {
     setSelectedDistributor(null);
     setActiveTab('outstanding');
     setDistributorHistory([]);
-    setDistributorLedger([]);
+    setDistributorLedger(null);
     setDistributorOrders([]);
     setUnpaidBills([]);
+    setLedgerDateRange({ startDate: '', endDate: '' });
   };
 
   const handleOpenModal = (distributor = null) => {
@@ -110,13 +121,14 @@ const DistributorsTab = () => {
       setEditingDistributor(distributor);
       setFormData({
         name: distributor.name,
+        openingBalance: distributor.opening_balance || '',
         amountOutstanding: distributor.amount_outstanding || ''
       });
     } else {
       setEditingDistributor(null);
       setFormData({
         name: '',
-        amountOutstanding: ''
+        openingBalance: ''
       });
     }
     setShowModal(true);
@@ -127,7 +139,7 @@ const DistributorsTab = () => {
     setEditingDistributor(null);
     setFormData({
       name: '',
-      amountOutstanding: ''
+      openingBalance: ''
     });
   };
 
@@ -139,7 +151,12 @@ const DistributorsTab = () => {
       if (editingDistributor) {
         await api.put(`/distributors/${editingDistributor.id}`, formData);
       } else {
-        await api.post('/distributors', formData);
+        // When creating, set both opening_balance and amountOutstanding to the same value
+        const payload = {
+          ...formData,
+          amountOutstanding: formData.openingBalance || 0
+        };
+        await api.post('/distributors', payload);
       }
       await fetchDistributors();
       handleCloseModal();
@@ -232,6 +249,16 @@ const DistributorsTab = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to record payment');
+    }
+  };
+
+  const handleRefreshLedger = async () => {
+    if (selectedDistributor) {
+      await fetchDistributorHistory(
+        selectedDistributor.id,
+        ledgerDateRange.startDate,
+        ledgerDateRange.endDate
+      );
     }
   };
 
@@ -339,43 +366,65 @@ const DistributorsTab = () => {
 
               {!editingDistributor && (
                 <div className="form-group">
-                  <label htmlFor="amountOutstanding">Initial Outstanding Amount (Optional)</label>
+                  <label htmlFor="openingBalance">Opening Balance (Optional)</label>
                   <input
                     type="number"
-                    id="amountOutstanding"
+                    id="openingBalance"
                     className="form-control"
-                    value={formData.amountOutstanding}
-                    onChange={(e) => setFormData({ ...formData, amountOutstanding: e.target.value })}
+                    value={formData.openingBalance}
+                    onChange={(e) => setFormData({ ...formData, openingBalance: e.target.value })}
                     step="0.01"
                     min="0"
                     placeholder="₹ 0.00"
                   />
                   <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                    Set the initial outstanding amount if you already owe this distributor money
+                    Initial outstanding amount when first adding this distributor. This sets both the opening balance (for ledger) and initial amount outstanding.
                   </small>
                 </div>
               )}
 
               {editingDistributor && (
-                <div className="form-group">
-                  <label htmlFor="amountOutstanding">Amount Outstanding (Read-Only)</label>
-                  <input
-                    type="number"
-                    id="amountOutstanding"
-                    className="form-control"
-                    value={formData.amountOutstanding}
-                    readOnly
-                    style={{
-                      backgroundColor: '#e9ecef',
-                      cursor: 'not-allowed',
-                      fontWeight: '600',
-                      color: '#000'
-                    }}
-                  />
-                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                    Outstanding is automatically calculated from orders and payments
-                  </small>
-                </div>
+                <>
+                  <div className="form-group">
+                    <label htmlFor="openingBalance">Opening Balance (Read-Only)</label>
+                    <input
+                      type="number"
+                      id="openingBalance"
+                      className="form-control"
+                      value={formData.openingBalance}
+                      readOnly
+                      style={{
+                        backgroundColor: '#e3f2fd',
+                        cursor: 'not-allowed',
+                        fontWeight: '600',
+                        color: '#0d47a1'
+                      }}
+                    />
+                    <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                      Historical opening balance (never changes, used for ledger calculations)
+                    </small>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="amountOutstanding">Current Amount Outstanding (Read-Only)</label>
+                    <input
+                      type="number"
+                      id="amountOutstanding"
+                      className="form-control"
+                      value={formData.amountOutstanding}
+                      readOnly
+                      style={{
+                        backgroundColor: '#fff3e0',
+                        cursor: 'not-allowed',
+                        fontWeight: '600',
+                        color: '#e65100'
+                      }}
+                    />
+                    <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                      Current outstanding amount (automatically calculated from orders and payments)
+                    </small>
+                  </div>
+                </>
               )}
 
               <div className="modal-buttons">
@@ -709,7 +758,7 @@ const DistributorsTab = () => {
                   whiteSpace: 'nowrap'
                 }}
               >
-                Complete Ledger ({distributorLedger.length})
+                Complete Ledger ({distributorLedger && distributorLedger.transactions ? distributorLedger.transactions.length : 0})
               </button>
             </div>
 
@@ -979,89 +1028,149 @@ const DistributorsTab = () => {
             {activeTab === 'ledger' && (
             <div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
-              Complete Ledger ({distributorLedger.length} transactions)
+              Complete Ledger {distributorLedger && distributorLedger.transactions ? `(${distributorLedger.transactions.length} transactions)` : ''}
             </h3>
 
-            {distributorLedger.length === 0 ? (
+            {/* Date Filters */}
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label htmlFor="startDate" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    id="startDate"
+                    className="form-control"
+                    value={ledgerDateRange.startDate}
+                    onChange={(e) => setLedgerDateRange({ ...ledgerDateRange, startDate: e.target.value })}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label htmlFor="endDate" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    id="endDate"
+                    className="form-control"
+                    value={ledgerDateRange.endDate}
+                    onChange={(e) => setLedgerDateRange({ ...ledgerDateRange, endDate: e.target.value })}
+                  />
+                </div>
+                <button
+                  onClick={handleRefreshLedger}
+                  className="btn btn-primary"
+                  style={{ marginBottom: 0 }}
+                >
+                  Apply Filters
+                </button>
+                {(ledgerDateRange.startDate || ledgerDateRange.endDate) && (
+                  <button
+                    onClick={() => {
+                      setLedgerDateRange({ startDate: '', endDate: '' });
+                      handleRefreshLedger();
+                    }}
+                    className="btn btn-secondary"
+                    style={{ marginBottom: 0 }}
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {!distributorLedger || !distributorLedger.transactions ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f8f9fa', borderRadius: '8px', marginBottom: '1.5rem' }}>
-                No transactions found for this distributor
+                Loading ledger...
+              </div>
+            ) : distributorLedger.transactions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f8f9fa', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                No transactions found for this date range
               </div>
             ) : (
-              <div style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Type</th>
-                      <th>Bill Number</th>
-                      <th>Debit (Orders)</th>
-                      <th>Credit (Payments)</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {distributorLedger.map((transaction, index) => {
-                      const isOrder = transaction.transaction_type === 'order';
-                      const typeDisplay = isOrder ? 'Order' :
-                        transaction.transaction_type === 'advance' ? 'Advance Payment' : 'Order Payment';
+              <div>
+                {/* Opening Balance */}
+                <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '2px solid #2196F3' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: '700', fontSize: '1.125rem' }}>Opening Balance:</span>
+                    <span style={{ fontWeight: '700', fontSize: '1.5rem', color: '#0d47a1' }}>
+                      ₹{parseFloat(distributorLedger.openingBalance || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
 
-                      return (
-                        <tr key={index} style={{ backgroundColor: isOrder ? '#fff3e0' : '#e8f5e9' }}>
-                          <td>{new Date(transaction.transaction_date).toLocaleDateString()}</td>
-                          <td>
-                            <span style={{
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '12px',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              backgroundColor: isOrder ? '#ff9800' : '#4caf50',
-                              color: '#fff'
+                {/* Transactions Table */}
+                <div style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Bill Number</th>
+                        <th>Amount</th>
+                        <th>Running Balance</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {distributorLedger.transactions.map((transaction, index) => {
+                        const isOrder = transaction.transaction_type === 'order';
+                        const typeDisplay = isOrder ? 'Order' :
+                          transaction.transaction_type === 'advance' ? 'Advance Payment' : 'Order Payment';
+
+                        const debit = parseFloat(transaction.debit_amount || transaction.debit || 0);
+                        const credit = parseFloat(transaction.credit_amount || transaction.credit || 0);
+                        const amount = debit - credit;
+                        const isPositive = amount > 0;
+
+                        return (
+                          <tr key={index} style={{ backgroundColor: isOrder ? '#fff3e0' : '#e8f5e9' }}>
+                            <td>{new Date(transaction.transaction_date).toLocaleDateString()}</td>
+                            <td>
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '12px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                backgroundColor: isOrder ? '#ff9800' : '#4caf50',
+                                color: '#fff'
+                              }}>
+                                {typeDisplay}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: '600' }}>
+                              {transaction.bill_number || '-'}
+                            </td>
+                            <td style={{
+                              color: isPositive ? '#d32f2f' : '#2e7d32',
+                              fontWeight: '700',
+                              fontSize: '1.125rem'
                             }}>
-                              {typeDisplay}
-                            </span>
-                          </td>
-                          <td style={{ fontWeight: '600' }}>
-                            {transaction.bill_number || '-'}
-                          </td>
-                          <td style={{ color: '#d32f2f', fontWeight: '700', fontSize: '1.125rem' }}>
-                            {parseFloat(transaction.debit_amount) > 0 ? `₹${parseFloat(transaction.debit_amount).toFixed(2)}` : '-'}
-                          </td>
-                          <td style={{ color: '#2e7d32', fontWeight: '700', fontSize: '1.125rem' }}>
-                            {parseFloat(transaction.credit_amount) > 0 ? `₹${parseFloat(transaction.credit_amount).toFixed(2)}` : '-'}
-                          </td>
-                          <td style={{ fontSize: '0.875rem', color: '#666' }}>
-                            {transaction.notes || '-'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot style={{ borderTop: '2px solid #dee2e6', backgroundColor: '#f8f9fa' }}>
-                    <tr>
-                      <td colSpan="3" style={{ fontWeight: '700', textAlign: 'right', paddingTop: '1rem' }}>
-                        Totals:
-                      </td>
-                      <td style={{ fontWeight: '700', fontSize: '1.25rem', color: '#d32f2f', paddingTop: '1rem' }}>
-                        ₹{distributorLedger.reduce((sum, t) => sum + parseFloat(t.debit_amount || 0), 0).toFixed(2)}
-                      </td>
-                      <td style={{ fontWeight: '700', fontSize: '1.25rem', color: '#2e7d32', paddingTop: '1rem' }}>
-                        ₹{distributorLedger.reduce((sum, t) => sum + parseFloat(t.credit_amount || 0), 0).toFixed(2)}
-                      </td>
-                      <td></td>
-                    </tr>
-                    <tr style={{ backgroundColor: '#e3f2fd' }}>
-                      <td colSpan="3" style={{ fontWeight: '700', textAlign: 'right', paddingTop: '1rem' }}>
-                        Net Outstanding:
-                      </td>
-                      <td colSpan="3" style={{ fontWeight: '700', fontSize: '1.5rem', color: '#0d47a1', paddingTop: '1rem' }}>
-                        ₹{(
-                          distributorLedger.reduce((sum, t) => sum + parseFloat(t.debit_amount || 0), 0) -
-                          distributorLedger.reduce((sum, t) => sum + parseFloat(t.credit_amount || 0), 0)
-                        ).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                              {amount === 0 ? '-' : `${isPositive ? '+' : ''}₹${Math.abs(amount).toFixed(2)}`}
+                            </td>
+                            <td style={{ fontWeight: '700', fontSize: '1.125rem', color: '#0d47a1' }}>
+                              ₹{parseFloat(transaction.running_balance || 0).toFixed(2)}
+                            </td>
+                            <td style={{ fontSize: '0.875rem', color: '#666' }}>
+                              {transaction.notes || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Closing Balance */}
+                <div style={{ padding: '1rem', backgroundColor: '#d4edda', borderRadius: '8px', border: '2px solid #28a745' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: '700', fontSize: '1.125rem' }}>Closing Balance:</span>
+                    <span style={{ fontWeight: '700', fontSize: '1.5rem', color: '#155724' }}>
+                      ₹{parseFloat(distributorLedger.closingBalance || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
             </div>

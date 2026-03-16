@@ -221,54 +221,47 @@ const OrdersTab = () => {
     e.preventDefault();
     setError('');
 
-    // Only validate distributor and order items when creating (not editing)
-    if (!editingOrder) {
-      if (!formData.distributorId) {
-        setError('Please select a distributor');
-        return;
-      }
+    // Validate distributor and order items (for both creating and editing)
+    if (!formData.distributorId) {
+      setError('Please select a distributor');
+      return;
+    }
 
-      if (formData.orderData.length === 0) {
-        setError('Please add at least one order item');
-        return;
-      }
+    if (formData.orderData.length === 0) {
+      setError('Please add at least one order item');
+      return;
+    }
 
-      // Validate all items have required fields
-      const invalidItem = formData.orderData.find(item =>
-        !item.product_id || !item.qty || !item.buy_price
-      );
+    // Validate all items have required fields
+    const invalidItem = formData.orderData.find(item =>
+      !item.product_id || !item.qty || !item.buy_price
+    );
 
-      if (invalidItem) {
-        setError('Please fill all fields for each order item');
-        return;
-      }
+    if (invalidItem) {
+      setError('Please fill all fields for each order item');
+      return;
     }
 
     try {
-      let submitData;
+      // Calculate totals for order items
+      const orderDataWithTotals = formData.orderData.map(item => ({
+        ...item,
+        total: (parseFloat(item.qty || 0) * parseFloat(item.buy_price || 0)).toFixed(2)
+      }));
 
-      if (editingOrder) {
-        // When editing, only send editable fields (exclude orderData and distributorId)
-        submitData = {
-          tax: formData.tax,
-          misc: formData.misc,
-          discount: formData.discount,
-          scheme: formData.scheme,
-          paymentOutstandingDate: formData.paymentOutstandingDate,
-          remarks: formData.remarks
-        };
-      } else {
-        // When creating, calculate totals and send all fields
-        const orderDataWithTotals = formData.orderData.map(item => ({
-          ...item,
-          total: (parseFloat(item.qty || 0) * parseFloat(item.buy_price || 0)).toFixed(2)
-        }));
-
-        submitData = {
-          ...formData,
-          orderData: orderDataWithTotals.length > 0 ? orderDataWithTotals : null
-        };
-      }
+      // Send all fields for both create and edit
+      const submitData = {
+        distributorId: formData.distributorId,
+        orderData: orderDataWithTotals,
+        orderDate: formData.orderDate,
+        billNumber: formData.billNumber,
+        tax: formData.tax,
+        misc: formData.misc,
+        discount: formData.discount,
+        scheme: formData.scheme,
+        paymentOutstandingDate: formData.paymentOutstandingDate,
+        remarks: formData.remarks
+      };
 
       console.log('Submitting order data:', submitData);
 
@@ -341,11 +334,8 @@ const OrdersTab = () => {
                     onChange={(e) => setFormData({ ...formData, distributorId: e.target.value })}
                     style={{
                       fontSize: '1.125rem',
-                      padding: '1rem',
-                      backgroundColor: editingOrder ? '#f5f5f5' : '#fff',
-                      cursor: editingOrder ? 'not-allowed' : 'auto'
+                      padding: '1rem'
                     }}
-                    disabled={editingOrder !== null}
                     required
                   >
                     <option value="">Select a distributor</option>
@@ -355,11 +345,6 @@ const OrdersTab = () => {
                       </option>
                     ))}
                   </select>
-                  {editingOrder && (
-                    <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                      Distributor cannot be changed when editing an order
-                    </small>
-                  )}
                 </div>
 
                 <div className="form-group">
@@ -386,22 +371,19 @@ const OrdersTab = () => {
                       return minDate.toISOString().split('T')[0];
                     })()}
                     max={new Date().toISOString().split('T')[0]}
-                    disabled={editingOrder !== null}
                     style={{
                       fontSize: '1.125rem',
                       padding: '1rem',
                       fontWeight: '600',
-                      color: '#000',
-                      backgroundColor: editingOrder ? '#f5f5f5' : '#fff',
-                      cursor: editingOrder ? 'not-allowed' : 'auto'
+                      color: '#000'
                     }}
                   />
                   <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
-                    {editingOrder ? 'Order date cannot be changed after creation' : `You can select dates from ${(() => {
+                    You can select dates from {(() => {
                       const minDate = new Date(lastSalesReportDate);
                       minDate.setDate(minDate.getDate() + 1);
                       return minDate.toLocaleDateString();
-                    })()} to today`}
+                    })()} to today
                   </small>
                   {orderDateWarning && !editingOrder && (
                     <div style={{
@@ -488,11 +470,8 @@ const OrdersTab = () => {
                             onChange={(e) => updateOrderItem(index, 'product_id', e.target.value)}
                             style={{
                               fontSize: '1rem',
-                              padding: '0.875rem',
-                              backgroundColor: editingOrder ? '#e0e0e0' : '#fff',
-                              cursor: editingOrder ? 'not-allowed' : 'auto'
+                              padding: '0.875rem'
                             }}
-                            disabled={editingOrder !== null}
                             required
                           >
                             <option value="">Select Product</option>
@@ -516,11 +495,8 @@ const OrdersTab = () => {
                             placeholder="0"
                             style={{
                               fontSize: '1rem',
-                              padding: '0.875rem',
-                              backgroundColor: editingOrder ? '#e0e0e0' : '#fff',
-                              cursor: editingOrder ? 'not-allowed' : 'auto'
+                              padding: '0.875rem'
                             }}
-                            disabled={editingOrder !== null}
                             required
                           />
                         </div>
@@ -537,11 +513,8 @@ const OrdersTab = () => {
                             placeholder="0.00"
                             style={{
                               fontSize: '1rem',
-                              padding: '0.875rem',
-                              backgroundColor: editingOrder ? '#e0e0e0' : '#fff',
-                              cursor: editingOrder ? 'not-allowed' : 'auto'
+                              padding: '0.875rem'
                             }}
-                            disabled={editingOrder !== null}
                             required
                           />
                         </div>

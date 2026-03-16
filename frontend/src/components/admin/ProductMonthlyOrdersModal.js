@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { X } from 'lucide-react';
 import api from '../../utils/api';
 import { formatMonthLabel } from '../../utils/formatMonth';
@@ -32,7 +32,21 @@ const ProductMonthlyOrdersModal = ({ productId, productName, onClose }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   // Calculate total orders
-  const totalOrdered = data?.monthlyOrders?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  const totalOrdered = data?.monthlyOrders?.reduce((sum, item) => sum + (item.total || item.quantity || 0), 0) || 0;
+
+  // Generate colors for distributors
+  const distributorColors = [
+    '#2196F3', // Blue
+    '#4CAF50', // Green
+    '#FF9800', // Orange
+    '#9C27B0', // Purple
+    '#F44336', // Red
+    '#00BCD4', // Cyan
+    '#FFEB3B', // Yellow
+    '#795548', // Brown
+    '#607D8B', // Blue Grey
+    '#E91E63'  // Pink
+  ];
 
   // Calculate minimum visible months (12) and total months
   const totalMonths = data?.monthlyOrders.length || 0;
@@ -267,15 +281,42 @@ const ProductMonthlyOrdersModal = ({ productId, productName, onClose }) => {
                           domain={[0, 'auto']}
                         />
                         <Tooltip
-                          formatter={(value) => [value.toLocaleString(), 'Quantity']}
+                          formatter={(value, name) => {
+                            const dist = data.distributors?.find(d => d.dataKey === name);
+                            return [value.toLocaleString(), dist ? dist.name : 'Quantity'];
+                          }}
                           contentStyle={{ fontSize: isMobile ? 11 : 14 }}
                           wrapperStyle={{ zIndex: 1000 }}
                         />
-                        <Bar dataKey="quantity" fill="#2196F3" />
+                        {data.distributors && data.distributors.length > 0 && (
+                          <Legend
+                            wrapperStyle={{ fontSize: isMobile ? '11px' : '13px', paddingTop: '10px' }}
+                            formatter={(value) => {
+                              const dist = data.distributors.find(d => d.dataKey === value);
+                              return dist ? dist.name : value;
+                            }}
+                          />
+                        )}
+                        {data.distributors && data.distributors.length > 0 ? (
+                          data.distributors.map((distributor, index) => (
+                            <Bar
+                              key={distributor.dataKey}
+                              dataKey={distributor.dataKey}
+                              stackId="a"
+                              fill={distributorColors[index % distributorColors.length]}
+                              name={distributor.name}
+                            />
+                          ))
+                        ) : (
+                          <Bar dataKey="quantity" fill="#2196F3" />
+                        )}
                       </BarChart>
                     ) : (
                       <LineChart
-                        data={data.monthlyOrders}
+                        data={data.monthlyOrders.map(item => ({
+                          ...item,
+                          quantity: item.total || item.quantity || 0
+                        }))}
                         margin={{
                           top: 5,
                           right: 30,
@@ -302,7 +343,7 @@ const ProductMonthlyOrdersModal = ({ productId, productName, onClose }) => {
                           domain={[0, 'auto']}
                         />
                         <Tooltip
-                          formatter={(value) => [value.toLocaleString(), 'Quantity']}
+                          formatter={(value) => [value.toLocaleString(), 'Total Quantity']}
                           contentStyle={{ fontSize: isMobile ? 11 : 14 }}
                           wrapperStyle={{ zIndex: 1000 }}
                         />
@@ -377,27 +418,30 @@ const ProductMonthlyOrdersModal = ({ productId, productName, onClose }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.monthlyOrders.slice().reverse().map((item, index) => (
-                      <tr
-                        key={item.month}
-                        style={{
-                          backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9',
-                          borderBottom: '1px solid #e0e0e0'
-                        }}
-                      >
-                        <td style={{ padding: isMobile ? '0.5rem' : '0.75rem', fontWeight: '600' }}>
-                          {formatMonthLabel(item.month)}
-                        </td>
-                        <td style={{
-                          padding: isMobile ? '0.5rem' : '0.75rem',
-                          textAlign: 'right',
-                          fontWeight: '700',
-                          color: item.quantity > 0 ? '#2196F3' : '#999'
-                        }}>
-                          {item.quantity > 0 ? item.quantity.toLocaleString() : '—'}
-                        </td>
-                      </tr>
-                    ))}
+                    {data.monthlyOrders.slice().reverse().map((item, index) => {
+                      const quantity = item.total || item.quantity || 0;
+                      return (
+                        <tr
+                          key={item.month}
+                          style={{
+                            backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9',
+                            borderBottom: '1px solid #e0e0e0'
+                          }}
+                        >
+                          <td style={{ padding: isMobile ? '0.5rem' : '0.75rem', fontWeight: '600' }}>
+                            {formatMonthLabel(item.month)}
+                          </td>
+                          <td style={{
+                            padding: isMobile ? '0.5rem' : '0.75rem',
+                            textAlign: 'right',
+                            fontWeight: '700',
+                            color: quantity > 0 ? '#2196F3' : '#999'
+                          }}>
+                            {quantity > 0 ? quantity.toLocaleString() : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

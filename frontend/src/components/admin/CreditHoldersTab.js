@@ -244,7 +244,7 @@ const CreditHoldersTab = () => {
           <button
             onClick={handleOpenCollectModal}
             className="btn btn-primary"
-            style={{ background: '#4CAF50', borderColor: '#4CAF50' }}
+            style={{ background: '#4CAF50', borderColor: '#000' }}
           >
             Collect Credit
           </button>
@@ -472,7 +472,8 @@ const CreditHoldersTab = () => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    padding: '0.75rem 1.5rem'
+                    padding: '0.75rem 1.5rem',
+                    borderColor: '#000'
                   }}
                 >
                   Collect Credit

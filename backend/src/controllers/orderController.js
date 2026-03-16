@@ -1,3 +1,4 @@
+const pool = require('../config/database');
 const db = require('../models/data');
 
 const getAllOrders = async (req, res) => {
@@ -108,53 +109,93 @@ const createOrder = async (req, res) => {
 };
 
 const updateOrder = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks, billNumber } = req.body;
 
     const order = await db.getOrderById(id);
 
     if (!order) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Order not found' });
     }
 
     // Check if order belongs to user's organisation
     if (order.organisation_id !== req.user.organisationId) {
+      await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Prevent editing of distributor and order items
-    if (distributorId !== undefined && distributorId !== order.distributor_id) {
-      return res.status(400).json({ error: 'Distributor cannot be changed when editing an order' });
+    // Validate bill number if provided
+    if (billNumber !== undefined) {
+      if (!billNumber || billNumber.trim() === '') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Bill number is required' });
+      }
     }
 
-    if (orderData !== undefined) {
-      return res.status(400).json({ error: 'Order items cannot be changed when editing an order' });
+    // If order items are being changed, we need to:
+    // 1. Revert old inventory changes (subtract old quantities that were added)
+    // 2. Apply new inventory changes (add new quantities)
+    if (orderData !== undefined && Array.isArray(orderData)) {
+      console.log('Order items are being updated - adjusting inventory...');
+
+      // Revert old inventory changes (subtract the old quantities that were added)
+      if (order.order_data && Array.isArray(order.order_data)) {
+        for (const oldItem of order.order_data) {
+          if (oldItem.product_id && oldItem.qty) {
+            const qty = parseFloat(oldItem.qty);
+            await db.decrementInventory(req.user.organisationId, oldItem.product_id, qty);
+            console.log(`Reverted inventory for product ${oldItem.product_id}: -${qty}`);
+          }
+        }
+      }
+
+      // Apply new inventory changes (add new quantities)
+      for (const newItem of orderData) {
+        if (newItem.product_id && newItem.qty) {
+          const qty = parseFloat(newItem.qty);
+          const orderTotal = parseFloat(newItem.total || 0);
+          const buyPricePerUnit = qty > 0 ? orderTotal / qty : 0;
+
+          await db.incrementInventory(req.user.organisationId, newItem.product_id, qty);
+          console.log(`Applied new inventory for product ${newItem.product_id}: +${qty}`);
+
+          // Update average buy price
+          await db.updateProductAverageBuyPrice(newItem.product_id, buyPricePerUnit, qty);
+          console.log(`Updated average buy price for product ${newItem.product_id} with new price ${buyPricePerUnit}`);
+        }
+      }
     }
 
-    // Note: Distributor outstanding is automatically updated by database trigger
-    // The trigger recalculates outstanding based on all orders and payments
-
-    // Build updates object - only allow editing specific fields
+    // Build updates object
     const updates = {};
+    if (orderData !== undefined) updates.orderData = orderData;
     if (tax !== undefined) updates.tax = tax;
     if (misc !== undefined) updates.misc = misc;
     if (discount !== undefined) updates.discount = discount;
     if (scheme !== undefined) updates.scheme = scheme;
     if (paymentOutstandingDate !== undefined) updates.paymentOutstandingDate = paymentOutstandingDate || null;
+    if (orderDate !== undefined) updates.orderDate = orderDate;
     if (remarks !== undefined) updates.remarks = remarks;
-    if (billNumber !== undefined) {
-      if (!billNumber || billNumber.trim() === '') {
-        return res.status(400).json({ error: 'Bill number is required' });
-      }
-      updates.billNumber = billNumber.trim();
-    }
+    if (billNumber !== undefined) updates.billNumber = billNumber.trim();
+    if (distributorId !== undefined) updates.distributorId = distributorId;
 
     const updatedOrder = await db.updateOrder(id, updates);
+
+    await client.query('COMMIT');
+
+    console.log('Order updated successfully with inventory adjustments');
     res.json(updatedOrder);
   } catch (error) {
-    console.error(error);
+    await client.query('ROLLBACK');
+    console.error('Error updating order:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

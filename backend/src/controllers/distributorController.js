@@ -39,7 +39,7 @@ const getDistributor = async (req, res) => {
 
 const createDistributor = async (req, res) => {
   try {
-    const { name, amountOutstanding } = req.body;
+    const { name, amountOutstanding, openingBalance } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Please provide name' });
@@ -62,7 +62,8 @@ const createDistributor = async (req, res) => {
     const newDistributor = await db.createDistributor({
       organisationId,
       name,
-      amountOutstanding: amountOutstanding || 0
+      amountOutstanding: amountOutstanding || 0,
+      openingBalance: openingBalance || 0
     });
 
     res.status(201).json(newDistributor);
