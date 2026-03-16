@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../utils/api';
+import CustomDropdown from '../common/CustomDropdown';
 import { Calendar, CreditCard, TrendingUp, User, X, FileText, Package, MessageSquare, Wallet, CheckCircle, AlertCircle, DollarSign } from 'lucide-react';
 
 const SalesReportTab = () => {
@@ -2637,17 +2638,19 @@ const SalesReportTab = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Credit Holder</label>
-                            <select
-                              className="form-control"
+                            <CustomDropdown
+                              label="Credit Holder"
                               value={entry.creditHolderId}
-                              onChange={(e) => updateCreditTakenInApproval(index, 'creditHolderId', e.target.value)}
-                            >
-                              <option value="">Select</option>
-                              {creditHolders.map(ch => (
-                                <option key={ch.id} value={ch.id}>{ch.name}</option>
-                              ))}
-                            </select>
+                              onChange={(value) => updateCreditTakenInApproval(index, 'creditHolderId', value)}
+                              options={[
+                                { value: '', label: 'Select' },
+                                ...creditHolders.map(ch => ({
+                                  value: ch.id,
+                                  label: ch.name
+                                }))
+                              ]}
+                              placeholder="Select credit holder"
+                            />
                           </div>
 
                           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -2664,15 +2667,16 @@ const SalesReportTab = () => {
                           </div>
 
                           <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Collected In</label>
-                            <select
-                              className="form-control"
+                            <CustomDropdown
+                              label="Collected In"
                               value={entry.collectedIn}
-                              onChange={(e) => updateCreditTakenInApproval(index, 'collectedIn', e.target.value)}
-                            >
-                              <option value="cash_balance">Cash</option>
-                              <option value="bank_balance">UPI</option>
-                            </select>
+                              onChange={(value) => updateCreditTakenInApproval(index, 'collectedIn', value)}
+                              options={[
+                                { value: 'cash_balance', label: 'Cash' },
+                                { value: 'bank_balance', label: 'UPI' }
+                              ]}
+                              placeholder="Select collection method"
+                            />
                           </div>
 
                           <button
@@ -2848,17 +2852,19 @@ const SalesReportTab = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: '0.875rem', fontWeight: '600' }}>Credit Holder</label>
-                            <select
-                              className="form-control"
+                            <CustomDropdown
+                              label="Credit Holder"
                               value={entry.creditHolderId}
-                              onChange={(e) => updateCreditEntryInApproval(index, 'creditHolderId', e.target.value)}
-                            >
-                              <option value="">Select</option>
-                              {creditHolders.map(ch => (
-                                <option key={ch.id} value={ch.id}>{ch.name}</option>
-                              ))}
-                            </select>
+                              onChange={(value) => updateCreditEntryInApproval(index, 'creditHolderId', value)}
+                              options={[
+                                { value: '', label: 'Select' },
+                                ...creditHolders.map(ch => ({
+                                  value: ch.id,
+                                  label: ch.name
+                                }))
+                              ]}
+                              placeholder="Select credit holder"
+                            />
                           </div>
 
                           <div className="form-group" style={{ marginBottom: 0 }}>

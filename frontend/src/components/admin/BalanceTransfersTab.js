@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { formatDate } from '../../utils/dateUtils';
 import MobileTable from '../common/MobileTable';
+import CustomDropdown from '../common/CustomDropdown';
 import { Wallet, TrendingUp, DollarSign, Plus } from 'lucide-react';
 
 const BalanceTransfersTab = () => {
@@ -497,19 +498,18 @@ const BalanceTransfersTab = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="fromAccount">From Account</label>
-                <select
-                  id="fromAccount"
-                  className="form-control"
+                <CustomDropdown
+                  label="From Account"
                   value={formData.fromAccount}
-                  onChange={(e) => setFormData({ ...formData, fromAccount: e.target.value })}
-                  required
-                >
-                  <option value="">Select account</option>
-                  <option value="cash_balance">Cash Balance</option>
-                  <option value="bank_balance">Bank Balance</option>
-                  <option value="gala_balance">Gala Balance</option>
-                </select>
+                  onChange={(value) => setFormData({ ...formData, fromAccount: value })}
+                  options={[
+                    { value: '', label: 'Select account' },
+                    { value: 'cash_balance', label: 'Cash Balance' },
+                    { value: 'bank_balance', label: 'Bank Balance' },
+                    { value: 'gala_balance', label: 'Gala Balance' }
+                  ]}
+                  placeholder="Select account"
+                />
                 {formData.fromAccount && (
                   <div style={{
                     marginTop: '0.5rem',
@@ -529,23 +529,22 @@ const BalanceTransfersTab = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="toAccount">To Account</label>
-                <select
-                  id="toAccount"
-                  className="form-control"
+                <CustomDropdown
+                  label="To Account"
                   value={formData.toAccount}
-                  onChange={(e) => setFormData({ ...formData, toAccount: e.target.value })}
-                  required
+                  onChange={(value) => setFormData({ ...formData, toAccount: value })}
+                  options={[
+                    { value: '', label: 'Select account' },
+                    { value: 'cash_balance', label: 'Cash Balance' },
+                    { value: 'bank_balance', label: 'Bank Balance' },
+                    { value: 'gala_balance', label: 'Gala Balance' }
+                  ]}
+                  placeholder="Select account"
                   style={{
                     borderColor: (formData.fromAccount && formData.toAccount && formData.fromAccount === formData.toAccount) ? '#dc3545' : undefined,
                     borderWidth: (formData.fromAccount && formData.toAccount && formData.fromAccount === formData.toAccount) ? '2px' : undefined
                   }}
-                >
-                  <option value="">Select account</option>
-                  <option value="cash_balance">Cash Balance</option>
-                  <option value="bank_balance">Bank Balance</option>
-                  <option value="gala_balance">Gala Balance</option>
-                </select>
+                />
                 {formData.fromAccount && formData.toAccount && formData.fromAccount === formData.toAccount && (
                   <div style={{
                     marginTop: '0.5rem',
@@ -711,19 +710,18 @@ const BalanceTransfersTab = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="incomeAccount">Add To Account *</label>
-                <select
-                  id="incomeAccount"
-                  className="form-control"
+                <CustomDropdown
+                  label="Add To Account *"
                   value={incomeFormData.account}
-                  onChange={(e) => setIncomeFormData({ ...incomeFormData, account: e.target.value })}
-                  required
-                >
-                  <option value="">Select account</option>
-                  <option value="cash_balance">Cash Balance</option>
-                  <option value="bank_balance">Bank Balance</option>
-                  <option value="gala_balance">Gala Balance</option>
-                </select>
+                  onChange={(value) => setIncomeFormData({ ...incomeFormData, account: value })}
+                  options={[
+                    { value: '', label: 'Select account' },
+                    { value: 'cash_balance', label: 'Cash Balance' },
+                    { value: 'bank_balance', label: 'Bank Balance' },
+                    { value: 'gala_balance', label: 'Gala Balance' }
+                  ]}
+                  placeholder="Select account"
+                />
                 {incomeFormData.account && (
                   <div style={{
                     marginTop: '0.5rem',

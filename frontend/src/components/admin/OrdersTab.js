@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Package, Calendar, Trash2, Plus } from 'lucide-react';
 import MobileTable from '../common/MobileTable';
+import CustomDropdown from '../common/CustomDropdown';
 
 const OrdersTab = () => {
   const [orders, setOrders] = useState([]);
@@ -323,28 +324,24 @@ const OrdersTab = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 <div className="form-group">
-                  <label htmlFor="distributorId" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem', fontWeight: '600' }}>
-                    <Package size={20} />
-                    Distributor *
-                  </label>
-                  <select
-                    id="distributorId"
-                    className="form-control"
+                  <CustomDropdown
+                    label={
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem' }}>
+                        <Package size={20} />
+                        Distributor *
+                      </span>
+                    }
                     value={formData.distributorId}
-                    onChange={(e) => setFormData({ ...formData, distributorId: e.target.value })}
-                    style={{
-                      fontSize: '1.125rem',
-                      padding: '1rem'
-                    }}
-                    required
-                  >
-                    <option value="">Select a distributor</option>
-                    {distributors.map(distributor => (
-                      <option key={distributor.id} value={distributor.id}>
-                        {distributor.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, distributorId: value })}
+                    options={[
+                      { value: '', label: 'Select a distributor' },
+                      ...distributors.map(distributor => ({
+                        value: distributor.id,
+                        label: distributor.name
+                      }))
+                    ]}
+                    placeholder="Select a distributor"
+                  />
                 </div>
 
                 <div className="form-group">
@@ -463,24 +460,19 @@ const OrdersTab = () => {
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
                         <div className="form-group">
-                          <label style={{ fontWeight: '600' }}>Product *</label>
-                          <select
-                            className="form-control"
+                          <CustomDropdown
+                            label="Product *"
                             value={item.product_id}
-                            onChange={(e) => updateOrderItem(index, 'product_id', e.target.value)}
-                            style={{
-                              fontSize: '1rem',
-                              padding: '0.875rem'
-                            }}
-                            required
-                          >
-                            <option value="">Select Product</option>
-                            {products.map(product => (
-                              <option key={product.id} value={product.id}>
-                                {product.product_name}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(value) => updateOrderItem(index, 'product_id', value)}
+                            options={[
+                              { value: '', label: 'Select Product' },
+                              ...products.map(product => ({
+                                value: product.id,
+                                label: product.product_name
+                              }))
+                            ]}
+                            placeholder="Select Product"
+                          />
                         </div>
 
                         <div className="form-group">

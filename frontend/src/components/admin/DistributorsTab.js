@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import MobileTable from '../common/MobileTable';
+import CustomDropdown from '../common/CustomDropdown';
 
 const DistributorsTab = () => {
   const [distributors, setDistributors] = useState([]);
@@ -452,30 +453,26 @@ const DistributorsTab = () => {
 
             <form onSubmit={handlePayDistributor}>
               <div className="form-group">
-                <label htmlFor="distributor">Select Distributor</label>
-                <select
-                  id="distributor"
-                  className="form-control"
+                <CustomDropdown
+                  label="Select Distributor"
                   value={paymentData.distributorId}
-                  onChange={async (e) => {
-                    const selectedId = e.target.value;
-                    setPaymentData({ ...paymentData, distributorId: selectedId, billNumber: '', orderId: '' });
-                    if (selectedId) {
-                      await fetchUnpaidBills(selectedId);
+                  onChange={async (value) => {
+                    setPaymentData({ ...paymentData, distributorId: value, billNumber: '', orderId: '' });
+                    if (value) {
+                      await fetchUnpaidBills(value);
                     } else {
                       setUnpaidBills([]);
                     }
                   }}
-                  required
-                  style={{ padding: '0.75rem', fontSize: '1rem' }}
-                >
-                  <option value="">-- Select Distributor --</option>
-                  {distributors.map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} - Outstanding: ₹{parseFloat(d.amount_outstanding || 0).toFixed(2)}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: '-- Select Distributor --' },
+                    ...distributors.map(d => ({
+                      value: d.id,
+                      label: `${d.name} - Outstanding: ₹${parseFloat(d.amount_outstanding || 0).toFixed(2)}`
+                    }))
+                  ]}
+                  placeholder="-- Select Distributor --"
+                />
               </div>
 
               {paymentData.distributorId && (
@@ -494,18 +491,15 @@ const DistributorsTab = () => {
               )}
 
               <div className="form-group">
-                <label htmlFor="paymentType">Payment Type</label>
-                <select
-                  id="paymentType"
-                  className="form-control"
+                <CustomDropdown
+                  label="Payment Type"
                   value={paymentData.paymentType}
-                  onChange={(e) => setPaymentData({ ...paymentData, paymentType: e.target.value, billNumber: '', orderId: '' })}
-                  required
-                  style={{ padding: '0.75rem', fontSize: '1rem' }}
-                >
-                  <option value="order_payment">Order Payment (Pay Bill)</option>
-                  <option value="advance">Advance Payment</option>
-                </select>
+                  onChange={(value) => setPaymentData({ ...paymentData, paymentType: value, billNumber: '', orderId: '' })}
+                  options={[
+                    { value: 'order_payment', label: 'Order Payment (Pay Bill)' },
+                    { value: 'advance', label: 'Advance Payment' }
+                  ]}
+                />
                 <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
                   {paymentData.paymentType === 'advance'
                     ? 'Advance payment reduces outstanding and allows negative balance'
@@ -515,32 +509,26 @@ const DistributorsTab = () => {
 
               {paymentData.paymentType === 'order_payment' && paymentData.distributorId && (
                 <div className="form-group">
-                  <label htmlFor="billNumber">Select Bill Number</label>
-                  <select
-                    id="billNumber"
-                    className="form-control"
+                  <CustomDropdown
+                    label="Select Bill Number"
                     value={paymentData.orderId}
-                    onChange={(e) => {
-                      const selectedBill = unpaidBills.find(b => b.id === e.target.value);
+                    onChange={(value) => {
+                      const selectedBill = unpaidBills.find(b => b.id === value);
                       setPaymentData({
                         ...paymentData,
-                        orderId: e.target.value,
+                        orderId: value,
                         billNumber: selectedBill?.bill_number || ''
                       });
                     }}
-                    required={paymentData.paymentType === 'order_payment'}
-                    style={{ padding: '0.75rem', fontSize: '1rem' }}
-                  >
-                    <option value="">-- Select Bill --</option>
-                    {unpaidBills.map(bill => (
-                      <option key={bill.id} value={bill.id}>
-                        {bill.bill_number || `Order ${new Date(bill.order_date).toLocaleDateString()}`} -
-                        Total: ₹{parseFloat(bill.total_amount).toFixed(2)} |
-                        Paid: ₹{parseFloat(bill.paid_amount).toFixed(2)} |
-                        Remaining: ₹{parseFloat(bill.remaining_amount).toFixed(2)}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: '', label: '-- Select Bill --' },
+                      ...unpaidBills.map(bill => ({
+                        value: bill.id,
+                        label: `${bill.bill_number || `Order ${new Date(bill.order_date).toLocaleDateString()}`} - Total: ₹${parseFloat(bill.total_amount).toFixed(2)} | Paid: ₹${parseFloat(bill.paid_amount).toFixed(2)} | Remaining: ₹${parseFloat(bill.remaining_amount).toFixed(2)}`
+                      }))
+                    ]}
+                    placeholder="-- Select Bill --"
+                  />
                   {unpaidBills.length === 0 && (
                     <small style={{ color: '#856404', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
                       No bills found for this distributor
@@ -566,19 +554,16 @@ const DistributorsTab = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="paymentFrom">Payment From | से भुगतान</label>
-                <select
-                  id="paymentFrom"
-                  className="form-control"
+                <CustomDropdown
+                  label="Payment From | से भुगतान"
                   value={paymentData.paymentFrom}
-                  onChange={(e) => setPaymentData({ ...paymentData, paymentFrom: e.target.value })}
-                  required
-                  style={{ padding: '0.75rem', fontSize: '1rem' }}
-                >
-                  <option value="bank_balance">Bank Balance | बैंक शेष</option>
-                  <option value="cash_balance">Cash Balance | नकद शेष</option>
-                  <option value="gala_balance">Gala Balance | गला शेष</option>
-                </select>
+                  onChange={(value) => setPaymentData({ ...paymentData, paymentFrom: value })}
+                  options={[
+                    { value: 'bank_balance', label: 'Bank Balance | बैंक शेष' },
+                    { value: 'cash_balance', label: 'Cash Balance | नकद शेष' },
+                    { value: 'gala_balance', label: 'Gala Balance | गला शेष' }
+                  ]}
+                />
                 <div style={{
                   marginTop: '0.5rem',
                   padding: '0.5rem',

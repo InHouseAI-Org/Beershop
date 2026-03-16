@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import MobileTable from '../common/MobileTable';
+import CustomDropdown from '../common/CustomDropdown';
 
 const RecurringExpensesTab = () => {
   const [recurringExpenses, setRecurringExpenses] = useState([]);
@@ -376,18 +377,17 @@ const RecurringExpensesTab = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
-                  <label htmlFor="recurrenceType">Recurrence Type *</label>
-                  <select
-                    id="recurrenceType"
-                    className="form-control"
+                  <CustomDropdown
+                    label="Recurrence Type *"
                     value={formData.recurrenceType}
-                    onChange={(e) => setFormData({ ...formData, recurrenceType: e.target.value })}
-                    required
-                  >
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, recurrenceType: value })}
+                    options={[
+                      { value: 'weekly', label: 'Weekly' },
+                      { value: 'monthly', label: 'Monthly' },
+                      { value: 'yearly', label: 'Yearly' }
+                    ]}
+                    placeholder="Select recurrence type"
+                  />
                 </div>
 
                 <div className="form-group">
@@ -517,18 +517,17 @@ const RecurringExpensesTab = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="paidFrom">Pay From *</label>
-                <select
-                  id="paidFrom"
-                  className="form-control"
+                <CustomDropdown
+                  label="Pay From *"
                   value={paymentData.paidFrom}
-                  onChange={(e) => setPaymentData({ ...paymentData, paidFrom: e.target.value })}
-                  required
-                >
-                  <option value="cash_balance">Cash Balance</option>
-                  <option value="bank_balance">Bank Balance</option>
-                  <option value="gala_balance">Gala Balance</option>
-                </select>
+                  onChange={(value) => setPaymentData({ ...paymentData, paidFrom: value })}
+                  options={[
+                    { value: 'cash_balance', label: 'Cash Balance' },
+                    { value: 'bank_balance', label: 'Bank Balance' },
+                    { value: 'gala_balance', label: 'Gala Balance' }
+                  ]}
+                  placeholder="Select payment account"
+                />
               </div>
 
               <div className="form-group">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import MobileTable from '../common/MobileTable';
+import CustomDropdown from '../common/CustomDropdown';
 
 const SchemesTab = () => {
   const [schemes, setSchemes] = useState([]);
@@ -410,19 +411,16 @@ const SchemesTab = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="distributor">Distributor *</label>
-                <select
-                  id="distributor"
-                  className="form-control"
+                <CustomDropdown
+                  label="Distributor *"
                   value={formData.distributorId}
-                  onChange={(e) => setFormData({ ...formData, distributorId: e.target.value })}
-                  required
-                >
-                  <option value="">-- Select Distributor --</option>
-                  {distributors.map(d => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
+                  onChange={(value) => setFormData({ ...formData, distributorId: value })}
+                  options={[
+                    { value: '', label: '-- Select Distributor --' },
+                    ...distributors.map(d => ({ value: d.id, label: d.name }))
+                  ]}
+                  placeholder="-- Select Distributor --"
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -471,29 +469,26 @@ const SchemesTab = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="schemePeriodUnit">Period Unit *</label>
-                  <select
-                    id="schemePeriodUnit"
-                    className="form-control"
+                  <CustomDropdown
+                    label="Period Unit *"
                     value={formData.schemePeriodUnit}
-                    onChange={(e) => setFormData({ ...formData, schemePeriodUnit: e.target.value })}
-                    required
-                  >
-                    <option value="weeks">Weeks</option>
-                    <option value="months">Months</option>
-                    <option value="years">Years</option>
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, schemePeriodUnit: value })}
+                    options={[
+                      { value: 'weeks', label: 'Weeks' },
+                      { value: 'months', label: 'Months' },
+                      { value: 'years', label: 'Years' }
+                    ]}
+                    placeholder="Select period unit"
+                  />
                 </div>
               </div>
 
               <div className="form-group">
-                <label htmlFor="targetType">Target Type *</label>
-                <select
-                  id="targetType"
-                  className="form-control"
+                <CustomDropdown
+                  label="Target Type *"
                   value={formData.targetType}
-                  onChange={(e) => {
-                    const newType = e.target.value;
+                  onChange={(value) => {
+                    const newType = value;
                     setFormData({
                       ...formData,
                       targetType: newType,
@@ -503,11 +498,12 @@ const SchemesTab = () => {
                       }))
                     });
                   }}
-                  required
-                >
-                  <option value="overall">Overall Quantity (sum of all products)</option>
-                  <option value="per_product">Separate Quantity for Each Product</option>
-                </select>
+                  options={[
+                    { value: 'overall', label: 'Overall Quantity (sum of all products)' },
+                    { value: 'per_product', label: 'Separate Quantity for Each Product' }
+                  ]}
+                  placeholder="Select target type"
+                />
                 <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
                   {formData.targetType === 'overall'
                     ? 'Total quantity target across all products'
@@ -553,23 +549,20 @@ const SchemesTab = () => {
                     marginBottom: '0.5rem',
                     alignItems: 'center'
                   }}>
-                    <select
-                      className="form-control"
+                    <CustomDropdown
+                      label="Product"
                       value={product.product_id}
-                      onChange={(e) => handleProductChange(index, 'product_id', e.target.value)}
-                      required
-                    >
-                      <option value="">-- Select Product --</option>
-                      {products.map(p => (
-                        <option
-                          key={p.id}
-                          value={p.id}
-                          disabled={formData.schemeProducts.some((sp, i) => i !== index && sp.product_id === p.id)}
-                        >
-                          {p.product_name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => handleProductChange(index, 'product_id', value)}
+                      options={[
+                        { value: '', label: '-- Select Product --' },
+                        ...products.map(p => ({
+                          value: p.id,
+                          label: p.product_name,
+                          disabled: formData.schemeProducts.some((sp, i) => i !== index && sp.product_id === p.id)
+                        }))
+                      ]}
+                      placeholder="-- Select Product --"
+                    />
 
                     {formData.targetType === 'per_product' && (
                       <input

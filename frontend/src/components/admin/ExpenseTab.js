@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Plus, Edit2, Trash2, AlertCircle, Receipt } from 'lucide-react';
 import MobileTable from '../common/MobileTable';
+import CustomDropdown from '../common/CustomDropdown';
 
 const ExpenseTab = () => {
   const [expenses, setExpenses] = useState([]);
@@ -315,19 +316,17 @@ const ExpenseTab = () => {
               </div>
 
               <div className="form-group">
-                <label>
-                  Expense From / व्यय का स्रोत <span style={{ color: 'red' }}>*</span>
-                </label>
-                <select
-                  className="form-control"
+                <CustomDropdown
+                  label="Expense From / व्यय का स्रोत *"
                   value={formData.expenseFrom}
-                  onChange={(e) => setFormData({ ...formData, expenseFrom: e.target.value })}
-                  required
-                >
-                  <option value="cash_balance">Cash Balance / नकद शेष</option>
-                  <option value="bank_balance">Bank Balance / बैंक शेष</option>
-                  <option value="gala_balance">Gala Balance / गला शेष</option>
-                </select>
+                  onChange={(value) => setFormData({ ...formData, expenseFrom: value })}
+                  options={[
+                    { value: 'cash_balance', label: 'Cash Balance / नकद शेष' },
+                    { value: 'bank_balance', label: 'Bank Balance / बैंक शेष' },
+                    { value: 'gala_balance', label: 'Gala Balance / गला शेष' }
+                  ]}
+                  placeholder="Select expense source"
+                />
               </div>
 
               <div className="form-group">

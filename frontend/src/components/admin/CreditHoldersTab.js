@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import MobileTable from '../common/MobileTable';
+import CustomDropdown from '../common/CustomDropdown';
 
 const CreditHoldersTab = () => {
   const [creditHolders, setCreditHolders] = useState([]);
@@ -371,24 +372,21 @@ const CreditHoldersTab = () => {
 
             <form onSubmit={handleCollectCredit}>
               <div className="form-group">
-                <label htmlFor="creditHolder">Select Credit Holder</label>
-                <select
-                  id="creditHolder"
-                  className="form-control"
+                <CustomDropdown
+                  label="Select Credit Holder"
                   value={collectData.creditHolderId}
-                  onChange={(e) => setCollectData({ ...collectData, creditHolderId: e.target.value })}
-                  required
-                  style={{ padding: '0.75rem', fontSize: '1rem' }}
-                >
-                  <option value="">-- Select Credit Holder --</option>
-                  {creditHolders
-                    .filter(ch => parseFloat(ch.amount_payable || 0) > 0)
-                    .map(ch => (
-                      <option key={ch.id} value={ch.id}>
-                        {ch.name} - Outstanding: ₹{parseFloat(ch.amount_payable || 0).toFixed(2)}
-                      </option>
-                    ))}
-                </select>
+                  onChange={(value) => setCollectData({ ...collectData, creditHolderId: value })}
+                  options={[
+                    { value: '', label: '-- Select Credit Holder --' },
+                    ...creditHolders
+                      .filter(ch => parseFloat(ch.amount_payable || 0) > 0)
+                      .map(ch => ({
+                        value: ch.id,
+                        label: `${ch.name} - Outstanding: ₹${parseFloat(ch.amount_payable || 0).toFixed(2)}`
+                      }))
+                  ]}
+                  placeholder="-- Select Credit Holder --"
+                />
               </div>
 
               {collectData.creditHolderId && (
@@ -423,19 +421,17 @@ const CreditHoldersTab = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="collectedIn">Collected In | में एकत्रित</label>
-                <select
-                  id="collectedIn"
-                  className="form-control"
+                <CustomDropdown
+                  label="Collected In | में एकत्रित"
                   value={collectData.collectedIn}
-                  onChange={(e) => setCollectData({ ...collectData, collectedIn: e.target.value })}
-                  required
-                  style={{ padding: '0.75rem', fontSize: '1rem' }}
-                >
-                  <option value="cash_balance">Cash Balance | नकद शेष</option>
-                  <option value="bank_balance">Bank Balance | बैंक शेष</option>
-                  <option value="gala_balance">Gala Balance | गला शेष</option>
-                </select>
+                  onChange={(value) => setCollectData({ ...collectData, collectedIn: value })}
+                  options={[
+                    { value: 'cash_balance', label: 'Cash Balance | नकद शेष' },
+                    { value: 'bank_balance', label: 'Bank Balance | बैंक शेष' },
+                    { value: 'gala_balance', label: 'Gala Balance | गला शेष' }
+                  ]}
+                  placeholder="Select balance account"
+                />
                 <div style={{
                   marginTop: '0.5rem',
                   padding: '0.5rem',
