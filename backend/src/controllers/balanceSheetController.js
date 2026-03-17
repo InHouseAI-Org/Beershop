@@ -21,9 +21,10 @@ const getBalanceSheet = async (req, res) => {
     const balancesResult = await client.query(balancesQuery, [organisationId]);
     const balances = balancesResult.rows[0] || { cash_balance: 0, bank_balance: 0, gala_balance: 0 };
 
-    // Get inventory value (sum of all inventory items: qty * average_buy_price)
+    // Get inventory value (sum of all inventory items: qty * buy_price)
+    // Use buy_price if available, otherwise fall back to average_buy_price
     const inventoryQuery = `
-      SELECT COALESCE(SUM(i.qty * p.average_buy_price), 0) as inventory_value
+      SELECT COALESCE(SUM(i.qty * COALESCE(p.buy_price, p.average_buy_price, 0)), 0) as inventory_value
       FROM inventory i
       JOIN products p ON i.product_id = p.id
       WHERE i.organisation_id = $1
