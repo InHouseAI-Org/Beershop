@@ -16,9 +16,11 @@ jobs:
           echo "Running daily prepaid expense amortization..."
 
           # Make POST request to your Vercel backend
-          response=$(curl -s -w "\n%{http_code}" -X POST \
+          # -L flag follows redirects automatically
+          response=$(curl -s -w "\n%{http_code}" -L -X POST \
             ${{ secrets.BACKEND_URL }}/api/prepaid-expenses/amortize/daily \
-            -H "Content-Type: application/json")
+            -H "Content-Type: application/json" \
+            -d '{}')
 
           # Extract HTTP status code (last line)
           http_code=$(echo "$response" | tail -n1)
@@ -27,13 +29,16 @@ jobs:
           body=$(echo "$response" | sed '$d')
 
           echo "HTTP Status: $http_code"
-          echo "Response: $body"
+          echo "Response Body:"
+          echo "$body"
 
           # Check if request was successful
           if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo ""
             echo "✅ Amortization completed successfully"
             exit 0
           else
+            echo ""
             echo "❌ Amortization failed with status $http_code"
             exit 1
           fi
