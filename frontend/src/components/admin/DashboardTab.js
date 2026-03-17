@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
+import { AlertTriangle } from 'lucide-react';
 import MonthlySalesChart from './charts/MonthlySalesChart';
 import DistributorOrdersChart from './charts/DistributorOrdersChart';
 import CreditOutstandingChart from './charts/CreditOutstandingChart';
@@ -103,7 +104,7 @@ const DashboardTab = () => {
             alignItems: 'center',
             gap: '0.5rem'
           }}>
-            <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+            <AlertTriangle size={isMobile ? 20 : 24} />
             Low Inventory Alert
           </h3>
           <p style={{ color: '#666', marginBottom: '1rem', fontSize: isMobile ? '0.875rem' : '1rem' }}>
