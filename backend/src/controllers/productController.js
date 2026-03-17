@@ -39,7 +39,7 @@ const getProduct = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { productName, salePrice, buyPrice, averageBuyPrice } = req.body;
+    const { productName, salePrice, buyPrice, averageBuyPrice, alertQty } = req.body;
 
     if (!productName || salePrice === undefined) {
       return res.status(400).json({ error: 'Please provide product name and sale price' });
@@ -64,7 +64,8 @@ const createProduct = async (req, res) => {
       productName,
       salePrice,
       buyPrice: buyPrice || 0,
-      averageBuyPrice: averageBuyPrice || 0
+      averageBuyPrice: averageBuyPrice || 0,
+      alertQty: alertQty || 0
     });
 
     // Automatically create inventory entry with 0 qty
@@ -90,7 +91,7 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { productName, salePrice, buyPrice } = req.body;
+    const { productName, salePrice, buyPrice, alertQty } = req.body;
 
     const product = await db.getProductById(id);
 
@@ -121,6 +122,7 @@ const updateProduct = async (req, res) => {
     if (productName !== undefined) updates.productName = productName;
     if (salePrice !== undefined) updates.salePrice = salePrice;
     if (buyPrice !== undefined) updates.buyPrice = buyPrice;
+    if (alertQty !== undefined) updates.alertQty = alertQty;
 
     const updatedProduct = await db.updateProduct(id, updates);
     res.json(updatedProduct);

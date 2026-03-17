@@ -254,15 +254,16 @@ const dataHelpers = {
 
   createProduct: async (productData) => {
     const result = await pool.query(
-      `INSERT INTO products (organisation_id, product_name, sale_price, buy_price, average_buy_price)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO products (organisation_id, product_name, sale_price, buy_price, average_buy_price, alert_qty)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [
         productData.organisationId,
         productData.productName,
         productData.salePrice,
         productData.buyPrice || 0,
-        productData.averageBuyPrice || 0
+        productData.averageBuyPrice || 0,
+        productData.alertQty || 0
       ]
     );
     return result.rows[0];
@@ -288,6 +289,12 @@ const dataHelpers = {
     if (updates.buyPrice !== undefined) {
       fields.push(`buy_price = $${paramCount}`);
       values.push(updates.buyPrice);
+      paramCount++;
+    }
+
+    if (updates.alertQty !== undefined) {
+      fields.push(`alert_qty = $${paramCount}`);
+      values.push(updates.alertQty);
       paramCount++;
     }
 
@@ -356,7 +363,9 @@ const dataHelpers = {
               p.product_name,
               p.sale_price,
               p.average_buy_price,
-              (COALESCE(i.qty, 0) * COALESCE(p.sale_price, 0)) as inventory_value
+              p.alert_qty,
+              (COALESCE(i.qty, 0) * COALESCE(p.sale_price, 0)) as inventory_value,
+              CASE WHEN COALESCE(i.qty, 0) < COALESCE(p.alert_qty, 0) THEN true ELSE false END as is_low_stock
        FROM inventory i
        JOIN products p ON i.product_id = p.id
        WHERE i.organisation_id = $1

@@ -12,7 +12,8 @@ const ProductsTab = () => {
   const [formData, setFormData] = useState({
     productName: '',
     salePrice: '',
-    buyPrice: ''
+    buyPrice: '',
+    alertQty: ''
   });
 
   useEffect(() => {
@@ -37,14 +38,16 @@ const ProductsTab = () => {
       setFormData({
         productName: product.product_name,
         salePrice: product.sale_price,
-        buyPrice: product.buy_price || ''
+        buyPrice: product.buy_price || '',
+        alertQty: product.alert_qty || ''
       });
     } else {
       setEditingProduct(null);
       setFormData({
         productName: '',
         salePrice: '',
-        buyPrice: ''
+        buyPrice: '',
+        alertQty: ''
       });
     }
     setShowModal(true);
@@ -56,7 +59,8 @@ const ProductsTab = () => {
     setFormData({
       productName: '',
       salePrice: '',
-      buyPrice: ''
+      buyPrice: '',
+      alertQty: ''
     });
   };
 
@@ -98,6 +102,15 @@ const ProductsTab = () => {
       render: (product) => (
         <span style={{ fontWeight: '700', color: '#4CAF50', fontSize: '1.125rem' }}>
           ₹{parseFloat(product.sale_price).toFixed(2)}
+        </span>
+      )
+    },
+    {
+      key: 'alert_qty',
+      label: 'Alert Qty',
+      render: (product) => (
+        <span style={{ fontWeight: '600', color: '#2196F3', fontSize: '1rem' }}>
+          {parseFloat(product.alert_qty || 0).toFixed(2)}
         </span>
       )
     },
@@ -186,6 +199,20 @@ const ProductsTab = () => {
                   step="0.01"
                   min="0"
                   required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="alertQty">Alert Quantity</label>
+                <input
+                  type="number"
+                  id="alertQty"
+                  className="form-control"
+                  value={formData.alertQty}
+                  onChange={(e) => setFormData({ ...formData, alertQty: e.target.value })}
+                  step="1"
+                  min="0"
+                  placeholder="Minimum stock level for alerts"
                 />
               </div>
 

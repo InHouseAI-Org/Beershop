@@ -103,4 +103,22 @@ const createInventory = async (req, res) => {
   }
 };
 
-module.exports = { getAllInventory, getInventoryByProduct, updateInventory, createInventory };
+const getLowInventoryAlerts = async (req, res) => {
+  try {
+    const organisationId = req.user.organisationId;
+
+    if (!organisationId) {
+      return res.status(400).json({ error: 'Organisation ID required' });
+    }
+
+    const inventory = await db.getInventoryByOrganisationId(organisationId);
+    const lowInventory = inventory.filter(item => item.is_low_stock && item.alert_qty > 0);
+
+    res.json(lowInventory);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+module.exports = { getAllInventory, getInventoryByProduct, updateInventory, createInventory, getLowInventoryAlerts };

@@ -23,6 +23,7 @@ const DashboardTab = () => {
     productNames: [],
     creditHolderNames: []
   });
+  const [lowInventory, setLowInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -32,14 +33,15 @@ const DashboardTab = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [usersRes, productsRes, creditHoldersRes, distributorsRes, ordersRes, salesRes, analyticsRes] = await Promise.all([
+      const [usersRes, productsRes, creditHoldersRes, distributorsRes, ordersRes, salesRes, analyticsRes, lowInventoryRes] = await Promise.all([
         api.get('/users'),
         api.get('/products'),
         api.get('/credit-holders'),
         api.get('/distributors'),
         api.get('/orders'),
         api.get('/sales'),
-        api.get('/analytics/monthly')
+        api.get('/analytics/monthly'),
+        api.get('/inventory/alerts')
       ]);
 
       setStats({
@@ -52,6 +54,7 @@ const DashboardTab = () => {
       });
 
       setAnalyticsData(analyticsRes.data);
+      setLowInventory(lowInventoryRes.data);
 
       setError('');
     } catch (err) {
@@ -82,6 +85,68 @@ const DashboardTab = () => {
       }}>
         Dashboard Overview
       </h2>
+
+      {/* Low Inventory Alerts */}
+      {lowInventory.length > 0 && (
+        <div className="card" style={{
+          backgroundColor: '#FFF3E0',
+          borderLeft: '4px solid #FF9800',
+          marginBottom: isMobile ? '1rem' : '2rem',
+          padding: isMobile ? '1rem' : '1.5rem'
+        }}>
+          <h3 style={{
+            color: '#E65100',
+            fontSize: isMobile ? '1.25rem' : '1.5rem',
+            fontWeight: '700',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+            Low Inventory Alert
+          </h3>
+          <p style={{ color: '#666', marginBottom: '1rem', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+            The following products are running low on stock:
+          </p>
+          <div style={{
+            display: 'grid',
+            gap: isMobile ? '0.75rem' : '1rem',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))'
+          }}>
+            {lowInventory.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  backgroundColor: '#fff',
+                  padding: isMobile ? '0.75rem' : '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #FFB74D',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <div style={{
+                    fontWeight: '700',
+                    color: '#000',
+                    fontSize: isMobile ? '1rem' : '1.125rem',
+                    marginBottom: '0.25rem'
+                  }}>
+                    {item.product_name}
+                  </div>
+                  <div style={{ color: '#666', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                    Current: <span style={{ fontWeight: '600', color: '#E65100' }}>{parseFloat(item.qty).toFixed(2)}</span>
+                    {' | '}
+                    Alert: <span style={{ fontWeight: '600', color: '#FF9800' }}>{parseFloat(item.alert_qty).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div style={{
@@ -126,6 +191,7 @@ const DashboardTab = () => {
           </p>
         </div>
       </div>
+
 
       {/* Analytics Charts */}
       {analyticsData.monthlySales && analyticsData.monthlySales.length > 0 && (
