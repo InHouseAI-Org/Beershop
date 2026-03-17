@@ -1,0 +1,39 @@
+name: Daily Prepaid Expense Amortization
+
+on:
+  schedule:
+    # Runs at 00:00 UTC (5:30 AM IST) every day
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  amortize:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run Amortization
+        run: |
+          echo "Running daily prepaid expense amortization..."
+
+          # Make POST request to your Vercel backend
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            ${{ secrets.BACKEND_URL }}/api/prepaid-expenses/amortize/daily \
+            -H "Content-Type: application/json")
+
+          # Extract HTTP status code (last line)
+          http_code=$(echo "$response" | tail -n1)
+
+          # Extract response body (everything except last line)
+          body=$(echo "$response" | sed '$d')
+
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+
+          # Check if request was successful
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo "✅ Amortization completed successfully"
+            exit 0
+          else
+            echo "❌ Amortization failed with status $http_code"
+            exit 1
+          fi
