@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "init-db": "node src/config/init-db.js",
     "create-superadmin": "node src/config/create-superadmin.js",
-    "migrate:financial": "node src/config/migrations/run_financial_migration.js"
+    "migrate:financial": "node src/config/migrations/run_financial_migration.js",
+    "test:amortize": "node test_amortization.js"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
+    "node-cron": "^4.2.1",
     "pg": "^8.18.0"
   },
   "devDependencies": {

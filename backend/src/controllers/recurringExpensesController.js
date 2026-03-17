@@ -408,19 +408,50 @@ const getPaymentHistory = async (req, res) => {
       return res.status(404).json({ error: 'Recurring expense not found' });
     }
 
-    const query = `
+    // Get regular payments
+    const paymentsQuery = `
       SELECT
         rep.*,
-        a.username as created_by_name
+        a.username as created_by_name,
+        'payment' as type
       FROM recurring_expense_payments rep
       LEFT JOIN admins a ON rep.created_by = a.id
       WHERE rep.recurring_expense_id = $1
-      ORDER BY rep.payment_date DESC
     `;
 
-    const result = await client.query(query, [id]);
+    // Get prepaid expenses
+    const prepaidQuery = `
+      SELECT
+        pe.id,
+        pe.payment_date,
+        pe.total_amount as amount,
+        pe.paid_from,
+        pe.notes,
+        pe.advance_periods,
+        pe.period_type,
+        pe.amount_per_period,
+        pe.coverage_start_date,
+        pe.coverage_end_date,
+        pe.remaining_value,
+        pe.amortized_value,
+        pe.created_at,
+        a.username as created_by_name,
+        'prepaid' as type
+      FROM prepaid_expenses pe
+      LEFT JOIN admins a ON pe.created_by = a.id
+      WHERE pe.recurring_expense_id = $1
+    `;
 
-    res.json(result.rows);
+    const paymentsResult = await client.query(paymentsQuery, [id]);
+    const prepaidResult = await client.query(prepaidQuery, [id]);
+
+    // Combine both results and sort by payment_date
+    const combinedResults = [
+      ...paymentsResult.rows,
+      ...prepaidResult.rows
+    ].sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date));
+
+    res.json(combinedResults);
   } catch (error) {
     console.error('Error fetching payment history:', error);
     res.status(500).json({ error: 'Server error' });

@@ -39,7 +39,7 @@ const getProduct = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { productName, salePrice, averageBuyPrice } = req.body;
+    const { productName, salePrice, buyPrice, averageBuyPrice } = req.body;
 
     if (!productName || salePrice === undefined) {
       return res.status(400).json({ error: 'Please provide product name and sale price' });
@@ -63,6 +63,7 @@ const createProduct = async (req, res) => {
       organisationId,
       productName,
       salePrice,
+      buyPrice: buyPrice || 0,
       averageBuyPrice: averageBuyPrice || 0
     });
 
@@ -89,7 +90,7 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { productName, salePrice } = req.body;
+    const { productName, salePrice, buyPrice } = req.body;
 
     const product = await db.getProductById(id);
 
@@ -119,6 +120,7 @@ const updateProduct = async (req, res) => {
     const updates = {};
     if (productName !== undefined) updates.productName = productName;
     if (salePrice !== undefined) updates.salePrice = salePrice;
+    if (buyPrice !== undefined) updates.buyPrice = buyPrice;
 
     const updatedProduct = await db.updateProduct(id, updates);
     res.json(updatedProduct);

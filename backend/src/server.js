@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cron = require('node-cron');
 
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admins');
@@ -21,6 +22,7 @@ const analyticsRoutes = require('./routes/analytics');
 const organisationRoutes = require('./routes/organisations');
 const schemesRoutes = require('./routes/schemes');
 const recurringExpensesRoutes = require('./routes/recurringExpenses');
+const prepaidExpensesRoutes = require('./routes/prepaidExpenses');
 const balanceSheetRoutes = require('./routes/balanceSheet');
 
 const app = express();
@@ -73,6 +75,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/organisations', organisationRoutes);
 app.use('/api/schemes', schemesRoutes);
 app.use('/api/recurring-expenses', recurringExpensesRoutes);
+app.use('/api/prepaid-expenses', prepaidExpensesRoutes);
 app.use('/api/balance-sheet', balanceSheetRoutes);
 
 // Health check
@@ -108,6 +111,119 @@ app.get('/api/debug', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0'; // Listen on all network interfaces
+
+// Set up cron job for daily prepaid expense amortization
+// Runs at midnight (00:00) every day
+if (process.env.NODE_ENV !== 'production') {
+  const pool = require('./config/database');
+
+  cron.schedule('0 0 * * *', async () => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Running period-based prepaid expense amortization...`);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const today = new Date().toISOString().split('T')[0];
+
+      // Get all prepaid expenses where next_amortization_date is today or earlier
+      const prepaidExpensesQuery = `
+        SELECT * FROM prepaid_expenses
+        WHERE next_amortization_date <= $1
+          AND coverage_end_date >= $1
+          AND remaining_value > 0
+      `;
+      const prepaidExpensesResult = await client.query(prepaidExpensesQuery, [today]);
+
+      let amortizedCount = 0;
+      let totalAmortizedAmount = 0;
+
+      for (const prepaidExpense of prepaidExpensesResult.rows) {
+        // Calculate which period we're amortizing
+        const amortizedSoFar = parseFloat(prepaidExpense.amortized_value);
+        const amountPerPeriod = parseFloat(prepaidExpense.amount_per_period);
+        const periodsAmortized = Math.floor(amortizedSoFar / amountPerPeriod);
+        const currentPeriodNumber = periodsAmortized + 1;
+
+        // Calculate period dates
+        const periodStartDate = new Date(prepaidExpense.next_amortization_date);
+        const periodEndDate = new Date(periodStartDate);
+
+        const frequency = parseInt(prepaidExpense.recurrence_frequency);
+
+        if (prepaidExpense.recurrence_type === 'weekly') {
+          periodEndDate.setDate(periodEndDate.getDate() + (frequency * 7) - 1);
+        } else if (prepaidExpense.recurrence_type === 'monthly') {
+          periodEndDate.setMonth(periodEndDate.getMonth() + frequency);
+          periodEndDate.setDate(periodEndDate.getDate() - 1);
+        } else if (prepaidExpense.recurrence_type === 'yearly') {
+          periodEndDate.setFullYear(periodEndDate.getFullYear() + frequency);
+          periodEndDate.setDate(periodEndDate.getDate() - 1);
+        }
+
+        // Create amortization entry
+        const amortizationQuery = `
+          INSERT INTO prepaid_expense_amortizations (
+            organisation_id,
+            prepaid_expense_id,
+            amortization_date,
+            amount,
+            period_number,
+            period_start_date,
+            period_end_date
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `;
+        await client.query(amortizationQuery, [
+          prepaidExpense.organisation_id,
+          prepaidExpense.id,
+          today,
+          amountPerPeriod,
+          currentPeriodNumber,
+          periodStartDate.toISOString().split('T')[0],
+          periodEndDate.toISOString().split('T')[0]
+        ]);
+
+        // Calculate next amortization date
+        const nextAmortDate = new Date(periodEndDate);
+        nextAmortDate.setDate(nextAmortDate.getDate() + 1); // Day after this period ends
+
+        // Update prepaid expense
+        const newRemainingValue = parseFloat(prepaidExpense.remaining_value) - amountPerPeriod;
+        const newAmortizedValue = parseFloat(prepaidExpense.amortized_value) + amountPerPeriod;
+
+        const updateQuery = `
+          UPDATE prepaid_expenses
+          SET
+            amortized_value = $1,
+            remaining_value = $2,
+            next_amortization_date = $3
+          WHERE id = $4
+        `;
+        await client.query(updateQuery, [
+          newAmortizedValue,
+          Math.max(0, newRemainingValue), // Don't go negative
+          nextAmortDate.toISOString().split('T')[0],
+          prepaidExpense.id
+        ]);
+
+        amortizedCount++;
+        totalAmortizedAmount += amountPerPeriod;
+      }
+
+      await client.query('COMMIT');
+      console.log(`[${timestamp}] Amortization completed: ${amortizedCount} expenses, total ₹${totalAmortizedAmount.toFixed(2)}`);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error(`[${timestamp}] Error running amortization:`, error);
+    } finally {
+      client.release();
+    }
+  });
+
+  console.log('Prepaid expense amortization cron job scheduled (runs daily at midnight)');
+}
 
 // Only start server if not in serverless environment (Vercel)
 if (process.env.NODE_ENV !== 'production') {

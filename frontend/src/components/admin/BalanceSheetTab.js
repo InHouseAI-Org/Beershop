@@ -106,6 +106,21 @@ const BalanceSheetTab = () => {
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: '0.75rem',
+              backgroundColor: '#fff3cd',
+              borderRadius: '6px',
+              border: '1px solid #ffc107'
+            }}>
+              <span style={{ fontWeight: '600', color: '#856404' }}>Prepaid Expenses</span>
+              <span style={{ fontWeight: '700', fontSize: '1.125rem', color: '#856404' }}>
+                {formatCurrency(balanceSheet.assets.prepaidExpenses || 0)}
+              </span>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '0.75rem',
               backgroundColor: '#f8f9fa',
               borderRadius: '6px'
             }}>

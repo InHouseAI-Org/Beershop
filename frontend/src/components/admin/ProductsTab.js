@@ -11,7 +11,8 @@ const ProductsTab = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
     productName: '',
-    salePrice: ''
+    salePrice: '',
+    buyPrice: ''
   });
 
   useEffect(() => {
@@ -35,13 +36,15 @@ const ProductsTab = () => {
       setEditingProduct(product);
       setFormData({
         productName: product.product_name,
-        salePrice: product.sale_price
+        salePrice: product.sale_price,
+        buyPrice: product.buy_price || ''
       });
     } else {
       setEditingProduct(null);
       setFormData({
         productName: '',
-        salePrice: ''
+        salePrice: '',
+        buyPrice: ''
       });
     }
     setShowModal(true);
@@ -52,7 +55,8 @@ const ProductsTab = () => {
     setEditingProduct(null);
     setFormData({
       productName: '',
-      salePrice: ''
+      salePrice: '',
+      buyPrice: ''
     });
   };
 
@@ -79,6 +83,15 @@ const ProductsTab = () => {
 
   const columns = [
     { key: 'product_name', label: 'Product Name' },
+    {
+      key: 'buy_price',
+      label: 'Buy Price',
+      render: (product) => (
+        <span style={{ fontWeight: '600', color: '#FF9800', fontSize: '1.125rem' }}>
+          ₹{parseFloat(product.buy_price || 0).toFixed(2)}
+        </span>
+      )
+    },
     {
       key: 'sale_price',
       label: 'Sale Price',
@@ -146,6 +159,19 @@ const ProductsTab = () => {
                   value={formData.productName}
                   onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
                   required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="buyPrice">Buy Price</label>
+                <input
+                  type="number"
+                  id="buyPrice"
+                  className="form-control"
+                  value={formData.buyPrice}
+                  onChange={(e) => setFormData({ ...formData, buyPrice: e.target.value })}
+                  step="0.01"
+                  min="0"
                 />
               </div>
 

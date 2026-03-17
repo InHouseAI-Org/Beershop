@@ -254,10 +254,16 @@ const dataHelpers = {
 
   createProduct: async (productData) => {
     const result = await pool.query(
-      `INSERT INTO products (organisation_id, product_name, sale_price, average_buy_price)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO products (organisation_id, product_name, sale_price, buy_price, average_buy_price)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [productData.organisationId, productData.productName, productData.salePrice, productData.averageBuyPrice || 0]
+      [
+        productData.organisationId,
+        productData.productName,
+        productData.salePrice,
+        productData.buyPrice || 0,
+        productData.averageBuyPrice || 0
+      ]
     );
     return result.rows[0];
   },
@@ -276,6 +282,12 @@ const dataHelpers = {
     if (updates.salePrice !== undefined) {
       fields.push(`sale_price = $${paramCount}`);
       values.push(updates.salePrice);
+      paramCount++;
+    }
+
+    if (updates.buyPrice !== undefined) {
+      fields.push(`buy_price = $${paramCount}`);
+      values.push(updates.buyPrice);
       paramCount++;
     }
 

@@ -177,6 +177,15 @@ const OrdersTab = () => {
   const updateOrderItem = (index, field, value) => {
     const updated = [...formData.orderData];
     updated[index][field] = value;
+
+    // Auto-populate buy_price when product is selected
+    if (field === 'product_id' && value) {
+      const selectedProduct = products.find(p => p.id === value);
+      if (selectedProduct && selectedProduct.buy_price) {
+        updated[index]['buy_price'] = selectedProduct.buy_price;
+      }
+    }
+
     setFormData({ ...formData, orderData: updated });
   };
 
@@ -468,7 +477,7 @@ const OrdersTab = () => {
                               { value: '', label: 'Select Product' },
                               ...products.map(product => ({
                                 value: product.id,
-                                label: product.product_name
+                                label: `${product.product_name}`
                               }))
                             ]}
                             placeholder="Select Product"

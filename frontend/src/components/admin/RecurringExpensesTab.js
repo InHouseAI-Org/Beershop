@@ -10,6 +10,7 @@ const RecurringExpensesTab = () => {
   const [success, setSuccess] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [showPayAdvanceModal, setShowPayAdvanceModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [selectedExpense, setSelectedExpense] = useState(null);
@@ -26,6 +27,12 @@ const RecurringExpensesTab = () => {
     paymentDate: new Date().toISOString().split('T')[0],
     paidFrom: 'cash_balance',
     amount: '',
+    notes: ''
+  });
+  const [advancePaymentData, setAdvancePaymentData] = useState({
+    paymentDate: new Date().toISOString().split('T')[0],
+    paidFrom: 'cash_balance',
+    advancePeriods: '1',
     notes: ''
   });
 
@@ -139,6 +146,52 @@ const RecurringExpensesTab = () => {
       setSuccess(`Payment of ₹${paymentData.amount} recorded successfully`);
       await fetchRecurringExpenses();
       handleClosePayModal();
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Payment failed');
+    }
+  };
+
+  const handleOpenPayAdvanceModal = (expense) => {
+    setSelectedExpense(expense);
+    const periodType = expense.recurrence_type === 'weekly' ? 'weeks' :
+                       expense.recurrence_type === 'monthly' ? 'months' : 'years';
+    setAdvancePaymentData({
+      paymentDate: new Date().toISOString().split('T')[0],
+      paidFrom: 'cash_balance',
+      advancePeriods: '1',
+      periodType: periodType,
+      notes: ''
+    });
+    setShowPayAdvanceModal(true);
+  };
+
+  const handleClosePayAdvanceModal = () => {
+    setShowPayAdvanceModal(false);
+    setSelectedExpense(null);
+  };
+
+  const handlePayInAdvance = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      const requestData = {
+        recurringExpenseId: selectedExpense.id,
+        paymentDate: advancePaymentData.paymentDate,
+        paidFrom: advancePaymentData.paidFrom,
+        advancePeriods: parseInt(advancePaymentData.advancePeriods),
+        periodType: advancePaymentData.periodType,
+        notes: advancePaymentData.notes
+      };
+
+      await api.post('/prepaid-expenses', requestData);
+
+      const totalAmount = parseFloat(selectedExpense.expense_amount) * parseInt(advancePaymentData.advancePeriods);
+      setSuccess(`Prepaid expense of ₹${totalAmount.toFixed(2)} recorded successfully`);
+      await fetchRecurringExpenses();
+      handleClosePayAdvanceModal();
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -277,16 +330,28 @@ const RecurringExpensesTab = () => {
       render: (expense) => (
         <div className="action-buttons" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {expense.is_active && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenPayModal(expense);
-              }}
-              className="btn btn-success"
-              style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
-            >
-              Pay
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenPayModal(expense);
+                }}
+                className="btn btn-success"
+                style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
+              >
+                Pay
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenPayAdvanceModal(expense);
+                }}
+                className="btn"
+                style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem', background: '#FF9800', color: '#fff' }}
+              >
+                Pay in Advance
+              </button>
+            </>
           )}
           <button
             onClick={(e) => {
@@ -555,6 +620,139 @@ const RecurringExpensesTab = () => {
         </div>
       )}
 
+      {/* Pay in Advance Modal */}
+      {showPayAdvanceModal && selectedExpense && (
+        <div className="modal-overlay" onClick={handleClosePayAdvanceModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '95%' }}>
+            <h2>Pay in Advance</h2>
+            {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
+
+            <div style={{
+              padding: '1rem',
+              backgroundColor: '#fff3cd',
+              borderRadius: '8px',
+              marginBottom: '1.5rem',
+              border: '1px solid #ffc107'
+            }}>
+              <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.125rem', color: '#856404' }}>
+                {selectedExpense.expense_name}
+              </h3>
+              <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: '#856404' }}>
+                Recurs every {selectedExpense.recurrence_frequency} {selectedExpense.recurrence_type}
+                {selectedExpense.recurrence_frequency > 1 ? 's' : ''}
+              </p>
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.125rem', fontWeight: '700', color: '#856404' }}>
+                Amount per {advancePaymentData.periodType?.slice(0, -1)}: ₹{parseFloat(selectedExpense.expense_amount).toFixed(2)}
+              </p>
+            </div>
+
+            <form onSubmit={handlePayInAdvance}>
+              <div className="form-group">
+                <label htmlFor="advancePaymentDate">Payment Date *</label>
+                <input
+                  type="date"
+                  id="advancePaymentDate"
+                  className="form-control"
+                  value={advancePaymentData.paymentDate}
+                  onChange={(e) => setAdvancePaymentData({ ...advancePaymentData, paymentDate: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="advancePeriods">
+                  Number of {advancePaymentData.periodType} to pay in advance *
+                </label>
+                <input
+                  type="number"
+                  id="advancePeriods"
+                  className="form-control"
+                  value={advancePaymentData.advancePeriods}
+                  onChange={(e) => setAdvancePaymentData({ ...advancePaymentData, advancePeriods: e.target.value })}
+                  min="1"
+                  max="100"
+                  required
+                  style={{ fontSize: '1.125rem', padding: '1rem', fontWeight: '600' }}
+                />
+                <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                  How many {advancePaymentData.periodType} do you want to pay for?
+                </small>
+              </div>
+
+              {/* Calculated Total Display */}
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#e3f2fd',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                border: '2px solid #2196F3'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#1565c0' }}>Total Amount to Pay</p>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#1565c0' }}>
+                      ₹{parseFloat(selectedExpense.expense_amount).toFixed(2)} × {advancePaymentData.advancePeriods} {advancePaymentData.periodType}
+                    </p>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: '700', color: '#1565c0' }}>
+                      ₹{(parseFloat(selectedExpense.expense_amount) * parseInt(advancePaymentData.advancePeriods || 0)).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <CustomDropdown
+                  label="Pay From *"
+                  value={advancePaymentData.paidFrom}
+                  onChange={(value) => setAdvancePaymentData({ ...advancePaymentData, paidFrom: value })}
+                  options={[
+                    { value: 'cash_balance', label: 'Cash Balance' },
+                    { value: 'bank_balance', label: 'Bank Balance' },
+                    { value: 'gala_balance', label: 'Gala Balance' }
+                  ]}
+                  placeholder="Select payment account"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="advanceNotes">Notes (Optional)</label>
+                <textarea
+                  id="advanceNotes"
+                  className="form-control"
+                  value={advancePaymentData.notes}
+                  onChange={(e) => setAdvancePaymentData({ ...advancePaymentData, notes: e.target.value })}
+                  rows="2"
+                  placeholder="Additional notes for this advance payment"
+                />
+              </div>
+
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                fontSize: '0.875rem',
+                color: '#666'
+              }}>
+                <strong>Note:</strong> This amount will be added to your Current Assets (Prepaid Expenses)
+                and will be automatically amortized over the coverage period.
+              </div>
+
+              <div className="modal-buttons">
+                <button type="submit" className="btn btn-success" style={{ fontSize: '1.125rem', padding: '0.75rem 1.5rem' }}>
+                  Pay ₹{(parseFloat(selectedExpense.expense_amount) * parseInt(advancePaymentData.advancePeriods || 0)).toFixed(2)} in Advance
+                </button>
+                <button type="button" onClick={handleClosePayAdvanceModal} className="btn btn-secondary">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Payment History Modal */}
       {showHistoryModal && selectedExpense && (
         <div className="modal-overlay" onClick={() => setShowHistoryModal(false)}>
@@ -609,18 +807,33 @@ const RecurringExpensesTab = () => {
                 <table className="table">
                   <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 1 }}>
                     <tr>
+                      <th>Type</th>
                       <th>Date</th>
                       <th>Amount</th>
                       <th>Paid From</th>
-                      <th>Notes</th>
+                      <th>Details</th>
                       <th>Paid By</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paymentHistory.map(payment => (
-                      <tr key={payment.id}>
+                      <tr key={payment.id} style={{
+                        backgroundColor: payment.type === 'prepaid' ? '#fff3cd' : 'transparent'
+                      }}>
+                        <td>
+                          <span style={{
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            backgroundColor: payment.type === 'prepaid' ? '#FF9800' : '#28a745',
+                            color: '#fff'
+                          }}>
+                            {payment.type === 'prepaid' ? 'PREPAID' : 'PAYMENT'}
+                          </span>
+                        </td>
                         <td>{new Date(payment.payment_date).toLocaleDateString()}</td>
-                        <td style={{ fontWeight: '700', color: '#dc3545' }}>
+                        <td style={{ fontWeight: '700', color: payment.type === 'prepaid' ? '#FF9800' : '#dc3545' }}>
                           ₹{parseFloat(payment.amount).toFixed(2)}
                         </td>
                         <td>
@@ -638,7 +851,28 @@ const RecurringExpensesTab = () => {
                              payment.paid_from === 'bank_balance' ? 'Bank' : 'Gala'}
                           </span>
                         </td>
-                        <td style={{ fontSize: '0.875rem' }}>{payment.notes || '-'}</td>
+                        <td style={{ fontSize: '0.875rem' }}>
+                          {payment.type === 'prepaid' ? (
+                            <div>
+                              <div style={{ fontWeight: '600', color: '#856404' }}>
+                                {payment.advance_periods} {payment.period_type}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                                {new Date(payment.coverage_start_date).toLocaleDateString()} - {new Date(payment.coverage_end_date).toLocaleDateString()}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                                Remaining: ₹{parseFloat(payment.remaining_value || 0).toFixed(2)}
+                              </div>
+                              {payment.notes && (
+                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                                  {payment.notes}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            payment.notes || '-'
+                          )}
+                        </td>
                         <td>{payment.created_by_name || '-'}</td>
                       </tr>
                     ))}

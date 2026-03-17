@@ -50,6 +50,17 @@ const getBalanceSheet = async (req, res) => {
     const creditResult = await client.query(creditQuery, [organisationId]);
     const creditToCollect = parseFloat(creditResult.rows[0].credit_to_collect || 0);
 
+    // Get prepaid expenses value (current asset - amount paid in advance)
+    const prepaidExpensesQuery = `
+      SELECT COALESCE(SUM(remaining_value), 0) as prepaid_expenses_value
+      FROM prepaid_expenses
+      WHERE organisation_id = $1
+        AND coverage_end_date >= CURRENT_DATE
+        AND remaining_value > 0
+    `;
+    const prepaidExpensesResult = await client.query(prepaidExpensesQuery, [organisationId]);
+    const prepaidExpensesValue = parseFloat(prepaidExpensesResult.rows[0].prepaid_expenses_value || 0);
+
     // Get amount payable to distributors (sum of distributor outstanding)
     const distributorsQuery = `
       SELECT COALESCE(SUM(amount_outstanding), 0) as amount_payable
@@ -100,7 +111,8 @@ const getBalanceSheet = async (req, res) => {
       SELECT
         re.expense_amount,
         re.recurrence_type,
-        re.recurrence_frequency
+        re.recurrence_frequency,
+        re.next_due_date
       FROM recurring_expenses re
       WHERE re.organisation_id = $1
         AND re.is_active = true
@@ -111,21 +123,42 @@ const getBalanceSheet = async (req, res) => {
     yearlyRecurringResult.rows.forEach(expense => {
       const amount = parseFloat(expense.expense_amount);
       const frequency = parseInt(expense.recurrence_frequency);
+      const nextDueDate = expense.next_due_date ? new Date(expense.next_due_date) : null;
       let occurrencesInRemainingPeriod = 0;
 
-      switch (expense.recurrence_type) {
-        case 'weekly':
-          // How many times will this expense occur in remaining weeks?
-          occurrencesInRemainingPeriod = Math.ceil(remainingWeeks / frequency);
-          break;
-        case 'monthly':
-          // How many times will this expense occur in remaining months?
-          occurrencesInRemainingPeriod = Math.ceil(remainingMonths / frequency);
-          break;
-        case 'yearly':
-          // Will this yearly expense occur in the remaining period?
-          occurrencesInRemainingPeriod = remainingMonths >= (frequency * 12) ? 1 : 0;
-          break;
+      // Skip if next_due_date is after FY end (expense is for next FY)
+      if (nextDueDate && nextDueDate > fyEnd) {
+        return; // Skip this expense
+      }
+
+      // Skip if next_due_date is null (no due date set)
+      if (!nextDueDate) {
+        return; // Skip this expense
+      }
+
+      // Calculate remaining period from next_due_date to FY end
+      const remainingDaysFromDue = Math.max(0, Math.ceil((fyEnd - nextDueDate) / (1000 * 60 * 60 * 24)));
+      const remainingWeeksFromDue = remainingDaysFromDue / 7;
+      const remainingMonthsFromDue = remainingDaysFromDue / 30.44;
+
+      // Only calculate if next_due_date is today or before FY end
+      if (nextDueDate <= fyEnd) {
+        switch (expense.recurrence_type) {
+          case 'weekly':
+            // How many times will this expense occur from next_due_date to FY end?
+            // First occurrence is the next_due_date itself, then calculate additional occurrences
+            occurrencesInRemainingPeriod = 1 + Math.floor(remainingWeeksFromDue / frequency);
+            break;
+          case 'monthly':
+            // How many times will this expense occur from next_due_date to FY end?
+            occurrencesInRemainingPeriod = 1 + Math.floor(remainingMonthsFromDue / frequency);
+            break;
+          case 'yearly':
+            // Will this yearly expense occur again in the remaining period?
+            // First occurrence is the next_due_date, check if there's another occurrence
+            occurrencesInRemainingPeriod = 1 + (remainingMonthsFromDue >= (frequency * 12) ? 1 : 0);
+            break;
+        }
       }
 
       yearlyRecurring += amount * occurrencesInRemainingPeriod;
@@ -138,7 +171,8 @@ const getBalanceSheet = async (req, res) => {
       parseFloat(balances.bank_balance || 0) +
       parseFloat(balances.cash_balance || 0) +
       parseFloat(balances.gala_balance || 0) +
-      creditToCollect;
+      creditToCollect +
+      prepaidExpensesValue;
 
     const totalLiabilities =
       amountPayable +
@@ -155,6 +189,7 @@ const getBalanceSheet = async (req, res) => {
         cashBalance: parseFloat(balances.cash_balance || 0),
         galaBalance: parseFloat(balances.gala_balance || 0),
         creditToCollect,
+        prepaidExpenses: prepaidExpensesValue,
         total: totalAssets
       },
       liabilities: {
