@@ -163,6 +163,82 @@ const getUnpaidBills = async (req, res) => {
 };
 
 /**
+ * Get opening balance payment limit for a distributor
+ * Returns the maximum amount that can be paid as "opening_balance_payment"
+ * Formula: opening_balance + sum(orders without bill_number)
+ */
+const getOpeningBalanceLimit = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params; // distributor ID
+    const organisationId = req.user.organisationId;
+
+    if (!organisationId) {
+      return res.status(400).json({ error: 'Organisation ID required' });
+    }
+
+    // Verify distributor belongs to organization
+    const distributor = await db.getDistributorById(id);
+    if (!distributor || distributor.organisation_id !== organisationId) {
+      return res.status(404).json({ error: 'Distributor not found' });
+    }
+
+    // Get sum of all orders without bill numbers
+    const unloggedOrdersQuery = `
+      SELECT COALESCE(SUM(
+        (
+          SELECT COALESCE(SUM((item->>'total')::DECIMAL), 0)
+          FROM jsonb_array_elements(o.order_data) as item
+        ) + COALESCE(o.tax, 0) + COALESCE(o.misc, 0) - COALESCE(o.discount, 0) - COALESCE(o.scheme, 0)
+      ), 0) as unlogged_total
+      FROM orders o
+      WHERE o.distributor_id = $1
+        AND o.organisation_id = $2
+        AND o.bill_number IS NULL
+    `;
+
+    const unloggedResult = await client.query(unloggedOrdersQuery, [id, organisationId]);
+    const unloggedTotal = parseFloat(unloggedResult.rows[0].unlogged_total || 0);
+
+    // Get sum of all opening_balance_payment type payments already made
+    const paidAgainstOpeningQuery = `
+      SELECT COALESCE(SUM(amount), 0) as total_paid
+      FROM distributor_payments
+      WHERE distributor_id = $1
+        AND organisation_id = $2
+        AND payment_type = 'opening_balance_payment'
+    `;
+
+    const paidResult = await client.query(paidAgainstOpeningQuery, [id, organisationId]);
+    const totalPaid = parseFloat(paidResult.rows[0].total_paid || 0);
+
+    const openingBalance = parseFloat(distributor.opening_balance || 0);
+    const maxLimit = openingBalance + unloggedTotal;
+    const remainingLimit = maxLimit - totalPaid;
+
+    console.log(`[Opening Balance Limit] Distributor ID: ${id}`);
+    console.log(`[Opening Balance Limit] Opening Balance: ${openingBalance}`);
+    console.log(`[Opening Balance Limit] Unlogged Orders Total: ${unloggedTotal}`);
+    console.log(`[Opening Balance Limit] Total Paid (opening_balance_payment): ${totalPaid}`);
+    console.log(`[Opening Balance Limit] Max Limit: ${maxLimit}`);
+    console.log(`[Opening Balance Limit] Remaining Limit: ${remainingLimit}`);
+
+    res.json({
+      opening_balance: openingBalance,
+      unlogged_orders_total: unloggedTotal,
+      max_limit: maxLimit,
+      total_paid: totalPaid,
+      remaining_limit: Math.max(0, remainingLimit)
+    });
+  } catch (error) {
+    console.error('Error fetching opening balance limit:', error);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
  * Make payment towards a bill or advance
  */
 const makePayment = async (req, res) => {
@@ -182,9 +258,9 @@ const makePayment = async (req, res) => {
     }
 
     // Validate payment type
-    if (!['order_payment', 'advance'].includes(paymentType)) {
+    if (!['order_payment', 'advance', 'opening_balance_payment'].includes(paymentType)) {
       return res.status(400).json({
-        error: 'Payment type must be either "order_payment" or "advance"'
+        error: 'Payment type must be "order_payment", "advance", or "opening_balance_payment"'
       });
     }
 
@@ -204,6 +280,48 @@ const makePayment = async (req, res) => {
     const distributor = await db.getDistributorById(distributorId);
     if (!distributor || distributor.organisation_id !== organisationId) {
       return res.status(404).json({ error: 'Distributor not found' });
+    }
+
+    // Validate opening_balance_payment doesn't exceed limit
+    if (paymentType === 'opening_balance_payment') {
+      // Calculate limit: opening_balance + sum(orders without bill_number)
+      const unloggedOrdersQuery = `
+        SELECT COALESCE(SUM(
+          (
+            SELECT COALESCE(SUM((item->>'total')::DECIMAL), 0)
+            FROM jsonb_array_elements(o.order_data) as item
+          ) + COALESCE(o.tax, 0) + COALESCE(o.misc, 0) - COALESCE(o.discount, 0) - COALESCE(o.scheme, 0)
+        ), 0) as unlogged_total
+        FROM orders o
+        WHERE o.distributor_id = $1
+          AND o.organisation_id = $2
+          AND o.bill_number IS NULL
+      `;
+
+      const unloggedResult = await client.query(unloggedOrdersQuery, [distributorId, organisationId]);
+      const unloggedTotal = parseFloat(unloggedResult.rows[0].unlogged_total || 0);
+
+      // Get sum of all opening_balance_payment type payments already made
+      const paidAgainstOpeningQuery = `
+        SELECT COALESCE(SUM(amount), 0) as total_paid
+        FROM distributor_payments
+        WHERE distributor_id = $1
+          AND organisation_id = $2
+          AND payment_type = 'opening_balance_payment'
+      `;
+
+      const paidResult = await client.query(paidAgainstOpeningQuery, [distributorId, organisationId]);
+      const totalPaid = parseFloat(paidResult.rows[0].total_paid || 0);
+
+      const openingBalance = parseFloat(distributor.opening_balance || 0);
+      const maxLimit = openingBalance + unloggedTotal;
+      const remainingLimit = maxLimit - totalPaid;
+
+      if (paymentAmount > remainingLimit) {
+        return res.status(400).json({
+          error: `Payment exceeds opening balance limit. Maximum allowed: ₹${remainingLimit.toFixed(2)} (Opening Balance: ₹${openingBalance.toFixed(2)} + Unlogged Orders: ₹${unloggedTotal.toFixed(2)} - Already Paid: ₹${totalPaid.toFixed(2)})`
+        });
+      }
     }
 
     // Check if sufficient balance available
@@ -311,6 +429,7 @@ const getPaymentHistory = async (req, res) => {
 module.exports = {
   getDistributorLedger,
   getUnpaidBills,
+  getOpeningBalanceLimit,
   makePayment,
   getPaymentHistory
 };

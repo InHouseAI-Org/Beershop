@@ -17,6 +17,7 @@ const DistributorsTab = () => {
   const [distributorLedger, setDistributorLedger] = useState(null); // Will store {openingBalance, closingBalance, transactions}
   const [distributorOrders, setDistributorOrders] = useState([]);
   const [unpaidBills, setUnpaidBills] = useState([]);
+  const [openingBalanceLimit, setOpeningBalanceLimit] = useState(null);
   const [editingDistributor, setEditingDistributor] = useState(null);
   const [ledgerDateRange, setLedgerDateRange] = useState({
     startDate: '',
@@ -80,6 +81,16 @@ const DistributorsTab = () => {
     } catch (err) {
       console.error('Failed to fetch unpaid bills:', err);
       setError('Failed to fetch unpaid bills');
+    }
+  };
+
+  const fetchOpeningBalanceLimit = async (distributorId) => {
+    try {
+      const response = await api.get(`/distributor-payments/${distributorId}/opening-balance-limit`);
+      setOpeningBalanceLimit(response.data);
+    } catch (err) {
+      console.error('Failed to fetch opening balance limit:', err);
+      setError('Failed to fetch opening balance limit');
     }
   };
 
@@ -177,6 +188,7 @@ const DistributorsTab = () => {
       notes: ''
     });
     setUnpaidBills([]);
+    setOpeningBalanceLimit(null);
     setShowPaymentModal(true);
     setError('');
     setSuccess('');
@@ -194,6 +206,7 @@ const DistributorsTab = () => {
       notes: ''
     });
     setUnpaidBills([]);
+    setOpeningBalanceLimit(null);
   };
 
   const handlePayDistributor = async (e) => {
@@ -216,6 +229,14 @@ const DistributorsTab = () => {
     if (paymentData.paymentType === 'order_payment' && !paymentData.orderId) {
       setError('Please select a bill number for order payment');
       return;
+    }
+
+    // Validate opening_balance_payment doesn't exceed limit
+    if (paymentData.paymentType === 'opening_balance_payment' && openingBalanceLimit) {
+      if (amount > openingBalanceLimit.remaining_limit) {
+        setError(`Payment exceeds opening balance limit. Maximum allowed: ₹${openingBalanceLimit.remaining_limit.toFixed(2)}`);
+        return;
+      }
     }
 
     const selectedDistributor = distributors.find(d => d.id === paymentData.distributorId);
@@ -459,9 +480,13 @@ const DistributorsTab = () => {
                   onChange={async (value) => {
                     setPaymentData({ ...paymentData, distributorId: value, billNumber: '', orderId: '' });
                     if (value) {
-                      await fetchUnpaidBills(value);
+                      await Promise.all([
+                        fetchUnpaidBills(value),
+                        fetchOpeningBalanceLimit(value)
+                      ]);
                     } else {
                       setUnpaidBills([]);
+                      setOpeningBalanceLimit(null);
                     }
                   }}
                   options={[
@@ -497,12 +522,15 @@ const DistributorsTab = () => {
                   onChange={(value) => setPaymentData({ ...paymentData, paymentType: value, billNumber: '', orderId: '' })}
                   options={[
                     { value: 'order_payment', label: 'Order Payment (Pay Bill)' },
+                    { value: 'opening_balance_payment', label: 'Opening Balance / Unlogged Bills Payment' },
                     { value: 'advance', label: 'Advance Payment' }
                   ]}
                 />
                 <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
                   {paymentData.paymentType === 'advance'
                     ? 'Advance payment reduces outstanding and allows negative balance'
+                    : paymentData.paymentType === 'opening_balance_payment'
+                    ? 'Pay against previous outstanding amount or orders without bill numbers'
                     : 'Pay against a specific bill/order'}
                 </small>
               </div>
@@ -537,8 +565,51 @@ const DistributorsTab = () => {
                 </div>
               )}
 
+              {paymentData.paymentType === 'opening_balance_payment' && paymentData.distributorId && openingBalanceLimit && (
+                <div style={{
+                  padding: '1rem',
+                  backgroundColor: '#fff3cd',
+                  borderRadius: '8px',
+                  marginBottom: '1rem',
+                  border: '1px solid #ffc107'
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#856404', fontWeight: '600' }}>Opening Balance Payment Limit</p>
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#666' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <span>Opening Balance:</span>
+                      <span style={{ fontWeight: '600' }}>₹{openingBalanceLimit.opening_balance.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <span>Unlogged Orders:</span>
+                      <span style={{ fontWeight: '600' }}>₹{openingBalanceLimit.unlogged_orders_total.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <span>Already Paid:</span>
+                      <span style={{ fontWeight: '600', color: '#28a745' }}>-₹{openingBalanceLimit.total_paid.toFixed(2)}</span>
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: '0.5rem',
+                      paddingTop: '0.5rem',
+                      borderTop: '2px solid #ffc107'
+                    }}>
+                      <span style={{ fontWeight: '700' }}>Maximum Allowed:</span>
+                      <span style={{ fontWeight: '700', fontSize: '1.125rem', color: '#856404' }}>₹{openingBalanceLimit.remaining_limit.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="form-group">
-                <label htmlFor="amount">Amount</label>
+                <label htmlFor="amount">
+                  Amount
+                  {paymentData.paymentType === 'opening_balance_payment' && openingBalanceLimit && (
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', color: '#856404', fontWeight: '600' }}>
+                      (Max: ₹{openingBalanceLimit.remaining_limit.toFixed(2)})
+                    </span>
+                  )}
+                </label>
                 <input
                   type="number"
                   id="amount"
@@ -547,10 +618,18 @@ const DistributorsTab = () => {
                   onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
                   step="0.01"
                   min="0"
+                  max={paymentData.paymentType === 'opening_balance_payment' && openingBalanceLimit ? openingBalanceLimit.remaining_limit : undefined}
                   required
-                  placeholder="Enter amount"
+                  placeholder={paymentData.paymentType === 'opening_balance_payment' && openingBalanceLimit
+                    ? `Max: ₹${openingBalanceLimit.remaining_limit.toFixed(2)}`
+                    : "Enter amount"}
                   style={{ padding: '0.75rem', fontSize: '1rem' }}
                 />
+                {paymentData.paymentType === 'opening_balance_payment' && openingBalanceLimit && openingBalanceLimit.remaining_limit === 0 && (
+                  <small style={{ color: '#dc3545', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block', fontWeight: '600' }}>
+                    ⚠️ Opening balance has been fully paid. No payment allowed.
+                  </small>
+                )}
               </div>
 
               <div className="form-group">

@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getDistributorLedger,
   getUnpaidBills,
+  getOpeningBalanceLimit,
   makePayment,
   getPaymentHistory
 } = require('../controllers/distributorPaymentsController');
@@ -17,7 +18,10 @@ router.get('/:id/ledger', getDistributorLedger);
 // Get unpaid bills for a distributor
 router.get('/:id/unpaid-bills', getUnpaidBills);
 
-// Make payment (order payment or advance)
+// Get opening balance payment limit for a distributor
+router.get('/:id/opening-balance-limit', getOpeningBalanceLimit);
+
+// Make payment (order payment, advance, or opening balance payment)
 router.post('/pay', makePayment);
 
 // Get payment history for a distributor
