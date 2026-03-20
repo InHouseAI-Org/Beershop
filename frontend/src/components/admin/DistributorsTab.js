@@ -34,7 +34,8 @@ const DistributorsTab = () => {
     paymentFrom: 'bank_balance',
     billNumber: '',
     orderId: '',
-    notes: ''
+    notes: '',
+    paymentDate: new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
@@ -185,7 +186,8 @@ const DistributorsTab = () => {
       paymentFrom: 'bank_balance',
       billNumber: '',
       orderId: '',
-      notes: ''
+      notes: '',
+      paymentDate: new Date().toISOString().split('T')[0]
     });
     setUnpaidBills([]);
     setOpeningBalanceLimit(null);
@@ -203,7 +205,8 @@ const DistributorsTab = () => {
       paymentFrom: 'bank_balance',
       billNumber: '',
       orderId: '',
-      notes: ''
+      notes: '',
+      paymentDate: new Date().toISOString().split('T')[0]
     });
     setUnpaidBills([]);
     setOpeningBalanceLimit(null);
@@ -251,6 +254,7 @@ const DistributorsTab = () => {
         paymentType: paymentData.paymentType,
         amount: amount,
         paymentFrom: paymentData.paymentFrom,
+        paymentDate: paymentData.paymentDate,
         notes: paymentData.notes || null
       };
 
@@ -630,6 +634,23 @@ const DistributorsTab = () => {
                     ⚠️ Opening balance has been fully paid. No payment allowed.
                   </small>
                 )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="paymentDate">Payment Date | भुगतान तिथि</label>
+                <input
+                  type="date"
+                  id="paymentDate"
+                  className="form-control"
+                  value={paymentData.paymentDate}
+                  onChange={(e) => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
+                  max={new Date().toISOString().split('T')[0]}
+                  required
+                  style={{ padding: '0.75rem', fontSize: '1rem' }}
+                />
+                <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+                  Date when the payment was made (cannot be in the future)
+                </small>
               </div>
 
               <div className="form-group">

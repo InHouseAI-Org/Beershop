@@ -246,7 +246,7 @@ const makePayment = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const { distributorId, paymentType, amount, paymentFrom, billNumber, orderId, notes } = req.body;
+    const { distributorId, paymentType, amount, paymentFrom, billNumber, orderId, notes, paymentDate } = req.body;
     const organisationId = req.user.organisationId;
     const createdBy = req.user.id;
 
@@ -338,8 +338,8 @@ const makePayment = async (req, res) => {
     const insertQuery = `
       INSERT INTO distributor_payments (
         organisation_id, distributor_id, order_id, payment_type,
-        amount, payment_from, bill_number, notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        amount, payment_from, bill_number, payment_date, notes, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
 
@@ -351,6 +351,7 @@ const makePayment = async (req, res) => {
       paymentAmount,
       paymentFrom,
       billNumber || null,
+      paymentDate || null,
       notes || null,
       createdBy
     ];
