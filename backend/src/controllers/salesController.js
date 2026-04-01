@@ -11,16 +11,31 @@ const getAllSales = async (req, res) => {
 
     const sales = await db.getSalesByOrganisationId(organisationId);
 
-    // Fetch daily expenses for each sale
-    // Note: creditTaken is now in sales.credit_taken column, no need to fetch separately
-    const salesWithDetails = await Promise.all(sales.map(async (sale) => {
-      const dailyExpenses = await db.getDailyExpensesBySaleId(sale.id);
+    // Fetch all daily expenses in one query instead of N queries (fixes N+1 problem)
+    if (sales.length === 0) {
+      return res.json([]);
+    }
 
-      return {
-        ...sale,
-        creditTaken: sale.credit_taken || [],
-        dailyExpenses: dailyExpenses || []
-      };
+    const saleIds = sales.map(s => s.id);
+    const dailyExpensesQuery = await pool.query(
+      `SELECT * FROM daily_expenses WHERE sale_id = ANY($1) ORDER BY expense_date DESC`,
+      [saleIds]
+    );
+
+    // Group expenses by sale_id for O(1) lookup
+    const expensesBySaleId = {};
+    dailyExpensesQuery.rows.forEach(expense => {
+      if (!expensesBySaleId[expense.sale_id]) {
+        expensesBySaleId[expense.sale_id] = [];
+      }
+      expensesBySaleId[expense.sale_id].push(expense);
+    });
+
+    // Map sales with their expenses (no async needed)
+    const salesWithDetails = sales.map(sale => ({
+      ...sale,
+      creditTaken: sale.credit_taken || [],
+      dailyExpenses: expensesBySaleId[sale.id] || []
     }));
 
     res.json(salesWithDetails);
