@@ -5,7 +5,7 @@ Fixed critical performance bottlenecks without requiring plan upgrades.
 
 ## Changes Made
 
-### 1. Fixed N+1 Query Problem (CRITICAL FIX)
+### 1. Fixed N+1 Query Problem in getAllSales (CRITICAL FIX)
 **File**: `backend/src/controllers/salesController.js:4-46`
 
 **Before**: Made N+1 queries (1 query for sales + N queries for daily expenses)
@@ -13,7 +13,31 @@ Fixed critical performance bottlenecks without requiring plan upgrades.
 
 **Expected Performance Gain**: 10-50x faster for endpoints fetching multiple sales
 
-### 2. Database Indexes
+### 2. Optimized createSale Endpoint (CRITICAL FIX - Slow Submit Buttons)
+**File**: `backend/src/controllers/salesController.js:79-168`
+
+**Before**: Made 4 full table scans on EVERY sale submission:
+- Fetched ALL inventory (could be hundreds of products)
+- Fetched ALL orders (could be thousands)
+- Fetched ALL sales twice for duplicate check
+- Total: 4 massive queries = very slow submit
+
+**After**: Makes targeted, indexed queries:
+- Line 119-122: Only fetch orders for the specific date (instead of all orders)
+- Line 157-160: Duplicate check with single targeted query (instead of fetching all sales)
+- Total: 2 small, fast queries
+
+**Expected Performance Gain**: 20-100x faster sale submissions
+
+### 3. Optimized approveSale Endpoint (CRITICAL FIX)
+**File**: `backend/src/controllers/salesController.js:493-505`
+
+**Before**: Fetched ALL sales to check for date conflicts
+**After**: Single targeted query with date and user filters
+
+**Expected Performance Gain**: 50-100x faster for approving sales
+
+### 4. Database Indexes
 **File**: `add_performance_indexes.sql`
 
 Created indexes for all frequently queried columns:

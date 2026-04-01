@@ -95,14 +95,7 @@ const createSale = async (req, res) => {
     const organisationId = req.user.organisationId;
     const userId = req.user.role === 'user' ? req.user.id : req.body.userId;
 
-    // Auto-fetch opening stock from inventory table
-    console.log('Fetching inventory for opening stock...');
-    const inventory = await db.getInventoryByOrganisationId(organisationId);
-
-    // Check if there were any orders on this date
-    const orders = await db.getOrdersByOrganisationId(organisationId);
-
-    // Parse the sale date to compare with order dates
+    // Parse the sale date first
     let saleDate;
     if (date) {
       const parsedDate = new Date(date);
@@ -118,16 +111,16 @@ const createSale = async (req, res) => {
       saleDate = `${year}-${month}-${day}`;
     }
 
-    // Find orders placed on the same date
-    const ordersOnSameDate = orders.filter(order => {
-      if (!order.order_date) return false;
-      const orderDate = new Date(order.order_date);
-      const year = orderDate.getFullYear();
-      const month = String(orderDate.getMonth() + 1).padStart(2, '0');
-      const day = String(orderDate.getDate()).padStart(2, '0');
-      const orderDateStr = `${year}-${month}-${day}`;
-      return orderDateStr === saleDate;
-    });
+    // Auto-fetch opening stock from inventory table
+    console.log('Fetching inventory for opening stock...');
+    const inventory = await db.getInventoryByOrganisationId(organisationId);
+
+    // Check if there were any orders on this date (optimized: only fetch orders for the specific date)
+    const ordersQuery = await pool.query(
+      `SELECT * FROM orders WHERE organisation_id = $1 AND order_date = $2`,
+      [organisationId, saleDate]
+    );
+    const ordersOnSameDate = ordersQuery.rows;
 
     console.log(`Found ${ordersOnSameDate.length} orders on date ${saleDate}`);
 
@@ -154,46 +147,20 @@ const createSale = async (req, res) => {
 
     console.log('Opening Stock (inventory - same day orders):', openingStock);
 
-    // For regular users, always check for duplicates
+    // For regular users, always check for duplicates (optimized: query only for specific user and date)
     if (req.user.role === 'user') {
       if (!userId) {
         return res.status(400).json({ error: 'User ID is required' });
       }
 
-      const existingSales = await db.getSalesByOrganisationId(organisationId);
+      // Optimized: Check for duplicate with a single targeted query instead of fetching all sales
+      const duplicateCheck = await pool.query(
+        `SELECT id FROM sales WHERE user_id = $1 AND DATE(date) = DATE($2)`,
+        [userId, saleDate]
+      );
 
-      // Parse input date and normalize to YYYY-MM-DD format in local time
-      let inputDate;
-      if (date) {
-        const parsedDate = new Date(date);
-        // Convert to local date string
-        const year = parsedDate.getFullYear();
-        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-        const day = String(parsedDate.getDate()).padStart(2, '0');
-        inputDate = `${year}-${month}-${day}`;
-      } else {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        inputDate = `${year}-${month}-${day}`;
-      }
-
-      const duplicateSale = existingSales.find(s => {
-        if (!s.date || s.user_id !== userId) return false;
-
-        // Parse database date to local date string
-        const dbDate = new Date(s.date);
-        const year = dbDate.getFullYear();
-        const month = String(dbDate.getMonth() + 1).padStart(2, '0');
-        const day = String(dbDate.getDate()).padStart(2, '0');
-        const saleDate = `${year}-${month}-${day}`;
-
-        return saleDate === inputDate;
-      });
-
-      if (duplicateSale) {
-        console.log(`Duplicate sale detected for user ${userId} on date ${inputDate}`);
+      if (duplicateCheck.rows.length > 0) {
+        console.log(`Duplicate sale detected for user ${userId} on date ${saleDate}`);
         return res.status(400).json({
           error: 'Sale already exists for this date. You can only submit one sale report per day. | इस तारीख के लिए बिक्री पहले से मौजूद है। आप प्रति दिन केवल एक बिक्री रिपोर्ट सबमिट कर सकते हैं।'
         });
@@ -524,23 +491,13 @@ const approveSale = async (req, res) => {
 
       // Only check if date actually changed
       if (existingDateStr !== newDateStr) {
-        const allSales = await db.getSalesByOrganisationId(organisationId);
+        // Optimized: Check for conflicting sale with a single targeted query
+        const conflictCheck = await pool.query(
+          `SELECT id FROM sales WHERE user_id = $1 AND DATE(date) = DATE($2) AND id != $3`,
+          [existingSale.user_id, newDateStr, id]
+        );
 
-        // Check if another sale exists for this user on the new date (excluding the current sale)
-        const conflictingSale = allSales.find(s => {
-          if (s.id === id) return false; // Exclude current sale
-          if (s.user_id !== existingSale.user_id) return false; // Only check same user
-
-          const dbDate = new Date(s.date);
-          const dbYear = dbDate.getFullYear();
-          const dbMonth = String(dbDate.getMonth() + 1).padStart(2, '0');
-          const dbDay = String(dbDate.getDate()).padStart(2, '0');
-          const dbDateStr = `${dbYear}-${dbMonth}-${dbDay}`;
-
-          return dbDateStr === newDateStr;
-        });
-
-        if (conflictingSale) {
+        if (conflictCheck.rows.length > 0) {
           return res.status(400).json({
             error: 'Cannot change date: Another sale already exists for this user on the selected date. | तारीख बदल नहीं सकते: इस उपयोगकर्ता के लिए चयनित तारीख पर पहले से बिक्री मौजूद है।'
           });

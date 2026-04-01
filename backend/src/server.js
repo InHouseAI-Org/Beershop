@@ -24,6 +24,7 @@ const schemesRoutes = require('./routes/schemes');
 const recurringExpensesRoutes = require('./routes/recurringExpenses');
 const prepaidExpensesRoutes = require('./routes/prepaidExpenses');
 const balanceSheetRoutes = require('./routes/balanceSheet');
+const balanceLedgerRoutes = require('./routes/balanceLedger');
 
 const app = express();
 
@@ -77,6 +78,7 @@ app.use('/api/schemes', schemesRoutes);
 app.use('/api/recurring-expenses', recurringExpensesRoutes);
 app.use('/api/prepaid-expenses', prepaidExpensesRoutes);
 app.use('/api/balance-sheet', balanceSheetRoutes);
+app.use('/api/balance-ledger', balanceLedgerRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

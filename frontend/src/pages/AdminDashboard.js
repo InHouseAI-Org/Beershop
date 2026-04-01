@@ -16,6 +16,7 @@ import BalanceTransfersTab from '../components/admin/BalanceTransfersTab';
 import SchemesTab from '../components/admin/SchemesTab';
 import RecurringExpensesTab from '../components/admin/RecurringExpensesTab';
 import BalanceSheetTab from '../components/admin/BalanceSheetTab';
+import BalanceLedgerTab from '../components/admin/BalanceLedgerTab';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -26,6 +27,7 @@ const AdminDashboard = () => {
     { id: 'salesReport', label: 'Sales Report', path: 'sales-report' },
     { id: 'balanceSheet', label: 'Balance Sheet', path: 'balance-sheet' },
     { id: 'balances', label: 'Balances', path: 'balances' },
+    { id: 'balanceLedger', label: 'Balance Ledger', path: 'balance-ledger' },
     { id: 'balanceTransfers', label: 'Balance Transfers', path: 'balance-transfers' },
     { id: 'expenses', label: 'Expenses', path: 'expenses' },
     { id: 'recurringExpenses', label: 'Recurring Expenses', path: 'recurring-expenses' },
@@ -162,6 +164,7 @@ const AdminDashboard = () => {
             <Route path="sales-report" element={<SalesReportTab />} />
             <Route path="balance-sheet" element={<BalanceSheetTab />} />
             <Route path="balances" element={<BalanceTab />} />
+            <Route path="balance-ledger" element={<BalanceLedgerTab />} />
             <Route path="balance-transfers" element={<BalanceTransfersTab />} />
             <Route path="expenses" element={<ExpenseTab />} />
             <Route path="recurring-expenses" element={<RecurringExpensesTab />} />
