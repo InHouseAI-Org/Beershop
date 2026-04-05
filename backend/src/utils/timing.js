@@ -10,6 +10,7 @@
 const createTimer = (endpoint) => {
   const startTime = Date.now();
   let dbTime = 0;
+  let dbCallCount = 0;
 
   return {
     /**
@@ -19,9 +20,17 @@ const createTimer = (endpoint) => {
      */
     async measureDb(operation) {
       const dbStart = Date.now();
+      dbCallCount++;
       try {
         const result = await operation();
-        dbTime += Date.now() - dbStart;
+        const callTime = Date.now() - dbStart;
+        dbTime += callTime;
+
+        // Log individual slow queries (>500ms)
+        if (callTime > 500) {
+          console.log(`⚠️ SLOW QUERY #${dbCallCount}: ${callTime}ms in ${endpoint}`);
+        }
+
         return result;
       } catch (error) {
         dbTime += Date.now() - dbStart;
@@ -35,14 +44,22 @@ const createTimer = (endpoint) => {
     finish() {
       const totalTime = Date.now() - startTime;
       const computeTime = totalTime - dbTime;
+      const avgDbTime = dbCallCount > 0 ? Math.round(dbTime / dbCallCount) : 0;
 
       console.log({
         endpoint,
         totalTime: `${totalTime}ms`,
         dbTime: `${dbTime}ms`,
         computeTime: `${computeTime}ms`,
-        dbPercentage: `${((dbTime / totalTime) * 100).toFixed(1)}%`
+        dbPercentage: `${((dbTime / totalTime) * 100).toFixed(1)}%`,
+        dbCalls: dbCallCount,
+        avgDbCallTime: `${avgDbTime}ms`
       });
+
+      // Flag extremely slow endpoints
+      if (totalTime > 2000) {
+        console.log(`🚨 CRITICAL: ${endpoint} took ${totalTime}ms - possible Neon cold start or missing indexes`);
+      }
     }
   };
 };
