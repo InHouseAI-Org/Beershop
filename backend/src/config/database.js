@@ -3,7 +3,7 @@ const { Pool } = require('pg');
 // Support both individual env vars and DATABASE_URL
 const poolConfig = process.env.DATABASE_URL
   ? {
-      connectionString: process.env.DATABASE_URL,
+      connectionString: process.env.DATABASE_URL + '?sslmode=verify-full',
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
       // Optimized connection pool settings for Neon + Vercel serverless
       max: 10, // Maximum number of clients in the pool (Neon free tier: 20 connections max)
