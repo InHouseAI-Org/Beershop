@@ -1,10 +1,12 @@
 const pool = require('../config/database');
+const { createTimer } = require('../utils/timing');
 
 /**
  * Get complete ledger for a specific balance type (cash, bank, or gala)
  * Similar to distributor ledger - shows all transactions with running balance
  */
 exports.getBalanceLedger = async (req, res) => {
+  const timer = createTimer('GET /api/balance-ledger/:balanceType/ledger');
   const client = await pool.connect();
   try {
     const { balanceType } = req.params;
@@ -99,7 +101,7 @@ exports.getBalanceLedger = async (req, res) => {
       ORDER BY transaction_date ASC, created_at ASC
     `;
 
-    const transactionsResult = await client.query(transactionsQuery, queryParams);
+    const transactionsResult = await timer.measureDb(() => client.query(transactionsQuery, queryParams));
 
     // Calculate running balance for each transaction
     let runningBalance = openingBalance;
@@ -121,6 +123,7 @@ exports.getBalanceLedger = async (req, res) => {
 
     const closingBalance = runningBalance;
 
+    timer.finish();
     res.json({
       balanceType,
       openingBalance: parseFloat(openingBalance.toFixed(2)),
@@ -134,6 +137,7 @@ exports.getBalanceLedger = async (req, res) => {
     });
 
   } catch (error) {
+    timer.finish();
     console.error('Error fetching balance ledger:', error);
     res.status(500).json({
       error: 'Failed to fetch balance ledger',

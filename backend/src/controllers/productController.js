@@ -1,6 +1,8 @@
 const db = require('../models/data');
+const { createTimer } = require('../utils/timing');
 
 const getAllProducts = async (req, res) => {
+  const timer = createTimer('GET /api/products');
   try {
     const organisationId = req.user.organisationId;
 
@@ -8,9 +10,11 @@ const getAllProducts = async (req, res) => {
       return res.status(400).json({ error: 'Organisation ID required' });
     }
 
-    const products = await db.getProductsByOrganisationId(organisationId);
+    const products = await timer.measureDb(() => db.getProductsByOrganisationId(organisationId));
+    timer.finish();
     res.json(products);
   } catch (error) {
+    timer.finish();
     console.error(error);
     res.status(500).json({ error: 'Server error' });
   }

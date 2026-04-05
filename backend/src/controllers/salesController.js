@@ -1,7 +1,9 @@
 const db = require('../models/data');
 const pool = require('../config/database');
+const { createTimer } = require('../utils/timing');
 
 const getAllSales = async (req, res) => {
+  const timer = createTimer('GET /api/sales');
   try {
     const organisationId = req.user.organisationId;
 
@@ -9,7 +11,7 @@ const getAllSales = async (req, res) => {
       return res.status(400).json({ error: 'Organisation ID required' });
     }
 
-    const sales = await db.getSalesByOrganisationId(organisationId);
+    const sales = await timer.measureDb(() => db.getSalesByOrganisationId(organisationId));
 
     // Fetch all daily expenses in one query instead of N queries (fixes N+1 problem)
     if (sales.length === 0) {
@@ -17,10 +19,10 @@ const getAllSales = async (req, res) => {
     }
 
     const saleIds = sales.map(s => s.id);
-    const dailyExpensesQuery = await pool.query(
+    const dailyExpensesQuery = await timer.measureDb(() => pool.query(
       `SELECT * FROM daily_expenses WHERE sale_id = ANY($1) ORDER BY expense_date DESC`,
       [saleIds]
-    );
+    ));
 
     // Group expenses by sale_id for O(1) lookup
     const expensesBySaleId = {};
@@ -38,8 +40,10 @@ const getAllSales = async (req, res) => {
       dailyExpenses: expensesBySaleId[sale.id] || []
     }));
 
+    timer.finish();
     res.json(salesWithDetails);
   } catch (error) {
+    timer.finish();
     console.error(error);
     res.status(500).json({ error: 'Server error' });
   }

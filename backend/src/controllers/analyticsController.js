@@ -1,7 +1,9 @@
 const db = require('../models/data');
 const pool = require('../config/database');
+const { createTimer } = require('../utils/timing');
 
 const getMonthlyAnalytics = async (req, res) => {
+  const timer = createTimer('GET /api/analytics/monthly');
   try {
     const organisationId = req.user.organisationId;
 
@@ -10,7 +12,7 @@ const getMonthlyAnalytics = async (req, res) => {
     }
 
     // Get all approved sales for this organization
-    const sales = await db.getSalesByOrganisationId(organisationId);
+    const sales = await timer.measureDb(() => db.getSalesByOrganisationId(organisationId));
     const approvedSales = sales.filter(sale => sale.status === 'approved');
 
     console.log('=== ANALYTICS DEBUG ===');
@@ -25,7 +27,7 @@ const getMonthlyAnalytics = async (req, res) => {
     }
 
     // Get all orders for this organization
-    const orders = await db.getOrdersByOrganisationId(organisationId);
+    const orders = await timer.measureDb(() => db.getOrdersByOrganisationId(organisationId));
     console.log('Total orders:', orders.length);
     if (orders.length > 0) {
       console.log('Sample order:', {
@@ -36,24 +38,24 @@ const getMonthlyAnalytics = async (req, res) => {
     }
 
     // Get all products for this organization
-    const products = await db.getProductsByOrganisationId(organisationId);
+    const products = await timer.measureDb(() => db.getProductsByOrganisationId(organisationId));
     console.log('Total products:', products.length);
 
     // Get all distributors for this organization
-    const distributors = await db.getDistributorsByOrganisationId(organisationId);
+    const distributors = await timer.measureDb(() => db.getDistributorsByOrganisationId(organisationId));
     console.log('Total distributors:', distributors.length);
 
     // Get all credit holders for this organization
-    const creditHolders = await db.getCreditHoldersByOrganisationId(organisationId);
+    const creditHolders = await timer.measureDb(() => db.getCreditHoldersByOrganisationId(organisationId));
     console.log('Total credit holders:', creditHolders.length);
 
     // Get credit collection history to track outstanding over time
-    const creditHistoryQuery = await pool.query(
+    const creditHistoryQuery = await timer.measureDb(() => pool.query(
       `SELECT * FROM credit_collection_history
        WHERE organisation_id = $1
        ORDER BY collected_at ASC`,
       [organisationId]
-    );
+    ));
     const creditHistory = creditHistoryQuery.rows;
 
     // Helper function to format date to YYYY-MM
@@ -265,6 +267,7 @@ const getMonthlyAnalytics = async (req, res) => {
     console.log('Months range:', months.length > 0 ? `${months[0]} to ${months[months.length-1]}` : 'none');
     console.log('=== END ANALYTICS DEBUG ===');
 
+    timer.finish();
     res.json({
       monthlySales,
       distributorOrders,
@@ -276,6 +279,7 @@ const getMonthlyAnalytics = async (req, res) => {
     });
 
   } catch (error) {
+    timer.finish();
     console.error('Error fetching monthly analytics:', error);
     res.status(500).json({ error: 'Server error' });
   }
