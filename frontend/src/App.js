@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -10,9 +10,40 @@ import AddSales from './pages/AddSales';
 import RoleRedirect from './components/RoleRedirect';
 import { Analytics } from "@vercel/analytics/react";
 
+// Database wake-up utility
+const wakeUpDatabase = async () => {
+  try {
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.36:5001/api';
+    await fetch(`${apiUrl}/wake-up`, {
+      method: 'GET',
+      keepalive: true
+    });
+    console.log('✅ Database wake-up initiated');
+  } catch (error) {
+    console.log('⚠️ Database wake-up failed (non-critical):', error.message);
+  }
+};
+
+// Component to wake up DB on route changes
+function DatabaseWakeUp() {
+  const location = useLocation();
+
+  useEffect(() => {
+    wakeUpDatabase();
+  }, [location.pathname]);
+
+  return null;
+}
+
 function App() {
+  // Wake up database on initial app load
+  useEffect(() => {
+    wakeUpDatabase();
+  }, []);
+
   return (
     <Router>
+      <DatabaseWakeUp />
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />

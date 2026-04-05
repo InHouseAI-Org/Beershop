@@ -85,6 +85,19 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
+// Database wake-up endpoint - lightweight query to prevent auto-suspend
+app.get('/api/wake-up', async (req, res) => {
+  const pool = require('./config/database');
+  try {
+    // Simple, fast query to wake up the database
+    await pool.query('SELECT 1');
+    res.json({ status: 'awake', timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Wake-up query failed:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to wake database' });
+  }
+});
+
 // Debug endpoint (remove after troubleshooting)
 app.get('/api/debug', async (req, res) => {
   const db = require('./models/data');
