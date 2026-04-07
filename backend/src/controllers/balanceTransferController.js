@@ -1,4 +1,5 @@
 const db = require('../models/data');
+const pool = require('../config/database');
 
 const getAllBalanceTransfers = async (req, res) => {
   try {
@@ -17,9 +18,13 @@ const getAllBalanceTransfers = async (req, res) => {
 };
 
 const createBalanceTransfer = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { name, description, amount, fromAccount, toAccount, transactionDate } = req.body;
     const organisationId = req.user.organisationId;
+    const username = req.user.username;
 
     // Validation
     if (!name || !amount || !fromAccount || !toAccount) {
@@ -45,6 +50,7 @@ const createBalanceTransfer = async (req, res) => {
     const fromBalance = parseFloat(balances[fromAccount] || 0);
 
     if (fromBalance < transferAmount) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         error: `Insufficient balance in ${fromAccount.replace('_', ' ')}. Available: ₹${fromBalance.toFixed(2)}, Required: ₹${transferAmount.toFixed(2)}`
       });
@@ -66,6 +72,52 @@ const createBalanceTransfer = async (req, res) => {
       createdBy,
       createdByUsername: req.user.username
     });
+
+    const transferDate = transactionDate || new Date().toISOString().split('T')[0];
+
+    // Create balance_transaction entry for debit (money going out)
+    await client.query(
+      `INSERT INTO balance_transactions (
+        organisation_id, transaction_type, account,
+        debit_amount, credit_amount, transaction_date,
+        description, notes, reference_id, reference_table, created_by_username
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        organisationId,
+        'balance_transfer_debit',
+        fromAccount,
+        transferAmount,
+        0,
+        transferDate,
+        `Transfer to ${toAccount.replace('_balance', '')}${name ? ' - ' + name : ''}`,
+        description,
+        newTransfer.id,
+        'balance_transfers',
+        username
+      ]
+    );
+
+    // Create balance_transaction entry for credit (money coming in)
+    await client.query(
+      `INSERT INTO balance_transactions (
+        organisation_id, transaction_type, account,
+        debit_amount, credit_amount, transaction_date,
+        description, notes, reference_id, reference_table, created_by_username
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        organisationId,
+        'balance_transfer_credit',
+        toAccount,
+        0,
+        transferAmount,
+        transferDate,
+        `Transfer from ${fromAccount.replace('_balance', '')}${name ? ' - ' + name : ''}`,
+        description,
+        newTransfer.id,
+        'balance_transfers',
+        username
+      ]
+    );
 
     // Update balances: deduct from source, add to destination
     const balanceUpdates = {};
@@ -90,15 +142,22 @@ const createBalanceTransfer = async (req, res) => {
 
     await db.incrementOrganisationBalances(organisationId, balanceUpdates);
 
+    await client.query('COMMIT');
     res.status(201).json(newTransfer);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error creating balance transfer:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
 const deleteBalanceTransfer = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const organisationId = req.user.organisationId;
 
@@ -112,6 +171,13 @@ const deleteBalanceTransfer = async (req, res) => {
     if (transfer.organisation_id !== organisationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
+
+    // Delete balance_transaction entries (both debit and credit)
+    await client.query(
+      `DELETE FROM balance_transactions
+       WHERE reference_id = $1 AND reference_table = 'balance_transfers'`,
+      [id]
+    );
 
     // Reverse the balance changes
     const amount = parseFloat(transfer.amount);
@@ -140,10 +206,14 @@ const deleteBalanceTransfer = async (req, res) => {
     // Delete the transfer record
     await db.deleteBalanceTransfer(id);
 
+    await client.query('COMMIT');
     res.json({ message: 'Transfer deleted successfully' });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error deleting balance transfer:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

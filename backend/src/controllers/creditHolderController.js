@@ -1,4 +1,5 @@
 const db = require('../models/data');
+const pool = require('../config/database');
 const { createTimer } = require('../utils/timing');
 
 const getAllCreditHolders = async (req, res) => {
@@ -158,8 +159,12 @@ const deleteCreditHolder = async (req, res) => {
 };
 
 const collectCredit = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { creditHolderId, amountCollected, collectedIn } = req.body;
+    const username = req.user.username;
 
     if (!creditHolderId || !amountCollected || !collectedIn) {
       return res.status(400).json({ error: 'Credit holder ID, amount collected, and collection account are required' });
@@ -192,6 +197,7 @@ const collectCredit = async (req, res) => {
     const currentPayable = parseFloat(creditHolder.amount_payable || 0);
 
     if (amount > currentPayable) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         error: `Amount collected (₹${amount.toFixed(2)}) cannot exceed outstanding payable (₹${currentPayable.toFixed(2)})`
       });
@@ -228,7 +234,7 @@ const collectCredit = async (req, res) => {
     }
 
     // Save transaction history with collectedIn information
-    await db.createCreditCollectionHistory({
+    const collectionHistory = await db.createCreditCollectionHistory({
       organisationId: req.user.organisationId,
       creditHolderId: creditHolderId,
       amountCollected: amount,
@@ -241,6 +247,32 @@ const collectCredit = async (req, res) => {
       collectedIn: collectedIn
     });
 
+    // Create balance_transaction entry
+    const collectionDate = new Date().toISOString().split('T')[0];
+
+    await client.query(
+      `INSERT INTO balance_transactions (
+        organisation_id, transaction_type, account,
+        debit_amount, credit_amount, transaction_date,
+        description, notes, reference_id, reference_table, created_by_username
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        req.user.organisationId,
+        'credit_collection',
+        collectedIn,
+        0,
+        amount,
+        collectionDate,
+        `Credit collected from ${creditHolder.name} - ₹${amount}`,
+        null,
+        collectionHistory.id,
+        'credit_collection_history',
+        username
+      ]
+    );
+
+    await client.query('COMMIT');
+
     res.json({
       message: 'Credit collected successfully',
       creditHolder: updatedCreditHolder,
@@ -251,8 +283,11 @@ const collectCredit = async (req, res) => {
       newBalance: newBalance
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error collecting credit:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

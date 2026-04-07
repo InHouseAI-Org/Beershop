@@ -357,6 +357,32 @@ const makePayment = async (req, res) => {
     ];
 
     const result = await client.query(insertQuery, values);
+    const paymentRecord = result.rows[0];
+
+    // Create balance_transaction entry
+    const username = req.user.username;
+    const effectivePaymentDate = paymentDate || new Date().toISOString().split('T')[0];
+
+    await client.query(
+      `INSERT INTO balance_transactions (
+        organisation_id, transaction_type, account,
+        debit_amount, credit_amount, transaction_date,
+        description, notes, reference_id, reference_table, created_by_username
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        organisationId,
+        'distributor_payment',
+        paymentFrom,
+        paymentAmount,
+        0,
+        effectivePaymentDate,
+        `Payment to ${distributor.name} - ₹${paymentAmount} (${paymentType})`,
+        notes,
+        paymentRecord.id,
+        'distributor_payments',
+        username
+      ]
+    );
 
     // Deduct from organization balance
     const balanceUpdate = {};

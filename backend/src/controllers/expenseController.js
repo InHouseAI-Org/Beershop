@@ -1,10 +1,15 @@
 const db = require('../models/data');
+const pool = require('../config/database');
 
 // Create new expense
 const createExpense = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { expenseName, description, expenseFrom, expenseAmount, date } = req.body;
     const organisationId = req.user.organisationId;
+    const username = req.user.username;
 
     if (!expenseName || !expenseFrom || !expenseAmount) {
       return res.status(400).json({
@@ -47,6 +52,7 @@ const createExpense = async (req, res) => {
     }
 
     if (amount > currentBalance) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         error: `Insufficient ${balanceName}. Available: ₹${currentBalance.toFixed(2)}, Required: ₹${amount.toFixed(2)}`
       });
@@ -61,6 +67,27 @@ const createExpense = async (req, res) => {
       date
     });
 
+    // Create balance_transaction entry
+    await client.query(
+      `INSERT INTO balance_transactions (
+        organisation_id, transaction_type, account,
+        debit_amount, credit_amount, transaction_date,
+        description, reference_id, reference_table, created_by_username
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        organisationId,
+        'expense',
+        expenseFrom,
+        amount,
+        0,
+        date,
+        `${expenseName}${description ? ' - ' + description : ''}`,
+        expense.id,
+        'expenses',
+        username
+      ]
+    );
+
     // Deduct expense amount from the selected balance
     const balanceUpdate = {};
     if (expenseFrom === 'cash_balance') {
@@ -72,14 +99,18 @@ const createExpense = async (req, res) => {
     }
     await db.incrementOrganisationBalances(organisationId, balanceUpdate);
 
+    await client.query('COMMIT');
     res.status(201).json({
       ...expense,
       previousBalance: currentBalance,
       newBalance: currentBalance - amount
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error(error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
@@ -114,10 +145,14 @@ const getExpenseById = async (req, res) => {
 
 // Update expense
 const updateExpense = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const { expenseName, description, expenseFrom, expenseAmount, date } = req.body;
     const organisationId = req.user.organisationId;
+    const username = req.user.username;
 
     // Get the existing expense first
     const existingExpense = await db.getExpenseById(id);
@@ -206,6 +241,7 @@ const updateExpense = async (req, res) => {
         }
         await db.incrementOrganisationBalances(organisationId, rollbackUpdate);
 
+        await client.query('ROLLBACK');
         return res.status(400).json({
           error: `Insufficient ${balanceName}. Available: ₹${currentBalance.toFixed(2)}, Required: ₹${newAmount.toFixed(2)}`
         });
@@ -221,20 +257,54 @@ const updateExpense = async (req, res) => {
         deductUpdate.galaBalance = -newAmount;
       }
       await db.incrementOrganisationBalances(organisationId, deductUpdate);
+
+      // Delete old balance_transaction entry and create new one
+      await client.query(
+        `DELETE FROM balance_transactions
+         WHERE reference_id = $1 AND reference_table = 'expenses'`,
+        [id]
+      );
+
+      await client.query(
+        `INSERT INTO balance_transactions (
+          organisation_id, transaction_type, account,
+          debit_amount, credit_amount, transaction_date,
+          description, reference_id, reference_table, created_by_username
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          organisationId,
+          'expense',
+          newFrom,
+          newAmount,
+          0,
+          date || existingExpense.date,
+          `${expenseName || existingExpense.expense_name}${(description !== undefined ? description : existingExpense.description) ? ' - ' + (description !== undefined ? description : existingExpense.description) : ''}`,
+          id,
+          'expenses',
+          username
+        ]
+      );
     }
 
     const updatedExpense = await db.updateExpense(id, updates);
 
+    await client.query('COMMIT');
     res.json(updatedExpense);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error(error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
 // Delete expense
 const deleteExpense = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const organisationId = req.user.organisationId;
 
@@ -248,6 +318,13 @@ const deleteExpense = async (req, res) => {
     if (existingExpense.organisation_id !== organisationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
+
+    // Delete balance_transaction entry
+    await client.query(
+      `DELETE FROM balance_transactions
+       WHERE reference_id = $1 AND reference_table = 'expenses'`,
+      [id]
+    );
 
     // Add back the expense amount to the balance before deleting
     const amount = parseFloat(existingExpense.expense_amount || 0);
@@ -266,13 +343,18 @@ const deleteExpense = async (req, res) => {
     const success = await db.deleteExpense(id);
 
     if (!success) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Expense not found' });
     }
 
+    await client.query('COMMIT');
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error(error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

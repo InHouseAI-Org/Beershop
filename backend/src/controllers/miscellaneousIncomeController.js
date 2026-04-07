@@ -1,4 +1,5 @@
 const db = require('../models/data');
+const pool = require('../config/database');
 
 /**
  * Get all miscellaneous income records for organization
@@ -23,9 +24,13 @@ const getAllMiscellaneousIncome = async (req, res) => {
  * Create a new miscellaneous income record
  */
 const createMiscellaneousIncome = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { name, description, amount, account, transactionDate } = req.body;
     const organisationId = req.user.organisationId;
+    const username = req.user.username;
 
     // Validation
     if (!name || !amount || !account) {
@@ -56,6 +61,30 @@ const createMiscellaneousIncome = async (req, res) => {
       createdByUsername: req.user.username
     });
 
+    const incomeDate = transactionDate || new Date().toISOString().split('T')[0];
+
+    // Create balance_transaction entry
+    await client.query(
+      `INSERT INTO balance_transactions (
+        organisation_id, transaction_type, account,
+        debit_amount, credit_amount, transaction_date,
+        description, notes, reference_id, reference_table, created_by_username
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        organisationId,
+        'miscellaneous_income',
+        account,
+        0,
+        incomeAmount,
+        incomeDate,
+        name,
+        description,
+        newIncome.id,
+        'miscellaneous_income',
+        username
+      ]
+    );
+
     // Update the organization balance - add income to the specified account
     const balanceUpdates = {};
 
@@ -69,10 +98,14 @@ const createMiscellaneousIncome = async (req, res) => {
 
     await db.incrementOrganisationBalances(organisationId, balanceUpdates);
 
+    await client.query('COMMIT');
     res.status(201).json(newIncome);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error creating miscellaneous income:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
@@ -80,7 +113,10 @@ const createMiscellaneousIncome = async (req, res) => {
  * Delete a miscellaneous income record
  */
 const deleteMiscellaneousIncome = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const organisationId = req.user.organisationId;
 
@@ -94,6 +130,13 @@ const deleteMiscellaneousIncome = async (req, res) => {
     if (income.organisation_id !== organisationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
+
+    // Delete balance_transaction entry
+    await client.query(
+      `DELETE FROM balance_transactions
+       WHERE reference_id = $1 AND reference_table = 'miscellaneous_income'`,
+      [id]
+    );
 
     // Reverse the balance change - deduct the income from the account
     const amount = parseFloat(income.amount);
@@ -112,10 +155,14 @@ const deleteMiscellaneousIncome = async (req, res) => {
     // Delete the income record
     await db.deleteMiscellaneousIncome(id);
 
+    await client.query('COMMIT');
     res.json({ message: 'Income record deleted successfully' });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error deleting miscellaneous income:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
