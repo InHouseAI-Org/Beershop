@@ -224,27 +224,28 @@ FROM miscellaneous_income mi
 ON CONFLICT DO NOTHING;
 
 -- 5.8: Distributor Payments (money paid to distributors)
+-- From the NEW distributor_payments table
 INSERT INTO balance_transactions (
   organisation_id, transaction_type, account,
   debit_amount, credit_amount, transaction_date,
   description, notes, reference_id, reference_table, created_by_username
 )
 SELECT
-  dph.organisation_id,
+  dp.organisation_id,
   'distributor_payment',
-  dph.paid_from,
-  dph.amount_paid,
+  dp.payment_from,
+  dp.amount,
   0,
-  CAST(dph.paid_at AS DATE),
-  CONCAT('Payment to ', d.name, ' - ₹', dph.amount_paid),
-  dph.notes,
-  dph.id,
-  'distributor_payment_history',
+  COALESCE(CAST(dp.payment_date AS DATE), CAST(dp.created_at AS DATE)),
+  CONCAT('Payment to ', d.name, ' - ₹', dp.amount, ' (', dp.payment_type, ')'),
+  dp.notes,
+  dp.id,
+  'distributor_payments',
   a.username
-FROM distributor_payment_history dph
-LEFT JOIN distributors d ON dph.distributor_id = d.id
-LEFT JOIN admins a ON dph.paid_by = a.id
-WHERE dph.paid_from IS NOT NULL
+FROM distributor_payments dp
+LEFT JOIN distributors d ON dp.distributor_id = d.id
+LEFT JOIN admins a ON dp.created_by = a.id
+WHERE dp.payment_from IS NOT NULL
 ON CONFLICT DO NOTHING;
 
 -- ============================================
