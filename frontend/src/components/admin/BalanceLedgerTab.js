@@ -479,7 +479,6 @@ const BalanceLedgerTab = () => {
               }}>
                 {ledgerData.transactions.map((transaction, index) => {
                   const isDebit = transaction.debit_amount > 0;
-                  const isCredit = transaction.credit_amount > 0;
 
                   return (
                     <div
