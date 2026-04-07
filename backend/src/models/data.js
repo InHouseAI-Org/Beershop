@@ -1011,7 +1011,8 @@ const dataHelpers = {
 
   getOrganisationBalances: async (organisationId) => {
     const result = await pool.query(
-      `SELECT cash_balance, bank_balance, gala_balance
+      `SELECT cash_balance, bank_balance, gala_balance,
+              cash_opening_balance, bank_opening_balance, gala_opening_balance
        FROM organisations
        WHERE id = $1`,
       [organisationId]
