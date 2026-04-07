@@ -142,9 +142,14 @@ const getAllOrganisations = async (req, res) => {
         return {
           id: org.id,
           name: org.organisation_name,
-          cashBalance: parseFloat(balances.cash_balance || 0),
-          bankBalance: parseFloat(balances.bank_balance || 0),
-          galaBalance: parseFloat(balances.gala_balance || 0),
+          // Return opening balances (what admin can edit) as the primary balance values
+          cashBalance: parseFloat(balances.cash_opening_balance || 0),
+          bankBalance: parseFloat(balances.bank_opening_balance || 0),
+          galaBalance: parseFloat(balances.gala_opening_balance || 0),
+          // Also include current balances for reference
+          currentCashBalance: parseFloat(balances.cash_balance || 0),
+          currentBankBalance: parseFloat(balances.bank_balance || 0),
+          currentGalaBalance: parseFloat(balances.gala_balance || 0),
           createdAt: org.created_at,
           updatedAt: org.updated_at
         };
