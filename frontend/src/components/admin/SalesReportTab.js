@@ -1327,8 +1327,7 @@ const SalesReportTab = () => {
             }}
           >
             <div style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
+              color: 'black',
               padding: '2rem',
               borderTopLeftRadius: '16px',
               borderTopRightRadius: '16px',
@@ -1340,8 +1339,8 @@ const SalesReportTab = () => {
                   position: 'absolute',
                   top: '1rem',
                   right: '1rem',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
+                  background: 'rgba(201, 201, 201, 0.72)',
+                  color: 'black',
                   border: 'none',
                   borderRadius: '50%',
                   width: '36px',
@@ -1355,11 +1354,11 @@ const SalesReportTab = () => {
                 <X size={20} />
               </button>
 
-              <h3 style={{ color: 'white', margin: 0, fontSize: '1.5rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <h3 style={{ color: 'black', margin: 0, fontSize: '1.5rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <Wallet size={28} />
                 Allocate Balance | शेष आवंटित करें
               </h3>
-              <p style={{ color: 'rgba(255, 255, 255, 0.9)', margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
+              <p style={{ color: 'rgba(0, 0, 0, 0.9)', margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
                 {new Date(allocationSale.date).toLocaleDateString()}
               </p>
             </div>

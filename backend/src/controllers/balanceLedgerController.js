@@ -23,11 +23,10 @@ exports.getBalanceLedger = async (req, res) => {
 
     // Convert to database column name
     const accountColumn = `${balanceType}_balance`;
-    const openingBalanceColumn = `${balanceType}_opening_balance`;
 
-    // Get organization to fetch opening balance
+    // Check if organisation exists
     const orgQuery = `
-      SELECT ${openingBalanceColumn} as opening_balance
+      SELECT id
       FROM organisations
       WHERE id = $1
     `;
@@ -37,13 +36,13 @@ exports.getBalanceLedger = async (req, res) => {
       return res.status(404).json({ error: 'Organisation not found' });
     }
 
-    const organisation = orgResult.rows[0];
-    let openingBalance = parseFloat(organisation.opening_balance || 0);
+    // Calculate opening balance based on transactions BEFORE the start_date (or all transactions if no start_date)
+    let openingBalance = 0;
 
-    // If start_date is provided, calculate opening balance including all transactions before start_date
     if (start_date) {
+      // If start_date is provided, opening balance = all transactions BEFORE start_date
       const beforeStartQuery = `
-        SELECT COALESCE(SUM(credit_amount - debit_amount), 0) as net_change
+        SELECT COALESCE(SUM(credit_amount - debit_amount), 0) as opening_balance
         FROM balance_transactions
         WHERE organisation_id = $1
           AND account = $2
@@ -56,8 +55,11 @@ exports.getBalanceLedger = async (req, res) => {
         start_date
       ]);
 
-      const netChange = parseFloat(beforeStartResult.rows[0].net_change || 0);
-      openingBalance += netChange;
+      openingBalance = parseFloat(beforeStartResult.rows[0].opening_balance || 0);
+    } else {
+      // If no start_date, opening balance starts at 0
+      // (we'll show all transactions from the beginning)
+      openingBalance = 0;
     }
 
     // Build the transactions query

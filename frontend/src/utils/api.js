@@ -1,7 +1,18 @@
 import axios from 'axios';
 
-// Use environment variable if available, otherwise use local IP for mobile access
-const API_URL = process.env.REACT_APP_API_URL || 'http://192.168.1.36:5001/api';
+// Dynamically determine API URL based on the current host
+const getApiUrl = () => {
+  // If environment variable is set, use it
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+
+  // Otherwise, use the same host as the frontend but with port 5001
+  const hostname = window.location.hostname;
+  return `http://${hostname}:5001/api`;
+};
+
+const API_URL = getApiUrl();
 
 const api = axios.create({
   baseURL: API_URL,

@@ -13,7 +13,16 @@ import { Analytics } from "@vercel/analytics/react";
 // Database wake-up utility
 const wakeUpDatabase = async () => {
   try {
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.36:5001/api';
+    // Dynamically determine API URL based on current host
+    const getApiUrl = () => {
+      if (process.env.REACT_APP_API_URL) {
+        return process.env.REACT_APP_API_URL;
+      }
+      const hostname = window.location.hostname;
+      return `http://${hostname}:5001/api`;
+    };
+
+    const apiUrl = getApiUrl();
     await fetch(`${apiUrl}/wake-up`, {
       method: 'GET',
       keepalive: true

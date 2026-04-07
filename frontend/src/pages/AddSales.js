@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import api from '../utils/api';
 import CustomDropdown from '../components/common/CustomDropdown';
+import { useFormSubmit } from '../hooks/useFormSubmit';
 
 const AddSales = () => {
   const navigate = useNavigate();
+  const { isSubmitting, handleSubmit: handleFormSubmit, showError, showWarning, showSuccess } = useFormSubmit();
   const [products, setProducts] = useState([]);
   const [creditHolders, setCreditHolders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,6 @@ const AddSales = () => {
 
   // Draft state
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
-  const [savingDraft, setSavingDraft] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -388,8 +389,9 @@ const AddSales = () => {
     console.log('  creditTaken:', creditTaken);
     console.log('  dailyExpenses:', dailyExpenses);
 
-    // Final check for duplicate sale before submission using local time
-    try {
+    // Use the form submit hook to handle loading state and navigation blocking
+    const success = await handleFormSubmit(async () => {
+      // Final check for duplicate sale before submission using local time
       const response = await api.get('/sales');
       const userSales = response.data.filter(sale => sale.user_id);
 
@@ -407,16 +409,8 @@ const AddSales = () => {
       });
 
       if (existingSale) {
-        alert('❌ Sale already exists for this date. Cannot submit duplicate.\n\nइस तारीख के लिए बिक्री पहले से मौजूद है। डुप्लिकेट सबमिट नहीं कर सकते।');
-        return;
+        throw new Error('Sale already exists for this date. Cannot submit duplicate.\n\nइस तारीख के लिए बिक्री पहले से मौजूद है। डुप्लिकेट सबमिट नहीं कर सकते।');
       }
-    } catch (err) {
-      console.error('Error checking for duplicates:', err);
-      alert('❌ Failed to verify duplicate. Please try again.\n\nडुप्लिकेट सत्यापित करने में विफल। कृपया पुनः प्रयास करें।');
-      return;
-    }
-
-    try {
       // Prepare opening stock, closing stock and sale data using product IDs
       // Opening stock is from inventory (already loaded in frontend)
       const openingStockData = [];
@@ -530,19 +524,17 @@ const AddSales = () => {
         console.log('No draft to delete or error deleting draft');
       }
 
-      // Show success message and redirect
-      alert('✅ Sales report submitted successfully!\n\nबिक्री रिपोर्ट सफलतापूर्वक सबमिट की गई!');
-      navigate('/dashboard');
-    } catch (err) {
-      const errorMessage = err.response?.data?.error || 'Failed to submit sale';
-      alert(`❌ ${errorMessage}\n\nबिक्री सबमिट करने में विफल`);
-    }
+      return payload; // Return data for success callback
+    }, {
+      successMessage: '✅ Sales report submitted successfully!\n\nबिक्री रिपोर्ट सफलतापूर्वक सबमिट की गई!',
+      onSuccess: () => {
+        navigate('/dashboard');
+      }
+    });
   };
 
   const handleSaveDraft = async () => {
-    try {
-      setSavingDraft(true);
-
+    await handleFormSubmit(async () => {
       const draftData = {
         saleDate,
         productData,
@@ -556,15 +548,10 @@ const AddSales = () => {
       };
 
       await api.post('/sales-drafts', draftData);
-
       setIsDraftLoaded(true);
-      alert('✅ Draft saved successfully! You can resume this form later.\n\nड्राफ्ट सफलतापूर्वक सहेजा गया! आप इस फॉर्म को बाद में फिर से शुरू कर सकते हैं।');
-    } catch (err) {
-      console.error('Error saving draft:', err);
-      alert('❌ Failed to save draft. Please try again.\n\nड्राफ्ट सहेजने में विफल। कृपया पुनः प्रयास करें।');
-    } finally {
-      setSavingDraft(false);
-    }
+    }, {
+      successMessage: '✅ Draft saved successfully! You can resume this form later.\n\nड्राफ्ट सफलतापूर्वक सहेजा गया! आप इस फॉर्म को बाद में फिर से शुरू कर सकते हैं।'
+    });
   };
 
   const handleClearDraft = async () => {
@@ -574,7 +561,7 @@ const AddSales = () => {
 
     if (!confirmed) return;
 
-    try {
+    await handleFormSubmit(async () => {
       await api.delete('/sales-drafts');
 
       // Reset form to initial state
@@ -589,13 +576,10 @@ const AddSales = () => {
       setRemarks('');
 
       // Reload fresh data
-      fetchData();
-
-      alert('✅ Draft cleared successfully!\n\nड्राफ्ट सफलतापूर्वक हटा दिया गया!');
-    } catch (err) {
-      console.error('Error clearing draft:', err);
-      alert('❌ Failed to clear draft. Please try again.\n\nड्राफ्ट हटाने में विफल। कृपया पुनः प्रयास करें।');
-    }
+      await fetchData();
+    }, {
+      successMessage: '✅ Draft cleared successfully!\n\nड्राफ्ट सफलतापूर्वक हटा दिया गया!'
+    });
   };
 
   if (loading) {
@@ -1504,34 +1488,44 @@ const AddSales = () => {
             <button
               onClick={handleSaveDraft}
               className="btn btn-secondary"
-              disabled={savingDraft}
+              disabled={isSubmitting}
               style={{
                 width: '100%',
                 fontSize: '1.125rem',
                 padding: '1rem',
-                fontWeight: '600'
+                fontWeight: '600',
+                opacity: isSubmitting ? 0.6 : 1,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer'
               }}
             >
-              {savingDraft ? 'Saving... | सहेजा जा रहा है...' : 'Save Draft | ड्राफ्ट सहेजें'}
+              {isSubmitting ? '⏳ Processing... | प्रसंस्करण...' : 'Save Draft | ड्राफ्ट सहेजें'}
             </button>
             <button
               onClick={handlePreview}
               className="btn btn-success"
-              disabled={dateError}
+              disabled={dateError || isSubmitting}
               style={{
                 width: '100%',
                 fontSize: '1.5rem',
                 padding: '1.5rem',
                 fontWeight: '700',
-                opacity: dateError ? 0.5 : 1,
-                cursor: dateError ? 'not-allowed' : 'pointer'
+                opacity: (dateError || isSubmitting) ? 0.5 : 1,
+                cursor: (dateError || isSubmitting) ? 'not-allowed' : 'pointer'
               }}
             >
-              Preview & Submit | पूर्वावलोकन और सबमिट करें
+              {isSubmitting ? '⏳ Processing... | प्रसंस्करण...' : 'Preview & Submit | पूर्वावलोकन और सबमिट करें'}
             </button>
-            <button onClick={() => navigate('/dashboard')} className="btn btn-secondary">
-            Cancel | रद्द करें
-          </button>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="btn btn-secondary"
+              disabled={isSubmitting}
+              style={{
+                opacity: isSubmitting ? 0.6 : 1,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Cancel | रद्द करें
+            </button>
           </div>
         </div>
       </div>

@@ -97,23 +97,29 @@ const DashboardTab = () => {
         }}>
           <h3 style={{
             color: '#E65100',
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
+            fontSize: isMobile ? '1.125rem' : '1.5rem',
             fontWeight: '700',
-            marginBottom: '1rem',
+            marginBottom: isMobile ? '0.75rem' : '1rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem'
+            gap: '0.5rem',
+            flexWrap: 'wrap'
           }}>
-            <AlertTriangle size={isMobile ? 20 : 24} />
+            <AlertTriangle size={isMobile ? 18 : 24} />
             Low Inventory Alert
           </h3>
-          <p style={{ color: '#666', marginBottom: '1rem', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+          <p style={{
+            color: '#666',
+            marginBottom: isMobile ? '0.75rem' : '1rem',
+            fontSize: isMobile ? '0.8125rem' : '1rem',
+            lineHeight: isMobile ? '1.4' : '1.5'
+          }}>
             The following products are running low on stock:
           </p>
           <div style={{
-            display: 'grid',
-            gap: isMobile ? '0.75rem' : '1rem',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: isMobile ? '0.625rem' : '1rem'
           }}>
             {lowInventory.map((item) => (
               <div
@@ -124,24 +130,33 @@ const DashboardTab = () => {
                   borderRadius: '8px',
                   border: '1px solid #FFB74D',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  flexDirection: 'column',
+                  gap: isMobile ? '0.5rem' : '0.25rem'
                 }}
               >
-                <div>
-                  <div style={{
-                    fontWeight: '700',
-                    color: '#000',
-                    fontSize: isMobile ? '1rem' : '1.125rem',
-                    marginBottom: '0.25rem'
-                  }}>
-                    {item.product_name}
-                  </div>
-                  <div style={{ color: '#666', fontSize: isMobile ? '0.875rem' : '1rem' }}>
+                <div style={{
+                  fontWeight: '700',
+                  color: '#000',
+                  fontSize: isMobile ? '0.9375rem' : '1.125rem',
+                  lineHeight: '1.3'
+                }}>
+                  {item.product_name}
+                </div>
+                <div style={{
+                  color: '#666',
+                  fontSize: isMobile ? '0.8125rem' : '1rem',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: isMobile ? '0.5rem' : '0.75rem',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ whiteSpace: 'nowrap' }}>
                     Current: <span style={{ fontWeight: '600', color: '#E65100' }}>{parseFloat(item.qty).toFixed(2)}</span>
-                    {' | '}
+                  </span>
+                  <span style={{ color: '#FFB74D' }}>|</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>
                     Alert: <span style={{ fontWeight: '600', color: '#FF9800' }}>{parseFloat(item.alert_qty).toFixed(2)}</span>
-                  </div>
+                  </span>
                 </div>
               </div>
             ))}
