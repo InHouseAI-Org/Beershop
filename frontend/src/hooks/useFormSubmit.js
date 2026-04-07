@@ -54,8 +54,7 @@ export const useFormSubmit = () => {
       onSuccess = null,
       onError = null,
       successMessage = '✅ Operation completed successfully!\n\nसफलतापूर्वक पूर्ण हुआ!',
-      showSuccessAlert = true,
-      loadingMessage = 'Processing your request...\n\nआपका अनुरोध संसाधित हो रहा है...'
+      showSuccessAlert = true
     } = options;
 
     if (isSubmitting) {

@@ -7,7 +7,7 @@ import { useFormSubmit } from '../hooks/useFormSubmit';
 
 const AddSales = () => {
   const navigate = useNavigate();
-  const { isSubmitting, handleSubmit: handleFormSubmit, showError, showWarning, showSuccess } = useFormSubmit();
+  const { isSubmitting, handleSubmit: handleFormSubmit } = useFormSubmit();
   const [products, setProducts] = useState([]);
   const [creditHolders, setCreditHolders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -390,7 +390,7 @@ const AddSales = () => {
     console.log('  dailyExpenses:', dailyExpenses);
 
     // Use the form submit hook to handle loading state and navigation blocking
-    const success = await handleFormSubmit(async () => {
+    await handleFormSubmit(async () => {
       // Final check for duplicate sale before submission using local time
       const response = await api.get('/sales');
       const userSales = response.data.filter(sale => sale.user_id);
