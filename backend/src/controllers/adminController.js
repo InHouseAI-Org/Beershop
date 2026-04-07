@@ -1,4 +1,5 @@
 const db = require('../models/data');
+const pool = require('../config/database');
 
 const getAllAdmins = async (req, res) => {
   try {
@@ -158,6 +159,7 @@ const getAllOrganisations = async (req, res) => {
 };
 
 const updateOrganisationBalances = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const { cashBalance, bankBalance, galaBalance } = req.body;
@@ -167,30 +169,57 @@ const updateOrganisationBalances = async (req, res) => {
       return res.status(400).json({ error: 'Please provide at least one balance to update' });
     }
 
-    // Build the update object
-    const balances = {};
-    if (cashBalance !== undefined) balances.cashBalance = parseFloat(cashBalance);
-    if (bankBalance !== undefined) balances.bankBalance = parseFloat(bankBalance);
-    if (galaBalance !== undefined) balances.galaBalance = parseFloat(galaBalance);
+    // Update opening balances instead of current balances
+    const fields = [];
+    const values = [];
+    let paramCount = 1;
 
-    // Update the balances
-    await db.updateOrganisationBalances(id, balances);
+    if (cashBalance !== undefined) {
+      fields.push(`cash_opening_balance = $${paramCount}`);
+      values.push(parseFloat(cashBalance));
+      paramCount++;
+    }
+    if (bankBalance !== undefined) {
+      fields.push(`bank_opening_balance = $${paramCount}`);
+      values.push(parseFloat(bankBalance));
+      paramCount++;
+    }
+    if (galaBalance !== undefined) {
+      fields.push(`gala_opening_balance = $${paramCount}`);
+      values.push(parseFloat(galaBalance));
+      paramCount++;
+    }
 
-    // Get updated balances
-    const updatedBalances = await db.getOrganisationBalances(id);
-    const organisation = await db.getOrganisationById(id);
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const result = await client.query(
+      `UPDATE organisations SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: 'Organisation not found' });
+    }
+
+    const organisation = result.rows[0];
 
     res.json({
       id: organisation.id,
       name: organisation.organisation_name,
-      cashBalance: parseFloat(updatedBalances.cash_balance || 0),
-      bankBalance: parseFloat(updatedBalances.bank_balance || 0),
-      galaBalance: parseFloat(updatedBalances.gala_balance || 0),
+      cashBalance: parseFloat(organisation.cash_balance || 0),
+      bankBalance: parseFloat(organisation.bank_balance || 0),
+      galaBalance: parseFloat(organisation.gala_balance || 0),
+      cashOpeningBalance: parseFloat(organisation.cash_opening_balance || 0),
+      bankOpeningBalance: parseFloat(organisation.bank_opening_balance || 0),
+      galaOpeningBalance: parseFloat(organisation.gala_opening_balance || 0),
       updatedAt: organisation.updated_at
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
