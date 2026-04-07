@@ -1,9 +1,6 @@
 -- ============================================
--- Balance Ledger System Migration
--- ============================================
--- This migration creates the balance_transactions table
--- and sets up the balance ledger system for tracking
--- cash, bank, and gala balance movements
+-- Balance Ledger System - COMPLETE Migration
+-- Includes distributor payments
 -- ============================================
 
 -- 1. Create balance_transactions table
@@ -54,7 +51,7 @@ ORDER BY transaction_date DESC, created_at DESC;
 
 -- 4. Populate initial transactions from existing data
 
--- From sales table (daily allocations)
+-- From sales table (daily cash allocations)
 INSERT INTO balance_transactions (
   organisation_id,
   transaction_type,
@@ -83,7 +80,7 @@ LEFT JOIN users u ON s.user_id = u.id
 WHERE s.status = 'approved' AND s.cash_collected > 0
 ON CONFLICT DO NOTHING;
 
--- From sales table (UPI allocations to bank)
+-- From sales table (daily UPI allocations to bank)
 INSERT INTO balance_transactions (
   organisation_id,
   transaction_type,
@@ -224,11 +221,46 @@ SELECT
 FROM miscellaneous_income mi
 ON CONFLICT DO NOTHING;
 
--- Success message
-DO $$
-BEGIN
-  RAISE NOTICE 'Balance ledger system created successfully!';
-  RAISE NOTICE 'Tables created: balance_transactions';
-  RAISE NOTICE 'Views created: balance_ledger';
-  RAISE NOTICE 'Historical data imported from: sales, expenses, balance_transfers, miscellaneous_income';
-END $$;
+-- NEW: From distributor_payment_history table (payments made to distributors - DEBIT)
+INSERT INTO balance_transactions (
+  organisation_id,
+  transaction_type,
+  account,
+  debit_amount,
+  credit_amount,
+  transaction_date,
+  description,
+  notes,
+  reference_id,
+  reference_table,
+  created_by_username
+)
+SELECT
+  dph.organisation_id,
+  'distributor_payment' as transaction_type,
+  dph.paid_from as account,
+  dph.amount_paid as debit_amount,
+  0 as credit_amount,
+  CAST(dph.paid_at AS DATE) as transaction_date,
+  CONCAT('Payment to ', d.name, ' - ₹', dph.amount_paid) as description,
+  dph.notes as notes,
+  dph.id as reference_id,
+  'distributor_payment_history' as reference_table,
+  a.username as created_by_username
+FROM distributor_payment_history dph
+LEFT JOIN distributors d ON dph.distributor_id = d.id
+LEFT JOIN admins a ON dph.paid_by = a.id
+WHERE dph.paid_from IS NOT NULL
+ON CONFLICT DO NOTHING;
+
+-- Verify the migration
+SELECT
+  transaction_type,
+  account,
+  COUNT(*) as count,
+  SUM(debit_amount) as total_debit,
+  SUM(credit_amount) as total_credit,
+  SUM(credit_amount - debit_amount) as net_change
+FROM balance_transactions
+GROUP BY transaction_type, account
+ORDER BY transaction_type, account;

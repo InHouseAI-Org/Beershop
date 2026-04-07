@@ -23,10 +23,11 @@ exports.getBalanceLedger = async (req, res) => {
 
     // Convert to database column name
     const accountColumn = `${balanceType}_balance`;
+    const openingBalanceColumn = `${balanceType}_opening_balance`;
 
-    // Check if organisation exists
+    // Get organisation and its opening balance
     const orgQuery = `
-      SELECT id
+      SELECT id, ${openingBalanceColumn} as opening_balance
       FROM organisations
       WHERE id = $1
     `;
@@ -36,13 +37,13 @@ exports.getBalanceLedger = async (req, res) => {
       return res.status(404).json({ error: 'Organisation not found' });
     }
 
-    // Calculate opening balance based on transactions BEFORE the start_date (or all transactions if no start_date)
-    let openingBalance = 0;
+    // Start with the opening balance from the organisation table
+    let openingBalance = parseFloat(orgResult.rows[0].opening_balance || 0);
 
+    // If start_date is provided, add all transactions BEFORE start_date to the opening balance
     if (start_date) {
-      // If start_date is provided, opening balance = all transactions BEFORE start_date
       const beforeStartQuery = `
-        SELECT COALESCE(SUM(credit_amount - debit_amount), 0) as opening_balance
+        SELECT COALESCE(SUM(credit_amount - debit_amount), 0) as net_change
         FROM balance_transactions
         WHERE organisation_id = $1
           AND account = $2
@@ -55,12 +56,12 @@ exports.getBalanceLedger = async (req, res) => {
         start_date
       ]);
 
-      openingBalance = parseFloat(beforeStartResult.rows[0].opening_balance || 0);
-    } else {
-      // If no start_date, opening balance starts at 0
-      // (we'll show all transactions from the beginning)
-      openingBalance = 0;
+      const netChange = parseFloat(beforeStartResult.rows[0].net_change || 0);
+      openingBalance += netChange;
     }
+
+    // If no start_date is provided, opening balance is just the organisation's opening balance
+    // (transactions will show from the beginning)
 
     // Build the transactions query
     let transactionsQuery = `

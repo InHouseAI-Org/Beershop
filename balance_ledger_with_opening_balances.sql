@@ -1,12 +1,15 @@
 -- ============================================
--- Balance Ledger System Migration
--- ============================================
--- This migration creates the balance_transactions table
--- and sets up the balance ledger system for tracking
--- cash, bank, and gala balance movements
+-- Balance Ledger System - COMPLETE Migration
+-- Includes opening balances + distributor payments
 -- ============================================
 
--- 1. Create balance_transactions table
+-- STEP 1: Add opening balance columns to organisations table
+ALTER TABLE organisations
+ADD COLUMN IF NOT EXISTS cash_opening_balance DECIMAL(10, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS bank_opening_balance DECIMAL(10, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS gala_opening_balance DECIMAL(10, 2) DEFAULT 0;
+
+-- STEP 2: Create balance_transactions table
 CREATE TABLE IF NOT EXISTS balance_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organisation_id UUID NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
@@ -25,14 +28,14 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Create indexes for better performance
+-- STEP 3: Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_org_id ON balance_transactions(organisation_id);
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_account ON balance_transactions(account);
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_date ON balance_transactions(transaction_date);
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_type ON balance_transactions(transaction_type);
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_reference ON balance_transactions(reference_id, reference_table);
 
--- 3. Create balance_ledger view for easy querying
+-- STEP 4: Create balance_ledger view for easy querying
 CREATE OR REPLACE VIEW balance_ledger AS
 SELECT
   id,
@@ -52,9 +55,9 @@ SELECT
 FROM balance_transactions
 ORDER BY transaction_date DESC, created_at DESC;
 
--- 4. Populate initial transactions from existing data
+-- STEP 5: Populate initial transactions from existing data
 
--- From sales table (daily allocations)
+-- From sales table (daily cash allocations)
 INSERT INTO balance_transactions (
   organisation_id,
   transaction_type,
@@ -83,7 +86,7 @@ LEFT JOIN users u ON s.user_id = u.id
 WHERE s.status = 'approved' AND s.cash_collected > 0
 ON CONFLICT DO NOTHING;
 
--- From sales table (UPI allocations to bank)
+-- From sales table (daily UPI allocations to bank)
 INSERT INTO balance_transactions (
   organisation_id,
   transaction_type,
@@ -224,11 +227,104 @@ SELECT
 FROM miscellaneous_income mi
 ON CONFLICT DO NOTHING;
 
--- Success message
-DO $$
-BEGIN
-  RAISE NOTICE 'Balance ledger system created successfully!';
-  RAISE NOTICE 'Tables created: balance_transactions';
-  RAISE NOTICE 'Views created: balance_ledger';
-  RAISE NOTICE 'Historical data imported from: sales, expenses, balance_transfers, miscellaneous_income';
-END $$;
+-- From distributor_payment_history table (payments made to distributors - DEBIT)
+INSERT INTO balance_transactions (
+  organisation_id,
+  transaction_type,
+  account,
+  debit_amount,
+  credit_amount,
+  transaction_date,
+  description,
+  notes,
+  reference_id,
+  reference_table,
+  created_by_username
+)
+SELECT
+  dph.organisation_id,
+  'distributor_payment' as transaction_type,
+  dph.paid_from as account,
+  dph.amount_paid as debit_amount,
+  0 as credit_amount,
+  CAST(dph.paid_at AS DATE) as transaction_date,
+  CONCAT('Payment to ', d.name, ' - ₹', dph.amount_paid) as description,
+  dph.notes as notes,
+  dph.id as reference_id,
+  'distributor_payment_history' as reference_table,
+  a.username as created_by_username
+FROM distributor_payment_history dph
+LEFT JOIN distributors d ON dph.distributor_id = d.id
+LEFT JOIN admins a ON dph.paid_by = a.id
+WHERE dph.paid_from IS NOT NULL
+ON CONFLICT DO NOTHING;
+
+-- STEP 6: Show summary of what was created
+SELECT
+  '✅ Migration Complete!' as status,
+  COUNT(*) as total_transactions
+FROM balance_transactions;
+
+-- STEP 7: Show breakdown by transaction type
+SELECT
+  transaction_type,
+  account,
+  COUNT(*) as count,
+  ROUND(SUM(debit_amount)::numeric, 2) as total_debit,
+  ROUND(SUM(credit_amount)::numeric, 2) as total_credit,
+  ROUND(SUM(credit_amount - debit_amount)::numeric, 2) as net_change
+FROM balance_transactions
+GROUP BY transaction_type, account
+ORDER BY transaction_type, account;
+
+-- STEP 8: Show current vs calculated balance (for verification)
+-- This helps you set the opening balance correctly
+SELECT
+  o.organisation_name,
+  o.cash_balance as current_cash,
+  o.bank_balance as current_bank,
+  o.gala_balance as current_gala,
+  ROUND(COALESCE(cash_txn.net, 0)::numeric, 2) as calculated_cash,
+  ROUND(COALESCE(bank_txn.net, 0)::numeric, 2) as calculated_bank,
+  ROUND(COALESCE(gala_txn.net, 0)::numeric, 2) as calculated_gala,
+  ROUND((o.cash_balance - COALESCE(cash_txn.net, 0))::numeric, 2) as cash_opening_needed,
+  ROUND((o.bank_balance - COALESCE(bank_txn.net, 0))::numeric, 2) as bank_opening_needed,
+  ROUND((o.gala_balance - COALESCE(gala_txn.net, 0))::numeric, 2) as gala_opening_needed
+FROM organisations o
+LEFT JOIN (
+  SELECT organisation_id, SUM(credit_amount - debit_amount) as net
+  FROM balance_transactions
+  WHERE account = 'cash_balance'
+  GROUP BY organisation_id
+) cash_txn ON o.id = cash_txn.organisation_id
+LEFT JOIN (
+  SELECT organisation_id, SUM(credit_amount - debit_amount) as net
+  FROM balance_transactions
+  WHERE account = 'bank_balance'
+  GROUP BY organisation_id
+) bank_txn ON o.id = bank_txn.organisation_id
+LEFT JOIN (
+  SELECT organisation_id, SUM(credit_amount - debit_amount) as net
+  FROM balance_transactions
+  WHERE account = 'gala_balance'
+  GROUP BY organisation_id
+) gala_txn ON o.id = gala_txn.organisation_id;
+
+-- ============================================
+-- IMPORTANT: Set your opening balances!
+-- ============================================
+-- After running this migration, you need to set the opening balances.
+-- Use the output from STEP 8 above to determine the correct values.
+--
+-- Example: If your current cash balance is 50000 and calculated is 30000,
+-- then your opening balance should be 20000 (50000 - 30000)
+--
+-- Run this query with YOUR organisation ID and values:
+--
+-- UPDATE organisations
+-- SET
+--   cash_opening_balance = 0,  -- Replace with your calculated value
+--   bank_opening_balance = 0,  -- Replace with your calculated value
+--   gala_opening_balance = 0   -- Replace with your calculated value
+-- WHERE id = 'your-organisation-id-here';
+-- ============================================
