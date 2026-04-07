@@ -183,9 +183,14 @@ const getOrganisationBalances = async (req, res) => {
     }
 
     res.json({
+      // Current balances (calculated from opening + transactions)
       cashBalance: parseFloat(organisation.cash_balance || 0),
       bankBalance: parseFloat(organisation.bank_balance || 0),
-      galaBalance: parseFloat(organisation.gala_balance || 0)
+      galaBalance: parseFloat(organisation.gala_balance || 0),
+      // Opening balances (set by admin, base for ledger calculations)
+      cashOpeningBalance: parseFloat(organisation.cash_opening_balance || 0),
+      bankOpeningBalance: parseFloat(organisation.bank_opening_balance || 0),
+      galaOpeningBalance: parseFloat(organisation.gala_opening_balance || 0)
     });
   } catch (error) {
     console.error(error);
@@ -193,26 +198,56 @@ const getOrganisationBalances = async (req, res) => {
   }
 };
 
-// Update organisation master balances
+// Update organisation opening balances (from admin panel)
 const updateOrganisationBalances = async (req, res) => {
+  const client = await pool.connect();
   try {
     const organisationId = req.user.organisationId;
     const { cashBalance, bankBalance, galaBalance } = req.body;
 
-    const updated = await db.updateOrganisationBalances(organisationId, {
-      cashBalance,
-      bankBalance,
-      galaBalance
-    });
+    // Update opening balances instead of current balances
+    const fields = [];
+    const values = [];
+    let paramCount = 1;
 
-    if (!updated) {
+    if (cashBalance !== undefined) {
+      fields.push(`cash_opening_balance = $${paramCount}`);
+      values.push(cashBalance);
+      paramCount++;
+    }
+    if (bankBalance !== undefined) {
+      fields.push(`bank_opening_balance = $${paramCount}`);
+      values.push(bankBalance);
+      paramCount++;
+    }
+    if (galaBalance !== undefined) {
+      fields.push(`gala_opening_balance = $${paramCount}`);
+      values.push(galaBalance);
+      paramCount++;
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No balance values provided' });
+    }
+
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(organisationId);
+
+    const result = await client.query(
+      `UPDATE organisations SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    if (!result.rows[0]) {
       return res.status(404).json({ error: 'Organisation not found' });
     }
 
-    res.json(updated);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
