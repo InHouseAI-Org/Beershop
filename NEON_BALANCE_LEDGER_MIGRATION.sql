@@ -71,51 +71,77 @@ ORDER BY transaction_date DESC, created_at DESC;
 -- STEP 5: Import historical transactions
 -- ============================================
 
--- 5.1: Sales - Cash Collections
+-- 5.1: Balance Allocations - Cash
+-- These are the ALLOCATED amounts from the "Allocate Balance" form
 INSERT INTO balance_transactions (
   organisation_id, transaction_type, account,
   debit_amount, credit_amount, transaction_date,
   description, reference_id, reference_table, created_by_username
 )
 SELECT
-  s.organisation_id,
+  b.organisation_id,
   'daily_allocation',
   'cash_balance',
   0,
-  COALESCE(s.cash_collected, 0),
-  s.date,
-  'Daily cash collection from sales',
-  s.id,
-  'sales',
+  COALESCE(b.cash_balance, 0),
+  b.date,
+  'Daily cash allocation from sales',
+  b.sales_id,
+  'balances',
   u.username
-FROM sales s
+FROM balances b
+LEFT JOIN sales s ON b.sales_id = s.id
 LEFT JOIN users u ON s.user_id = u.id
-WHERE s.status = 'approved' AND s.cash_collected > 0
+WHERE s.status = 'approved' AND b.cash_balance > 0
 ON CONFLICT DO NOTHING;
 
--- 5.2: Sales - UPI Collections
+-- 5.2: Balance Allocations - Bank
 INSERT INTO balance_transactions (
   organisation_id, transaction_type, account,
   debit_amount, credit_amount, transaction_date,
   description, reference_id, reference_table, created_by_username
 )
 SELECT
-  s.organisation_id,
+  b.organisation_id,
   'daily_allocation',
   'bank_balance',
   0,
-  COALESCE(s.upi, 0),
-  s.date,
-  'Daily UPI collection from sales',
-  s.id,
-  'sales',
+  COALESCE(b.bank_balance, 0),
+  b.date,
+  'Daily bank allocation from sales',
+  b.sales_id,
+  'balances',
   u.username
-FROM sales s
+FROM balances b
+LEFT JOIN sales s ON b.sales_id = s.id
 LEFT JOIN users u ON s.user_id = u.id
-WHERE s.status = 'approved' AND s.upi > 0
+WHERE s.status = 'approved' AND b.bank_balance > 0
 ON CONFLICT DO NOTHING;
 
--- 5.3: Expenses
+-- 5.3: Balance Allocations - Gala
+INSERT INTO balance_transactions (
+  organisation_id, transaction_type, account,
+  debit_amount, credit_amount, transaction_date,
+  description, reference_id, reference_table, created_by_username
+)
+SELECT
+  b.organisation_id,
+  'daily_allocation',
+  'gala_balance',
+  0,
+  COALESCE(b.gala_balance, 0),
+  b.date,
+  'Daily gala allocation from sales',
+  b.sales_id,
+  'balances',
+  u.username
+FROM balances b
+LEFT JOIN sales s ON b.sales_id = s.id
+LEFT JOIN users u ON s.user_id = u.id
+WHERE s.status = 'approved' AND b.gala_balance > 0
+ON CONFLICT DO NOTHING;
+
+-- 5.4: Expenses
 INSERT INTO balance_transactions (
   organisation_id, transaction_type, account,
   debit_amount, credit_amount, transaction_date,
@@ -134,7 +160,7 @@ SELECT
 FROM expenses e
 ON CONFLICT DO NOTHING;
 
--- 5.4: Balance Transfers - Debit (money going out)
+-- 5.5: Balance Transfers - Debit (money going out)
 INSERT INTO balance_transactions (
   organisation_id, transaction_type, account,
   debit_amount, credit_amount, transaction_date,
@@ -155,7 +181,7 @@ SELECT
 FROM balance_transfers bt
 ON CONFLICT DO NOTHING;
 
--- 5.5: Balance Transfers - Credit (money coming in)
+-- 5.6: Balance Transfers - Credit (money coming in)
 INSERT INTO balance_transactions (
   organisation_id, transaction_type, account,
   debit_amount, credit_amount, transaction_date,
@@ -176,7 +202,7 @@ SELECT
 FROM balance_transfers bt
 ON CONFLICT DO NOTHING;
 
--- 5.6: Miscellaneous Income
+-- 5.7: Miscellaneous Income
 INSERT INTO balance_transactions (
   organisation_id, transaction_type, account,
   debit_amount, credit_amount, transaction_date,
@@ -197,7 +223,7 @@ SELECT
 FROM miscellaneous_income mi
 ON CONFLICT DO NOTHING;
 
--- 5.7: Distributor Payments (money paid to distributors)
+-- 5.8: Distributor Payments (money paid to distributors)
 INSERT INTO balance_transactions (
   organisation_id, transaction_type, account,
   debit_amount, credit_amount, transaction_date,
