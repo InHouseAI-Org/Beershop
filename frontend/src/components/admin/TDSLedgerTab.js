@@ -8,18 +8,28 @@ const TDSLedgerTab = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [summary, setSummary] = useState(null);
+  const [dateRange, setDateRange] = useState({
+    startDate: '',
+    endDate: ''
+  });
 
   useEffect(() => {
     fetchTDSLedger();
   }, []);
 
-  const fetchTDSLedger = async () => {
+  const fetchTDSLedger = async (startDate = '', endDate = '') => {
     try {
       setLoading(true);
       setError('');
 
+      // Build query params
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append('start_date', startDate);
+      if (endDate) queryParams.append('end_date', endDate);
+      const queryString = queryParams.toString();
+
       // Fetch TDS ledger data
-      const response = await api.get('/tds-ledger');
+      const response = await api.get(`/tds-ledger${queryString ? '?' + queryString : ''}`);
       setLedgerData(response.data.ledger || []);
       setSummary(response.data.summary || null);
     } catch (err) {
@@ -28,6 +38,20 @@ const TDSLedgerTab = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDateRangeChange = (field, value) => {
+    const newDateRange = { ...dateRange, [field]: value };
+    setDateRange(newDateRange);
+  };
+
+  const handleApplyDateFilter = () => {
+    fetchTDSLedger(dateRange.startDate, dateRange.endDate);
+  };
+
+  const handleClearDateFilter = () => {
+    setDateRange({ startDate: '', endDate: '' });
+    fetchTDSLedger('', '');
   };
 
   const formatCurrency = (amount) => {
@@ -138,6 +162,63 @@ const TDSLedgerTab = () => {
 
       {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
 
+      {/* Date Range Filter */}
+      <div style={{
+        backgroundColor: '#fff',
+        padding: '1.5rem',
+        borderRadius: '12px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        marginBottom: '2rem'
+      }}>
+        <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.125rem', fontWeight: '600', color: '#000' }}>
+          Filter by Date Range
+        </h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ margin: 0, minWidth: '200px' }}>
+            <label htmlFor="startDate" style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
+              Start Date
+            </label>
+            <input
+              type="date"
+              id="startDate"
+              className="form-control"
+              value={dateRange.startDate}
+              onChange={(e) => handleDateRangeChange('startDate', e.target.value)}
+              style={{ fontSize: '1rem', padding: '0.75rem' }}
+            />
+          </div>
+          <div className="form-group" style={{ margin: 0, minWidth: '200px' }}>
+            <label htmlFor="endDate" style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>
+              End Date
+            </label>
+            <input
+              type="date"
+              id="endDate"
+              className="form-control"
+              value={dateRange.endDate}
+              onChange={(e) => handleDateRangeChange('endDate', e.target.value)}
+              style={{ fontSize: '1rem', padding: '0.75rem' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={handleApplyDateFilter}
+              className="btn btn-primary"
+              style={{ padding: '0.75rem 1.5rem', fontSize: '1rem' }}
+            >
+              Apply Filter
+            </button>
+            <button
+              onClick={handleClearDateFilter}
+              className="btn btn-secondary"
+              style={{ padding: '0.75rem 1.5rem', fontSize: '1rem' }}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       {summary && (
         <div style={{
@@ -146,45 +227,6 @@ const TDSLedgerTab = () => {
           gap: '1.5rem',
           marginBottom: '2rem'
         }}>
-          <div style={{
-            backgroundColor: '#fff3cd',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            border: '2px solid #ffc107'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              <Calendar size={24} color="#856404" />
-              <h3 style={{ margin: 0, fontSize: '1rem', color: '#856404', fontWeight: '600' }}>
-                Pending TDS
-              </h3>
-            </div>
-            <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: '700', color: '#856404' }}>
-              {formatCurrency(summary.pending || 0)}
-            </p>
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#856404' }}>
-              {summary.pending_count || 0} transactions
-            </p>
-          </div>
-
-          <div style={{
-            backgroundColor: '#d4edda',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            border: '2px solid #28a745'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              <DollarSign size={24} color="#155724" />
-              <h3 style={{ margin: 0, fontSize: '1rem', color: '#155724', fontWeight: '600' }}>
-                Received TDS
-              </h3>
-            </div>
-            <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: '700', color: '#155724' }}>
-              {formatCurrency(summary.received || 0)}
-            </p>
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#155724' }}>
-              {summary.received_count || 0} transactions
-            </p>
-          </div>
 
           <div style={{
             backgroundColor: '#f8f9fa',
