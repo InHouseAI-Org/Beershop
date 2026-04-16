@@ -70,27 +70,6 @@ const TCSLedgerTab = () => {
     });
   };
 
-  const getStatusBadge = (status) => {
-    const statusColors = {
-      pending: { bg: '#fff3cd', color: '#856404', label: 'Pending' },
-      paid: { bg: '#d4edda', color: '#155724', label: 'Paid' },
-      adjusted: { bg: '#d1ecf1', color: '#0c5460', label: 'Adjusted' }
-    };
-    const config = statusColors[status] || statusColors.pending;
-    return (
-      <span style={{
-        backgroundColor: config.bg,
-        color: config.color,
-        padding: '0.25rem 0.75rem',
-        borderRadius: '12px',
-        fontSize: '0.875rem',
-        fontWeight: '600'
-      }}>
-        {config.label}
-      </span>
-    );
-  };
-
   const columns = [
     {
       key: 'order_date',
