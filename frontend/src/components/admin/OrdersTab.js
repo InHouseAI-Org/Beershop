@@ -28,6 +28,10 @@ const OrdersTab = () => {
     paymentOutstandingDate: '',
     remarks: ''
   });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     fetchOrders();
@@ -284,6 +288,37 @@ const OrdersTab = () => {
       handleCloseOrderForm();
     } catch (err) {
       setError(err.response?.data?.error || 'Operation failed');
+    }
+  };
+
+  const handleDeleteOrder = (order) => {
+    console.log('Delete button clicked for order:', order);
+    setDeleteTarget(order);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    setError('');
+
+    try {
+      await api.delete(`/orders/${deleteTarget.id}`);
+      setSuccess(`Order ${deleteTarget.bill_number} deleted successfully`);
+
+      // Refresh orders
+      await fetchOrders();
+
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete order');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -827,6 +862,15 @@ const OrdersTab = () => {
           >
             Edit
           </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteOrder(order);
+            }}
+            className="btn btn-danger"
+          >
+            Delete
+          </button>
         </div>
       )
     }
@@ -836,6 +880,7 @@ const OrdersTab = () => {
   return (
     <>
       {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
+      {success && <div className="alert alert-success" style={{ marginBottom: '1rem' }}>{success}</div>}
 
       <div className="mobile-stack" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2 style={{ color: '#000', margin: 0, fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '700', letterSpacing: '0.5px' }}>
@@ -1022,6 +1067,74 @@ const OrdersTab = () => {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && deleteTarget && (
+        <div className="modal show" style={{
+          display: 'block',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          zIndex: 1050,
+          overflow: 'auto'
+        }}>
+          <div className="modal-dialog" style={{
+            position: 'relative',
+            margin: '1.75rem auto',
+            maxWidth: '500px'
+          }}>
+            <div className="modal-content" style={{
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div className="modal-header">
+                <h5 className="modal-title">Confirm Delete Order</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p>Are you sure you want to delete this order?</p>
+                <div style={{ backgroundColor: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+                  <p style={{ margin: '0.5rem 0' }}><strong>Bill Number:</strong> {deleteTarget.bill_number}</p>
+                  <p style={{ margin: '0.5rem 0' }}><strong>Distributor:</strong> {getDistributorName(deleteTarget.distributor_id)}</p>
+                  <p style={{ margin: '0.5rem 0' }}><strong>Order Date:</strong> {new Date(deleteTarget.order_date).toLocaleDateString()}</p>
+                  <p style={{ margin: '0.5rem 0' }}><strong>Grand Total:</strong> ₹{calculateGrandTotal(deleteTarget).toFixed(2)}</p>
+                  <p style={{ margin: '0.5rem 0' }}><strong>Items:</strong> {deleteTarget.order_data?.length || 0} products</p>
+                </div>
+                <p style={{ marginTop: '1rem', color: '#dc3545', fontWeight: '600' }}>
+                  This action will revert inventory changes and update the distributor's outstanding amount. This action cannot be undone.
+                </p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={confirmDeleteOrder}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Order'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

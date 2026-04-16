@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAllCreditHolders, getCreditHolder, createCreditHolder, updateCreditHolder, deleteCreditHolder, collectCredit, getCreditCollectionHistory, getCreditHolderHistory } = require('../controllers/creditHolderController');
+const { getAllCreditHolders, getCreditHolder, createCreditHolder, updateCreditHolder, deleteCreditHolder, collectCredit, getCreditCollectionHistory, getCreditHolderHistory, deleteCreditCollection } = require('../controllers/creditHolderController');
 const { authMiddleware, adminOnly } = require('../middleware/auth');
 
 // All routes require authentication
@@ -19,5 +19,8 @@ router.post('/', adminOnly, createCreditHolder);
 router.post('/collect', adminOnly, collectCredit);
 router.put('/:id', adminOnly, updateCreditHolder);
 router.delete('/:id', adminOnly, deleteCreditHolder);
+
+// Delete credit collection
+router.delete('/collection/:id', adminOnly, deleteCreditCollection);
 
 module.exports = router;

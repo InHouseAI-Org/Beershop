@@ -329,4 +329,91 @@ const getCreditHolderHistory = async (req, res) => {
   }
 };
 
-module.exports = { getAllCreditHolders, getCreditHolder, createCreditHolder, updateCreditHolder, deleteCreditHolder, collectCredit, getCreditCollectionHistory, getCreditHolderHistory };
+/**
+ * Delete a credit collection
+ * Reverses the collection by deducting from organization balance and restoring credit holder's payable
+ */
+const deleteCreditCollection = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params; // collection history ID
+    const organisationId = req.user.organisationId;
+
+    if (!organisationId) {
+      return res.status(400).json({ error: 'Organisation ID required' });
+    }
+
+    // Get collection record
+    const collectionQuery = 'SELECT * FROM credit_collection_history WHERE id = $1 AND organisation_id = $2';
+    const collectionResult = await client.query(collectionQuery, [id, organisationId]);
+
+    if (collectionResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Credit collection record not found' });
+    }
+
+    const collection = collectionResult.rows[0];
+    const amountCollected = parseFloat(collection.amount_collected);
+    const creditHolderId = collection.credit_holder_id;
+    const collectedIn = collection.collected_in;
+
+    console.log(`[Delete Credit Collection] Deleting collection ID: ${id}, Amount: ₹${amountCollected}, Account: ${collectedIn}`);
+
+    // Get current credit holder
+    const creditHolder = await db.getCreditHolderById(creditHolderId);
+    if (!creditHolder) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Credit holder not found' });
+    }
+
+    // Delete balance_transaction record
+    await client.query(
+      'DELETE FROM balance_transactions WHERE reference_id = $1 AND reference_table = $2',
+      [id, 'credit_collection_history']
+    );
+
+    // Delete collection history record
+    await client.query('DELETE FROM credit_collection_history WHERE id = $1', [id]);
+
+    // Deduct from organization balance (reverse the addition)
+    const balanceUpdate = {};
+    if (collectedIn === 'cash_balance') {
+      balanceUpdate.cashBalance = -amountCollected;
+    } else if (collectedIn === 'bank_balance') {
+      balanceUpdate.bankBalance = -amountCollected;
+    } else if (collectedIn === 'gala_balance') {
+      balanceUpdate.galaBalance = -amountCollected;
+    }
+    await db.incrementOrganisationBalances(organisationId, balanceUpdate);
+
+    console.log(`[Delete Credit Collection] Deducted ₹${amountCollected} from ${collectedIn}`);
+
+    // Restore credit holder's amount payable (add back the collected amount)
+    const currentPayable = parseFloat(creditHolder.amount_payable || 0);
+    const newPayable = currentPayable + amountCollected;
+    const updatedCreditHolder = await db.updateCreditHolder(creditHolderId, {
+      amountPayable: newPayable
+    });
+
+    console.log(`[Delete Credit Collection] Restored ₹${amountCollected} to credit holder payable (${currentPayable} → ${newPayable})`);
+
+    await client.query('COMMIT');
+
+    res.json({
+      message: 'Credit collection deleted successfully',
+      deductedAmount: amountCollected,
+      deductedFrom: collectedIn,
+      creditHolder: updatedCreditHolder
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting credit collection:', error);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+};
+
+module.exports = { getAllCreditHolders, getCreditHolder, createCreditHolder, updateCreditHolder, deleteCreditHolder, collectCredit, getCreditCollectionHistory, getCreditHolderHistory, deleteCreditCollection };

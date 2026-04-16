@@ -453,10 +453,77 @@ const getPaymentHistory = async (req, res) => {
   }
 };
 
+/**
+ * Delete a distributor payment
+ * Refunds the payment amount to organization balance and updates distributor outstanding
+ */
+const deletePayment = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params; // payment ID
+    const organisationId = req.user.organisationId;
+
+    if (!organisationId) {
+      return res.status(400).json({ error: 'Organisation ID required' });
+    }
+
+    // Get payment record to restore balance
+    const paymentQuery = 'SELECT * FROM distributor_payments WHERE id = $1 AND organisation_id = $2';
+    const paymentResult = await client.query(paymentQuery, [id, organisationId]);
+
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    const payment = paymentResult.rows[0];
+
+    console.log(`[Delete Payment] Deleting payment ID: ${id}, Amount: ₹${payment.amount}, From: ${payment.payment_from}`);
+
+    // Delete balance_transaction record
+    await client.query(
+      'DELETE FROM balance_transactions WHERE reference_id = $1 AND reference_table = $2',
+      [id, 'distributor_payments']
+    );
+
+    // Delete payment record
+    await client.query('DELETE FROM distributor_payments WHERE id = $1', [id]);
+
+    // Restore balance (add back what was deducted)
+    const balanceUpdate = {};
+    const balanceField = payment.payment_from.replace('_balance', 'Balance');
+    balanceUpdate[balanceField] = parseFloat(payment.amount);
+    await db.incrementOrganisationBalances(organisationId, balanceUpdate);
+
+    console.log(`[Delete Payment] Restored ₹${payment.amount} to ${payment.payment_from}`);
+
+    // Get updated distributor (trigger will automatically recalculate amount_outstanding)
+    const updatedDistributor = await db.getDistributorById(payment.distributor_id);
+
+    await client.query('COMMIT');
+
+    res.json({
+      message: 'Payment deleted successfully',
+      refundedAmount: parseFloat(payment.amount),
+      refundedTo: payment.payment_from,
+      distributor: updatedDistributor
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting payment:', error);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getDistributorLedger,
   getUnpaidBills,
   getOpeningBalanceLimit,
   makePayment,
-  getPaymentHistory
+  getPaymentHistory,
+  deletePayment
 };

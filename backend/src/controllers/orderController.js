@@ -204,25 +204,68 @@ const updateOrder = async (req, res) => {
 };
 
 const deleteOrder = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
+    const organisationId = req.user.organisationId;
 
     const order = await db.getOrderById(id);
 
     if (!order) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Order not found' });
     }
 
     // Check if order belongs to user's organisation
-    if (order.organisation_id !== req.user.organisationId) {
+    if (order.organisation_id !== organisationId) {
+      await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    console.log(`[Delete Order] Deleting order ID: ${id}, Bill: ${order.bill_number}`);
+
+    // Check if any payments are associated with this order
+    const paymentsQuery = 'SELECT * FROM distributor_payments WHERE order_id = $1';
+    const paymentsResult = await client.query(paymentsQuery, [id]);
+
+    if (paymentsResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Cannot delete order with associated payments. Please delete the payments first.'
+      });
+    }
+
+    // Revert inventory changes (subtract the quantities that were added)
+    if (order.order_data && Array.isArray(order.order_data)) {
+      console.log('[Delete Order] Reverting inventory changes...');
+      for (const orderItem of order.order_data) {
+        if (orderItem.product_id && orderItem.qty) {
+          const qty = parseFloat(orderItem.qty);
+          await db.decrementInventory(organisationId, orderItem.product_id, qty);
+          console.log(`[Delete Order] Reverted inventory for product ${orderItem.product_id}: -${qty}`);
+        }
+      }
+    }
+
+    // Delete the order (trigger will automatically update distributor.amount_outstanding)
     await db.deleteOrder(id);
-    res.json({ message: 'Order deleted successfully' });
+
+    console.log('[Delete Order] Order deleted successfully');
+
+    await client.query('COMMIT');
+
+    res.json({
+      message: 'Order deleted successfully',
+      orderId: id
+    });
   } catch (error) {
-    console.error(error);
+    await client.query('ROLLBACK');
+    console.error('Error deleting order:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

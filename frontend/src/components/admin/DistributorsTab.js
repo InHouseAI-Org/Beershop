@@ -37,6 +37,9 @@ const DistributorsTab = () => {
     notes: '',
     paymentDate: new Date().toISOString().split('T')[0]
   });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchDistributors();
@@ -285,6 +288,39 @@ const DistributorsTab = () => {
         ledgerDateRange.startDate,
         ledgerDateRange.endDate
       );
+    }
+  };
+
+  const handleDeletePayment = (payment) => {
+    setDeleteTarget(payment);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeletePayment = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    setError('');
+
+    try {
+      await api.delete(`/distributor-payments/payment/${deleteTarget.id}`);
+      setSuccess(`Payment of ₹${parseFloat(deleteTarget.amount).toFixed(2)} deleted successfully`);
+
+      // Refresh data
+      await Promise.all([
+        fetchDistributors(),
+        selectedDistributor ? fetchDistributorHistory(selectedDistributor.id) : Promise.resolve()
+      ]);
+
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete payment');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -963,6 +999,7 @@ const DistributorsTab = () => {
                       <th>Paid From</th>
                       <th>Notes</th>
                       <th>Paid By</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1012,6 +1049,19 @@ const DistributorsTab = () => {
                             {record.notes || '-'}
                           </td>
                           <td>{record.created_by_name || '-'}</td>
+                          <td>
+                            <button
+                              onClick={() => handleDeletePayment(record)}
+                              className="btn btn-danger btn-sm"
+                              style={{
+                                padding: '0.25rem 0.75rem',
+                                fontSize: '0.875rem',
+                                borderRadius: '4px'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1261,6 +1311,75 @@ const DistributorsTab = () => {
             </div>
             )}
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal show" style={{
+          display: 'block',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          zIndex: 1050,
+          overflow: 'auto'
+        }}>
+          <div className="modal-dialog" style={{
+            position: 'relative',
+            margin: '1.75rem auto',
+            maxWidth: '500px'
+          }}>
+            <div className="modal-content" style={{
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}>
+              <div className="modal-header">
+                <h5 className="modal-title">Confirm Delete Payment</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p>Are you sure you want to delete this payment?</p>
+                {deleteTarget && (
+                  <div style={{ backgroundColor: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+                    <p style={{ margin: '0.5rem 0' }}><strong>Amount:</strong> ₹{parseFloat(deleteTarget.amount).toFixed(2)}</p>
+                    <p style={{ margin: '0.5rem 0' }}><strong>Type:</strong> {deleteTarget.payment_type === 'advance' ? 'Advance' : 'Order Payment'}</p>
+                    <p style={{ margin: '0.5rem 0' }}><strong>Date:</strong> {new Date(deleteTarget.payment_date).toLocaleDateString()}</p>
+                    {deleteTarget.bill_number && <p style={{ margin: '0.5rem 0' }}><strong>Bill:</strong> {deleteTarget.bill_number}</p>}
+                  </div>
+                )}
+                <p style={{ marginTop: '1rem', color: '#dc3545', fontWeight: '600' }}>
+                  This action will refund ₹{deleteTarget ? parseFloat(deleteTarget.amount).toFixed(2) : '0.00'} to your organization balance and update the distributor's outstanding amount.
+                </p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={confirmDeletePayment}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Payment'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

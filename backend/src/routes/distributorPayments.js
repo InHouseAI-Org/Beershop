@@ -5,7 +5,8 @@ const {
   getUnpaidBills,
   getOpeningBalanceLimit,
   makePayment,
-  getPaymentHistory
+  getPaymentHistory,
+  deletePayment
 } = require('../controllers/distributorPaymentsController');
 const { authMiddleware } = require('../middleware/auth');
 
@@ -26,5 +27,8 @@ router.post('/pay', makePayment);
 
 // Get payment history for a distributor
 router.get('/:id/payments', getPaymentHistory);
+
+// Delete a payment
+router.delete('/payment/:id', deletePayment);
 
 module.exports = router;
