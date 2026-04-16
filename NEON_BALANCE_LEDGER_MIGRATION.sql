@@ -248,30 +248,10 @@ LEFT JOIN admins a ON dp.created_by = a.id
 WHERE dp.payment_from IS NOT NULL
 ON CONFLICT DO NOTHING;
 
--- 5.9: Credit Collection (money collected from credit holders)
-INSERT INTO balance_transactions (
-  organisation_id, transaction_type, account,
-  debit_amount, credit_amount, transaction_date,
-  description, notes, reference_id, reference_table, created_by_username
-)
-SELECT
-  cch.organisation_id,
-  'credit_collection',
-  cch.collected_in,
-  0,
-  cch.amount_collected,
-  CAST(cch.collected_at AS DATE),
-  CONCAT('Credit collected from ', ch.name, ' - ₹', cch.amount_collected),
-  cch.notes,
-  cch.id,
-  'credit_collection_history',
-  COALESCE(a.username, u.username)
-FROM credit_collection_history cch
-LEFT JOIN credit_holders ch ON cch.credit_holder_id = ch.id
-LEFT JOIN admins a ON cch.collected_by = a.id
-LEFT JOIN users u ON cch.collected_by = u.id
-WHERE cch.collected_in IS NOT NULL AND cch.transaction_type = 'collected'
-ON CONFLICT DO NOTHING;
+-- 5.9: Credit Collection - SKIPPED
+-- Credit collections are already included in daily allocations (sections 5.1-5.3)
+-- The allocated balances from sales already account for credit collections
+-- So we don't need separate entries here to avoid double counting
 
 -- ============================================
 -- VERIFICATION QUERIES

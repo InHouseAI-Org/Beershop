@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Calendar, DollarSign, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import MobileTable from '../common/MobileTable';
 
 const TCSLedgerTab = () => {
@@ -115,21 +115,6 @@ const TCSLedgerTab = () => {
           {formatCurrency(item.tcs_amount)}
         </span>
       )
-    },
-    {
-      key: 'payment_status',
-      label: 'Status',
-      render: (item) => getStatusBadge(item.payment_status)
-    },
-    {
-      key: 'payment_date',
-      label: 'Payment Date',
-      render: (item) => item.payment_date ? formatDate(item.payment_date) : '-'
-    },
-    {
-      key: 'payment_reference',
-      label: 'Reference',
-      render: (item) => item.payment_reference || '-'
     }
   ];
 

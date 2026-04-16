@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import MobileTable from '../common/MobileTable';
 import CustomDropdown from '../common/CustomDropdown';
+import DeleteConfirmModal from '../common/DeleteConfirmModal';
 
 const CreditHoldersTab = () => {
   const [creditHolders, setCreditHolders] = useState([]);
@@ -693,71 +694,23 @@ const CreditHoldersTab = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && deleteTarget && (
-        <div className="modal show" style={{
-          display: 'block',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          zIndex: 1050,
-          overflow: 'auto'
-        }}>
-          <div className="modal-dialog" style={{
-            position: 'relative',
-            margin: '1.75rem auto',
-            maxWidth: '500px'
-          }}>
-            <div className="modal-content" style={{
-              backgroundColor: '#fff',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-            }}>
-              <div className="modal-header">
-                <h5 className="modal-title">Confirm Delete Collection</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isDeleting}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p>Are you sure you want to delete this credit collection?</p>
-                <div style={{ backgroundColor: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Amount:</strong> ₹{parseFloat(deleteTarget.amount_collected).toFixed(2)}</p>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Collected In:</strong> {deleteTarget.collected_in === 'cash_balance' ? 'Cash' : deleteTarget.collected_in === 'bank_balance' ? 'Bank' : 'Gala'}</p>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Date:</strong> {new Date(deleteTarget.collected_at).toLocaleString()}</p>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Collected By:</strong> {deleteTarget.collected_by_name}</p>
-                </div>
-                <p style={{ marginTop: '1rem', color: '#dc3545', fontWeight: '600' }}>
-                  This action will deduct ₹{parseFloat(deleteTarget.amount_collected).toFixed(2)} from your organization balance and restore the credit holder's outstanding amount.
-                </p>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={confirmDeleteCollection}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Collection'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        isOpen={showDeleteConfirm && deleteTarget !== null}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteCollection}
+        isDeleting={isDeleting}
+        title="Delete Credit Collection"
+        message="Are you sure you want to delete this credit collection? This will reverse the transaction and update all related balances."
+        details={deleteTarget ? [
+          { label: 'Amount Collected', value: `₹${parseFloat(deleteTarget.amount_collected).toFixed(2)}`, highlight: true },
+          { label: 'Collected In', value: deleteTarget.collected_in === 'cash_balance' ? 'Cash Balance' : deleteTarget.collected_in === 'bank_balance' ? 'Bank Balance' : 'Gala Balance' },
+          { label: 'Collection Date', value: new Date(deleteTarget.collected_at).toLocaleString() },
+          { label: 'Collected By', value: deleteTarget.collected_by_name || 'Unknown' }
+        ] : []}
+        warningMessage={`Deleting this collection will deduct ₹${deleteTarget ? parseFloat(deleteTarget.amount_collected).toFixed(2) : '0.00'} from your organization balance and restore the credit holder's outstanding amount.`}
+        confirmButtonText="Delete Collection"
+        type="danger"
+      />
     </>
   );
 };

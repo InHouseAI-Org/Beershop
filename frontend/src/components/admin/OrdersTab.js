@@ -3,6 +3,7 @@ import api from '../../utils/api';
 import { Package, Calendar, Trash2, Plus } from 'lucide-react';
 import MobileTable from '../common/MobileTable';
 import CustomDropdown from '../common/CustomDropdown';
+import DeleteConfirmModal from '../common/DeleteConfirmModal';
 
 const OrdersTab = () => {
   const [orders, setOrders] = useState([]);
@@ -865,6 +866,18 @@ const OrdersTab = () => {
       )
     },
     {
+      key: 'tcs',
+      label: 'TCS',
+      render: (order) => `₹${parseFloat(order.tcs || 0).toFixed(2)}`
+    },
+    {
+      key: 'tds',
+      label: 'TDS',
+      render: (order) => (
+        <span style={{ color: '#f57c00' }}>₹{parseFloat(order.tds || 0).toFixed(2)}</span>
+      )
+    },
+    {
       key: 'grand_total',
       label: 'Grand Total',
       sortable: false,
@@ -1144,72 +1157,24 @@ const OrdersTab = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && deleteTarget && (
-        <div className="modal show" style={{
-          display: 'block',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          zIndex: 1050,
-          overflow: 'auto'
-        }}>
-          <div className="modal-dialog" style={{
-            position: 'relative',
-            margin: '1.75rem auto',
-            maxWidth: '500px'
-          }}>
-            <div className="modal-content" style={{
-              backgroundColor: '#fff',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-            }}>
-              <div className="modal-header">
-                <h5 className="modal-title">Confirm Delete Order</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isDeleting}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p>Are you sure you want to delete this order?</p>
-                <div style={{ backgroundColor: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Bill Number:</strong> {deleteTarget.bill_number}</p>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Distributor:</strong> {getDistributorName(deleteTarget.distributor_id)}</p>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Order Date:</strong> {new Date(deleteTarget.order_date).toLocaleDateString()}</p>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Grand Total:</strong> ₹{calculateGrandTotal(deleteTarget).toFixed(2)}</p>
-                  <p style={{ margin: '0.5rem 0' }}><strong>Items:</strong> {deleteTarget.order_data?.length || 0} products</p>
-                </div>
-                <p style={{ marginTop: '1rem', color: '#dc3545', fontWeight: '600' }}>
-                  This action will revert inventory changes and update the distributor's outstanding amount. This action cannot be undone.
-                </p>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={confirmDeleteOrder}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Order'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        isOpen={showDeleteConfirm && deleteTarget !== null}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteOrder}
+        isDeleting={isDeleting}
+        title="Delete Order"
+        message="Are you sure you want to delete this order? This action cannot be undone and will affect your inventory and distributor outstanding balance."
+        details={deleteTarget ? [
+          { label: 'Bill Number', value: deleteTarget.bill_number || 'N/A' },
+          { label: 'Distributor', value: getDistributorName(deleteTarget.distributor_id) },
+          { label: 'Order Date', value: new Date(deleteTarget.order_date).toLocaleDateString() },
+          { label: 'Grand Total', value: `₹${calculateGrandTotal(deleteTarget).toFixed(2)}`, highlight: true },
+          { label: 'Items', value: `${deleteTarget.order_data?.length || 0} products` }
+        ] : []}
+        warningMessage="Deleting this order will revert inventory changes and update the distributor's outstanding amount."
+        confirmButtonText="Delete Order"
+        type="danger"
+      />
     </>
   );
 };

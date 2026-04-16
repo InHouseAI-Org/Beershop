@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import MobileTable from '../common/MobileTable';
 import CustomDropdown from '../common/CustomDropdown';
+import DeleteConfirmModal from '../common/DeleteConfirmModal';
 
 const DistributorsTab = () => {
   const [distributors, setDistributors] = useState([]);
@@ -1317,73 +1318,25 @@ const DistributorsTab = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="modal show" style={{
-          display: 'block',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          zIndex: 1050,
-          overflow: 'auto'
-        }}>
-          <div className="modal-dialog" style={{
-            position: 'relative',
-            margin: '1.75rem auto',
-            maxWidth: '500px'
-          }}>
-            <div className="modal-content" style={{
-              backgroundColor: '#fff',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-            }}>
-              <div className="modal-header">
-                <h5 className="modal-title">Confirm Delete Payment</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isDeleting}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p>Are you sure you want to delete this payment?</p>
-                {deleteTarget && (
-                  <div style={{ backgroundColor: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
-                    <p style={{ margin: '0.5rem 0' }}><strong>Amount:</strong> ₹{parseFloat(deleteTarget.amount).toFixed(2)}</p>
-                    <p style={{ margin: '0.5rem 0' }}><strong>Type:</strong> {deleteTarget.payment_type === 'advance' ? 'Advance' : 'Order Payment'}</p>
-                    <p style={{ margin: '0.5rem 0' }}><strong>Date:</strong> {new Date(deleteTarget.payment_date).toLocaleDateString()}</p>
-                    {deleteTarget.bill_number && <p style={{ margin: '0.5rem 0' }}><strong>Bill:</strong> {deleteTarget.bill_number}</p>}
-                  </div>
-                )}
-                <p style={{ marginTop: '1rem', color: '#dc3545', fontWeight: '600' }}>
-                  This action will refund ₹{deleteTarget ? parseFloat(deleteTarget.amount).toFixed(2) : '0.00'} to your organization balance and update the distributor's outstanding amount.
-                </p>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={confirmDeletePayment}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Payment'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        isOpen={showDeleteConfirm && deleteTarget !== null}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeletePayment}
+        isDeleting={isDeleting}
+        title="Delete Payment"
+        message="Are you sure you want to delete this payment? This will reverse the transaction and update all related balances."
+        details={deleteTarget ? [
+          { label: 'Amount', value: `₹${parseFloat(deleteTarget.amount).toFixed(2)}`, highlight: true },
+          { label: 'Type', value: deleteTarget.payment_type === 'advance' ? 'Advance Payment' : deleteTarget.payment_type === 'opening_balance_payment' ? 'Opening Balance Payment' : 'Order Payment' },
+          { label: 'Payment Date', value: new Date(deleteTarget.payment_date).toLocaleDateString() },
+          ...(deleteTarget.bill_number ? [{ label: 'Bill Number', value: deleteTarget.bill_number }] : []),
+          ...(deleteTarget.payment_from ? [{ label: 'Paid From', value: deleteTarget.payment_from === 'cash_balance' ? 'Cash Balance' : deleteTarget.payment_from === 'bank_balance' ? 'Bank Balance' : 'Gala Balance' }] : []),
+          ...(deleteTarget.notes ? [{ label: 'Notes', value: deleteTarget.notes }] : [])
+        ] : []}
+        warningMessage={`Deleting this payment will refund ₹${deleteTarget ? parseFloat(deleteTarget.amount).toFixed(2) : '0.00'} to your organization balance and update the distributor's outstanding amount.`}
+        confirmButtonText="Delete Payment"
+        type="danger"
+      />
     </>
   );
 };
