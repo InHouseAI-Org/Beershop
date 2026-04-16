@@ -25,6 +25,8 @@ const OrdersTab = () => {
     misc: '',
     discount: '',
     scheme: '',
+    tcs: '',
+    tds: '',
     paymentOutstandingDate: '',
     remarks: ''
   });
@@ -117,6 +119,8 @@ const OrdersTab = () => {
         misc: order.misc || '',
         discount: order.discount || '',
         scheme: order.scheme || '',
+        tcs: order.tcs || '',
+        tds: order.tds || '',
         paymentOutstandingDate: order.payment_outstanding_date ? new Date(order.payment_outstanding_date).toISOString().split('T')[0] : '',
         remarks: order.remarks || ''
       });
@@ -132,6 +136,8 @@ const OrdersTab = () => {
         misc: '',
         discount: '',
         scheme: '',
+        tcs: '',
+        tds: '',
         paymentOutstandingDate: '',
         remarks: ''
       });
@@ -156,6 +162,8 @@ const OrdersTab = () => {
       misc: '',
       discount: '',
       scheme: '',
+      tcs: '',
+      tds: '',
       paymentOutstandingDate: '',
       remarks: ''
     });
@@ -273,6 +281,8 @@ const OrdersTab = () => {
         misc: formData.misc,
         discount: formData.discount,
         scheme: formData.scheme,
+        tcs: formData.tcs,
+        tds: formData.tds,
         paymentOutstandingDate: formData.paymentOutstandingDate,
         remarks: formData.remarks
       };
@@ -641,6 +651,40 @@ const OrdersTab = () => {
                     style={{ fontSize: '1.125rem', padding: '1rem' }}
                   />
                 </div>
+
+                <div className="form-group">
+                  <label htmlFor="tcs" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                    TCS (₹)
+                  </label>
+                  <input
+                    type="number"
+                    id="tcs"
+                    className="form-control"
+                    value={formData.tcs}
+                    onChange={(e) => setFormData({ ...formData, tcs: e.target.value })}
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    style={{ fontSize: '1.125rem', padding: '1rem' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="tds" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                    TDS (₹)
+                  </label>
+                  <input
+                    type="number"
+                    id="tds"
+                    className="form-control"
+                    value={formData.tds}
+                    onChange={(e) => setFormData({ ...formData, tds: e.target.value })}
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    style={{ fontSize: '1.125rem', padding: '1rem' }}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -707,9 +751,21 @@ const OrdersTab = () => {
                     </p>
                   </div>
                   <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>TCS</p>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700' }}>
+                      +₹{parseFloat(formData.tcs || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>TDS</p>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: '700', color: '#f57c00' }}>
+                      -₹{parseFloat(formData.tds || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex',justifyContent:'space-between', flexDirection: 'column',alignItems:'center', gap: '0.5rem' }}>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>Grand Total</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.5rem', fontWeight: '700', color: '#2e7d32' }}>
-                      ₹{(getTotalOrderValue(formData.orderData) + parseFloat(formData.tax || 0) + parseFloat(formData.misc || 0) - parseFloat(formData.scheme || 0) - parseFloat(formData.discount || 0)).toFixed(2)}
+                      ₹{(getTotalOrderValue(formData.orderData) + parseFloat(formData.tax || 0) + parseFloat(formData.misc || 0) + parseFloat(formData.tcs || 0) - parseFloat(formData.scheme || 0) - parseFloat(formData.discount || 0) - parseFloat(formData.tds || 0)).toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -744,9 +800,11 @@ const OrdersTab = () => {
     return (
       getTotalOrderValue(order.order_data) +
       parseFloat(order.tax || 0) +
-      parseFloat(order.misc || 0) -
+      parseFloat(order.misc || 0) +
+      parseFloat(order.tcs || 0) -
       parseFloat(order.scheme || 0) -
-      parseFloat(order.discount || 0)
+      parseFloat(order.discount || 0) -
+      parseFloat(order.tds || 0)
     );
   };
 
@@ -1029,6 +1087,18 @@ const OrdersTab = () => {
                     -₹{parseFloat(selectedOrder.discount || 0).toFixed(2)}
                   </span>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '1rem', color: '#666' }}>TCS:</span>
+                  <span style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                    +₹{parseFloat(selectedOrder.tcs || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '1rem', color: '#666' }}>TDS:</span>
+                  <span style={{ fontSize: '1.125rem', fontWeight: '600', color: '#f57c00' }}>
+                    -₹{parseFloat(selectedOrder.tds || 0).toFixed(2)}
+                  </span>
+                </div>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -1041,9 +1111,11 @@ const OrdersTab = () => {
                     ₹{(
                       getTotalOrderValue(selectedOrder.order_data) +
                       parseFloat(selectedOrder.tax || 0) +
-                      parseFloat(selectedOrder.misc || 0) -
+                      parseFloat(selectedOrder.misc || 0) +
+                      parseFloat(selectedOrder.tcs || 0) -
                       parseFloat(selectedOrder.scheme || 0) -
-                      parseFloat(selectedOrder.discount || 0)
+                      parseFloat(selectedOrder.discount || 0) -
+                      parseFloat(selectedOrder.tds || 0)
                     ).toFixed(2)}
                   </span>
                 </div>

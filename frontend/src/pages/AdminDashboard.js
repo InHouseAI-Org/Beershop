@@ -17,6 +17,8 @@ import SchemesTab from '../components/admin/SchemesTab';
 import RecurringExpensesTab from '../components/admin/RecurringExpensesTab';
 import BalanceSheetTab from '../components/admin/BalanceSheetTab';
 import BalanceLedgerTab from '../components/admin/BalanceLedgerTab';
+import TCSLedgerTab from '../components/admin/TCSLedgerTab';
+import TDSLedgerTab from '../components/admin/TDSLedgerTab';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -37,6 +39,8 @@ const AdminDashboard = () => {
     { id: 'distributors', label: 'Distributors', path: 'distributors' },
     { id: 'schemes', label: 'Schemes', path: 'schemes' },
     { id: 'inventory', label: 'Inventory', path: 'inventory' },
+    { id: 'tcsLedger', label: 'TCS Ledger', path: 'tcs-ledger' },
+    { id: 'tdsLedger', label: 'TDS Ledger', path: 'tds-ledger' },
     { id: 'users', label: 'Users', path: 'users' }
   ];
 
@@ -174,6 +178,8 @@ const AdminDashboard = () => {
             <Route path="distributors" element={<DistributorsTab />} />
             <Route path="schemes" element={<SchemesTab />} />
             <Route path="orders" element={<OrdersTab />} />
+            <Route path="tcs-ledger" element={<TCSLedgerTab />} />
+            <Route path="tds-ledger" element={<TDSLedgerTab />} />
             <Route path="users" element={<UsersTab />} />
             {/* Redirect unknown paths to dashboard */}
             <Route path="*" element={<Navigate to="/admin" replace />} />

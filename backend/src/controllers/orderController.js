@@ -44,7 +44,7 @@ const getOrder = async (req, res) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks, billNumber } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, tcs, tds, paymentOutstandingDate, orderDate, remarks, billNumber } = req.body;
 
     if (!distributorId) {
       return res.status(400).json({ error: 'Please provide distributor ID' });
@@ -78,6 +78,8 @@ const createOrder = async (req, res) => {
       misc: misc || 0,
       discount: discount || 0,
       scheme: scheme || 0,
+      tcs: tcs || 0,
+      tds: tds || 0,
       paymentOutstandingDate: paymentOutstandingDate || null,
       remarks: remarks || ''
     });
@@ -118,7 +120,7 @@ const updateOrder = async (req, res) => {
     await client.query('BEGIN');
 
     const { id } = req.params;
-    const { distributorId, orderData, tax, misc, discount, scheme, paymentOutstandingDate, orderDate, remarks, billNumber } = req.body;
+    const { distributorId, orderData, tax, misc, discount, scheme, tcs, tds, paymentOutstandingDate, orderDate, remarks, billNumber } = req.body;
 
     const order = await db.getOrderById(id);
 
@@ -182,6 +184,8 @@ const updateOrder = async (req, res) => {
     if (misc !== undefined) updates.misc = misc;
     if (discount !== undefined) updates.discount = discount;
     if (scheme !== undefined) updates.scheme = scheme;
+    if (tcs !== undefined) updates.tcs = tcs;
+    if (tds !== undefined) updates.tds = tds;
     if (paymentOutstandingDate !== undefined) updates.paymentOutstandingDate = paymentOutstandingDate || null;
     if (orderDate !== undefined) updates.orderDate = orderDate;
     if (remarks !== undefined) updates.remarks = remarks;

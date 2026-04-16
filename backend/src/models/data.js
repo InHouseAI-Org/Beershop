@@ -776,8 +776,8 @@ const dataHelpers = {
 
   createOrder: async (orderData) => {
     const result = await pool.query(
-      `INSERT INTO orders (organisation_id, distributor_id, order_date, bill_number, order_data, tax, misc, discount, scheme, payment_outstanding_date, remarks)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO orders (organisation_id, distributor_id, order_date, bill_number, order_data, tax, misc, discount, scheme, tcs, tds, payment_outstanding_date, remarks)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         orderData.organisationId,
@@ -789,6 +789,8 @@ const dataHelpers = {
         orderData.misc || 0,
         orderData.discount || 0,
         orderData.scheme || 0,
+        orderData.tcs || 0,
+        orderData.tds || 0,
         orderData.paymentOutstandingDate || null,
         orderData.remarks || ''
       ]
@@ -809,6 +811,8 @@ const dataHelpers = {
       misc: 'misc',
       discount: 'discount',
       scheme: 'scheme',
+      tcs: 'tcs',
+      tds: 'tds',
       paymentOutstandingDate: 'payment_outstanding_date',
       remarks: 'remarks'
     };
