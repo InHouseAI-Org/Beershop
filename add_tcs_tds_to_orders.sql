@@ -91,8 +91,7 @@ BEGIN
       tcs_amount,
       order_date,
       bill_number,
-      payment_status,
-      created_by
+      payment_status
     ) VALUES (
       NEW.organisation_id,
       NEW.id,
@@ -100,8 +99,7 @@ BEGIN
       NEW.tcs,
       NEW.order_date,
       NEW.bill_number,
-      'pending',
-      NEW.created_by
+      'pending'
     );
   END IF;
 
@@ -114,8 +112,7 @@ BEGIN
       tds_amount,
       order_date,
       bill_number,
-      payment_status,
-      created_by
+      payment_status
     ) VALUES (
       NEW.organisation_id,
       NEW.id,
@@ -123,8 +120,7 @@ BEGIN
       NEW.tds,
       NEW.order_date,
       NEW.bill_number,
-      'pending',
-      NEW.created_by
+      'pending'
     );
   END IF;
 
