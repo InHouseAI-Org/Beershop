@@ -1116,7 +1116,7 @@ const DistributorsTab = () => {
                       const itemsTotal = order.order_data && Array.isArray(order.order_data)
                         ? order.order_data.reduce((sum, item) => sum + parseFloat(item.total || 0), 0)
                         : 0;
-                      const grandTotal = itemsTotal + parseFloat(order.tax || 0) + parseFloat(order.misc || 0) - parseFloat(order.scheme || 0) - parseFloat(order.discount || 0);
+                      const grandTotal = itemsTotal + parseFloat(order.tax || 0) + parseFloat(order.misc || 0) + parseFloat(order.tcs || 0) + parseFloat(order.tds || 0) - parseFloat(order.scheme || 0) - parseFloat(order.discount || 0);
 
                       return (
                         <tr key={order.id}>
@@ -1149,7 +1149,7 @@ const DistributorsTab = () => {
                           const itemsTotal = order.order_data && Array.isArray(order.order_data)
                             ? order.order_data.reduce((s, item) => s + parseFloat(item.total || 0), 0)
                             : 0;
-                          return sum + itemsTotal + parseFloat(order.tax || 0) + parseFloat(order.misc || 0) - parseFloat(order.scheme || 0) - parseFloat(order.discount || 0);
+                          return sum + itemsTotal + parseFloat(order.tax || 0) + parseFloat(order.misc || 0) + parseFloat(order.tcs || 0) + parseFloat(order.tds || 0) - parseFloat(order.scheme || 0) - parseFloat(order.discount || 0);
                         }, 0).toFixed(2)}
                       </td>
                     </tr>

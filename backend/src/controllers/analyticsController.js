@@ -157,6 +157,14 @@ const getMonthlyAnalytics = async (req, res) => {
             }
           });
         }
+        // Add tax, misc, tcs, tds and subtract discount and scheme
+        totalOrderValue += parseFloat(order.tax || 0);
+        totalOrderValue += parseFloat(order.misc || 0);
+        totalOrderValue += parseFloat(order.tcs || 0);
+        totalOrderValue += parseFloat(order.tds || 0);
+        totalOrderValue -= parseFloat(order.discount || 0);
+        totalOrderValue -= parseFloat(order.scheme || 0);
+
         distributorOrdersMap[order.distributor_id].data[month] += totalOrderValue;
       }
     });

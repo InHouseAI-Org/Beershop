@@ -328,7 +328,7 @@ const dataHelpers = {
 
     // Get total quantity ordered so far for this product
     const orderStats = await pool.query(
-      `SELECT COALESCE(SUM((item->>'quantity')::integer), 0) as total_quantity
+      `SELECT COALESCE(SUM((item->>'qty')::numeric), 0) as total_quantity
        FROM orders, jsonb_array_elements(order_data) as item
        WHERE organisation_id = (SELECT organisation_id FROM products WHERE id = $1)
        AND (item->>'product_id')::uuid = $1`,

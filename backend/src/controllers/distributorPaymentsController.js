@@ -134,7 +134,7 @@ const getUnpaidBills = async (req, res) => {
         (
           SELECT COALESCE(SUM((item->>'total')::DECIMAL), 0)
           FROM jsonb_array_elements(o.order_data) as item
-        ) + COALESCE(o.tax, 0) + COALESCE(o.misc, 0) - COALESCE(o.discount, 0) - COALESCE(o.scheme, 0) as total_amount,
+        ) + COALESCE(o.tax, 0) + COALESCE(o.misc, 0) + COALESCE(o.tcs, 0) + COALESCE(o.tds, 0) - COALESCE(o.discount, 0) - COALESCE(o.scheme, 0) as total_amount,
         COALESCE(
           (SELECT SUM(amount) FROM distributor_payments WHERE order_id = o.id),
           0
@@ -189,7 +189,7 @@ const getOpeningBalanceLimit = async (req, res) => {
         (
           SELECT COALESCE(SUM((item->>'total')::DECIMAL), 0)
           FROM jsonb_array_elements(o.order_data) as item
-        ) + COALESCE(o.tax, 0) + COALESCE(o.misc, 0) - COALESCE(o.discount, 0) - COALESCE(o.scheme, 0)
+        ) + COALESCE(o.tax, 0) + COALESCE(o.misc, 0) + COALESCE(o.tcs, 0) + COALESCE(o.tds, 0) - COALESCE(o.discount, 0) - COALESCE(o.scheme, 0)
       ), 0) as unlogged_total
       FROM orders o
       WHERE o.distributor_id = $1
