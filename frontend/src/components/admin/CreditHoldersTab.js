@@ -3,6 +3,7 @@ import api from '../../utils/api';
 import MobileTable from '../common/MobileTable';
 import CustomDropdown from '../common/CustomDropdown';
 import DeleteConfirmModal from '../common/DeleteConfirmModal';
+import { exportCreditHistoryToPDF } from '../../utils/pdfExport';
 
 const CreditHoldersTab = () => {
   const [creditHolders, setCreditHolders] = useState([]);
@@ -213,6 +214,12 @@ const CreditHoldersTab = () => {
       setError(err.response?.data?.error || 'Failed to delete collection');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (selectedCreditHolder && creditHolderHistory) {
+      exportCreditHistoryToPDF(selectedCreditHolder, creditHolderHistory);
     }
   };
 
@@ -523,15 +530,24 @@ const CreditHoldersTab = () => {
       {showCreditHolderHistory && selectedCreditHolder && (
         <div className="modal-overlay" onClick={handleCloseCreditHolderHistory}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h2 style={{ margin: 0 }}>Credit History - {selectedCreditHolder.name}</h2>
-              <button
-                onClick={handleCloseCreditHolderHistory}
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem' }}
-              >
-                Close
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={handleExportPDF}
+                  className="btn btn-primary"
+                  style={{ padding: '0.5rem 1rem', background: '#2196F3', borderColor: '#000' }}
+                >
+                  Export PDF
+                </button>
+                <button
+                  onClick={handleCloseCreditHolderHistory}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.5rem 1rem' }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
             {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
