@@ -1,5 +1,5 @@
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /**
  * Export credit holder history to PDF
@@ -44,7 +44,7 @@ export const exportCreditHistoryToPDF = (creditHolder, history) => {
     ['Current Outstanding:', `₹${parseFloat(creditHolder.amount_payable || 0).toFixed(2)}`]
   ];
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: 45,
     head: [],
     body: holderDetails,
@@ -79,7 +79,7 @@ export const exportCreditHistoryToPDF = (creditHolder, history) => {
     ['Current Outstanding:', `₹${parseFloat(creditHolder.amount_payable || 0).toFixed(2)}`]
   ];
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: currentY,
     head: [],
     body: summaryData,
@@ -118,7 +118,7 @@ export const exportCreditHistoryToPDF = (creditHolder, history) => {
   });
 
   // Add transaction table
-  doc.autoTable({
+  autoTable(doc, {
     startY: currentY + 5,
     head: [['Date & Time', 'Type', 'Amount', 'Collected In', 'Prev. Balance', 'New Balance', 'User']],
     body: transactionData,
